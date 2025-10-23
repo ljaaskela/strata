@@ -48,9 +48,4 @@ public:
     }
 };
 
-[[maybe_unused]]
-IRegistry& GetRegistry();
-
-
-
 #endif // INTF_REGISTRY_H

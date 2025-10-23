@@ -15,7 +15,6 @@ using Uid = uint64_t;
 
 using std::vector;
 
-//template <typename Str>
 constexpr Uid MakeHash(const std::string_view toHash)
 {
     static_assert(sizeof(Uid) == 8);

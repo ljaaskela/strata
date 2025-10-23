@@ -1,6 +1,7 @@
 #ifndef EXT_EVENT_H
 #define EXT_EVENT_H
 
+#include <api/ltk.h>
 #include <common.h>
 #include <interface/intf_event.h>
 #include <interface/intf_registry.h>
