@@ -2,7 +2,6 @@
 #include "event.h"
 #include "function.h"
 #include "property.h"
-#include <api/property.h>
 #include <ext/any.h>
 #include <interface/types.h>
 #include <iostream>
@@ -82,11 +81,4 @@ IProperty::Ptr Registry::CreateProperty(Uid type, const IAny::Ptr &value) const
         }
     }
     return {};
-}
-
-
-IRegistry& GetRegistry()
-{
-    static Registry r;
-    return *(r.GetInterface<IRegistry>());
 }

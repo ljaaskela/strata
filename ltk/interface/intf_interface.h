@@ -70,7 +70,11 @@ public:
         return *this;
     }
     constexpr refcnt_ptr(const refcnt_ptr &o) noexcept { reset(o.ptr_); }
-    constexpr refcnt_ptr(refcnt_ptr &&o) noexcept { ptr_ = std::exchange(o.ptr_, nullptr); }
+    constexpr refcnt_ptr(refcnt_ptr &&o) noexcept
+    {
+        release();
+        ptr_ = std::exchange(o.ptr_, nullptr);
+    }
     operator bool() const noexcept { return ptr_ != nullptr; }
     T *operator->() noexcept { return ptr_; }
     const T *operator->() const noexcept { return ptr_; }
