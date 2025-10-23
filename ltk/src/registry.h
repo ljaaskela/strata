@@ -4,7 +4,6 @@
 #include <common.h>
 #include <ext/object.h>
 #include <interface/intf_registry.h>
-#include <functional>
 #include <map>
 
 class Registry final : public Object<Registry, IRegistry>
@@ -23,6 +22,5 @@ public:
 private:
     std::map<Uid, const IObjectFactory *> types_;
 };
-
 
 #endif // REGISTRY_H
