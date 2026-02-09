@@ -77,6 +77,12 @@ inline bool IsCompatible(const IAny::ConstPtr &any)
     return IsCompatible(any, TypeUid<T>());
 }
 
+/** @copydoc IsCompatible(const IAny&, Uid) */
+inline bool IsCompatible(const IAny::RefPtr &any, Uid type)
+{
+    return any && IsCompatible(*(any.get()), type);
+}
+
 /**
  * @brief Returns the first type UID that both any objects are compatible with, or 0 if none.
  */

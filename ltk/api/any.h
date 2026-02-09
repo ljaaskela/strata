@@ -16,15 +16,26 @@ public:
     operator bool() const noexcept { return any_.operator bool(); }
 
 protected:
-    void SetAny(const IAny &any) { any_ = refcnt_ptr<IAny>(const_cast<IAny *>(&any)); }
-    void SetAny(const IAny::ConstPtr &any)
-    {
-        if (any) {
-            SetAny(*(any.get()));
-        }
-    }
     ConstAny() = default;
     virtual ~ConstAny() = default;
+
+    void SetAny(const IAny &any, const Uid &req) noexcept
+    {
+        if (IsCompatible(any, req)) {
+            SetAnyDirect(any);
+        }
+    }
+    void SetAny(const IAny::ConstPtr &any, const Uid &req) noexcept
+    {
+        if (IsCompatible(any, req)) {
+            SetAnyDirect(any);
+        }
+    }
+    void SetAnyDirect(const IAny &any) noexcept
+    {
+        any_ = refcnt_ptr<IAny>(const_cast<IAny *>(&any));
+    }
+    void SetAnyDirect(const IAny::ConstPtr &any) noexcept { SetAnyDirect(*(any.get())); }
     refcnt_ptr<IAny> any_;
 };
 
@@ -33,8 +44,8 @@ class Any : public ConstAny
 {
 public:
     operator IAny *() { return any_.get(); }
-    const IAny *GetAnyInterface() { return any_.get(); }
     bool CopyFrom(const IAny &other) { return any_ && any_->CopyFrom(other); }
+    IAny *GetAnyInterface() { return any_.get(); }
 
 protected:
     Any() = default;
@@ -59,22 +70,10 @@ public:
     template<class Flag = std::enable_if_t<IsReadWrite>>
     constexpr AnyT(const IAny::Ptr &any) noexcept
     {
-        if (IsCompatible(any, TYPE_UID)) {
-            SetAny(any);
-        }
+        SetAny(any, TYPE_UID);
     }
-    constexpr AnyT(const IAny::ConstPtr &any) noexcept
-    {
-        if (IsCompatible(any, TYPE_UID)) {
-            SetAny(any);
-        }
-    }
-    constexpr AnyT(const IAny &any) noexcept
-    {
-        if (IsCompatible(any, TYPE_UID)) {
-            SetAny(any);
-        }
-    }
+    constexpr AnyT(const IAny::ConstPtr &any) noexcept { SetAny(any, TYPE_UID); }
+    constexpr AnyT(const IAny &any) noexcept { SetAny(any, TYPE_UID); }
     constexpr AnyT(IAny &&any) noexcept
     {
         if (IsCompatible(any, TYPE_UID)) {
@@ -84,10 +83,11 @@ public:
     AnyT() noexcept { Create(); }
     AnyT(const T &value) noexcept
     {
-        if (auto any = GetRegistry().CreateAny(TYPE_UID)) {
-            any->SetData(&value, TYPE_SIZE, TYPE_UID);
+        if (!IsCompatible(any_, TYPE_UID)) {
+            auto any = GetRegistry().CreateAny(TYPE_UID);
             any_.reset(any.get());
         }
+        any_->SetData(&value, TYPE_SIZE, TYPE_UID);
     }
     operator const IAny &() const noexcept { return *(any_.get()); }
 
@@ -111,7 +111,7 @@ public:
     static const AnyT<const T> ConstRef(const IAny::ConstPtr &ref) { return AnyT<const T>(ref); }
 
 protected:
-    void Create() { SetAny(GetRegistry().CreateAny(TYPE_UID)); }
+    void Create() { SetAnyDirect(GetRegistry().CreateAny(TYPE_UID)); }
 };
 
 #endif // ANY_H
