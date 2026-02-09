@@ -15,7 +15,7 @@ using Uid = uint64_t;
 
 using std::vector;
 
-constexpr Uid MakeHash(const std::string_view toHash)
+constexpr Uid make_hash(const std::string_view toHash)
 {
     static_assert(sizeof(Uid) == 8);
     // FNV-1a 64 bit algorithm
@@ -76,10 +76,10 @@ constexpr std::string_view GetName()
 template<class... T>
 constexpr Uid TypeUid()
 {
-    return MakeHash(GetName<T...>());
+    return make_hash(GetName<T...>());
 }
 
-#define MakeInterfaceUid(type) MakeHash(#type)
-#define MakeClassUid(className) MakeHash(#className)
+#define MakeInterfaceUid(type) make_hash(#type)
+#define MakeClassUid(className) make_hash(#className)
 
 #endif // COMMON_H
