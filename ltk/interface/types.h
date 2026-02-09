@@ -38,6 +38,58 @@ typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
     return nullptr;
 }
 
+/**
+ * @brief Casts a shared const IInterface pointer to a derived const interface type.
+ * @tparam T The target interface type.
+ * @tparam U Deduced element type of the shared_ptr. Must be const-qualified (SFINAE).
+ * @param obj The source pointer.
+ * @return A shared_ptr<const T> if the interface is supported, nullptr otherwise.
+ */
+template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
+typename T::ConstPtr interface_pointer_cast(const std::shared_ptr<U> &obj)
+{
+    if (obj && obj->GetInterface(T::UID)) {
+        return std::dynamic_pointer_cast<const T>(obj);
+    }
+    return nullptr;
+}
+
+/**
+ * @brief Casts an IInterface pointer to a derived interface type.
+ * @tparam T The target interface type.
+ * @param obj The source pointer.
+ * @return A pointer to T if the interface is supported, nullptr otherwise.
+ */
+template <class T>
+T *interface_cast(IInterface *obj)
+{
+    return obj ? obj->GetInterface<T>() : nullptr;
+}
+
+/** @copydoc interface_cast(IInterface*) */
+template <class T>
+const T *interface_cast(const IInterface *obj)
+{
+    return obj ? obj->GetInterface<T>() : nullptr;
+}
+
+/** @copydoc interface_cast(IInterface*) */
+template <class T>
+T *interface_cast(const IInterface::Ptr &obj)
+{
+    return obj ? obj->GetInterface<T>() : nullptr;
+}
+
+/**
+ * @copydoc interface_cast(IInterface*)
+ * @tparam U Deduced element type of the shared_ptr. Must be const-qualified (SFINAE).
+ */
+template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
+const T *interface_cast(const std::shared_ptr<U> &obj)
+{
+    return obj ? obj->GetInterface<T>() : nullptr;
+}
+
 /** @brief Standard return codes for LTK operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t {
     SUCCESS = 0,         ///< Operation succeeded.

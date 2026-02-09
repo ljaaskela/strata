@@ -16,7 +16,7 @@ public:
     Function(CallbackFn *cb)
     {
         fn_ = GetRegistry().Create<IFunction>(ClassId::Function);
-        if (auto internal = interface_pointer_cast<IFunctionInternal>(fn_); internal && cb) {
+        if (auto internal = interface_cast<IFunctionInternal>(fn_); internal && cb) {
             internal->SetInvokeCallback(cb);
         }
     }

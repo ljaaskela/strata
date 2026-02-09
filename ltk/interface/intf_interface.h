@@ -39,7 +39,9 @@ class IInterface : NoCopyMove
 public:
     static constexpr Uid UID = 0;
     using Ptr = std::shared_ptr<IInterface>;
+    using ConstPtr = std::shared_ptr<const IInterface>;
     using WeakPtr = std::weak_ptr<IInterface>;
+    using ConstWeakPtrr = std::weak_ptr<const IInterface>;
 
 public:
     /** @brief Returns a pointer to the requested interface, or nullptr if not supported. */
