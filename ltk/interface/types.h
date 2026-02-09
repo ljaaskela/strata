@@ -12,7 +12,7 @@ struct ClassInfo
 
 #define DECLARE_CLASS(Name) \
     namespace ClassId { \
-    [[maybe_unused]] static constexpr ClassInfo Name{MakeHash(#Name), #Name}; \
+    [[maybe_unused]] static constexpr ClassInfo Name{make_hash(#Name), #Name}; \
     }
 
 // Built-in classes
