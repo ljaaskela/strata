@@ -147,7 +147,12 @@ public:
     static constexpr std::string_view GetClassName() noexcept { return GetName<FinalClass>(); }
     static constexpr Uid GetClassUid() noexcept { return TypeUid<FinalClass>(); }
 
-    void SetSelf(const IObject::Ptr &self) override { self_ = self; }
+    void SetSelf(const IObject::Ptr &self) override
+    {
+        if (self_.expired()) { // Only allow one set (called by factory)
+            self_ = self;
+        }
+    }
     IObject::Ptr GetSelf() const override { return self_.lock(); }
 
     template<class T>

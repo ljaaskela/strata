@@ -57,6 +57,14 @@ IInterface::Ptr Registry::Create(Uid uid) const
     return {};
 }
 
+const ClassInfo* Registry::GetClassInfo(Uid classUid) const
+{
+    if (auto fac = types_.find(classUid); fac != types_.end()) {
+        return &fac->second->GetClassInfo();
+    }
+    return nullptr;
+}
+
 IAny::Ptr Registry::CreateAny(Uid type) const
 {
     return interface_pointer_cast<IAny>(Create(type));

@@ -25,6 +25,8 @@ public:
     virtual ReturnValue UnregisterType(const IObjectFactory &factory) = 0;
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr Create(Uid uid) const = 0;
+    /** @brief Returns the ClassInfo for a registered type, or nullptr if not found. */
+    virtual const ClassInfo* GetClassInfo(Uid classUid) const = 0;
     /** @brief Creates a new IAny value container for the given type UID. */
     virtual IAny::Ptr CreateAny(Uid type) const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
