@@ -4,7 +4,6 @@
 #include <api/any.h>
 #include <api/function.h>
 #include <common.h>
-#include <interface/intf_metadata.h>
 #include <interface/intf_property.h>
 #include <interface/intf_registry.h>
 #include <interface/types.h>
@@ -59,6 +58,12 @@ protected:
     }
 
     Property() = default;
+    explicit Property(IProperty::Ptr existing) : prop_(std::move(existing))
+    {
+        if (prop_) {
+            internal_ = prop_->GetInterface<IPropertyInternal>();
+        }
+    }
     IProperty::Ptr prop_;
     IPropertyInternal *internal_{};
 };
@@ -81,6 +86,7 @@ public:
         Create();
         Set(value);
     }
+    explicit PropertyT(IProperty::Ptr existing) : Property(std::move(existing)) {}
     Uid GetTypeUid() const override
     {
         return TYPE_UID;
@@ -97,24 +103,6 @@ public:
             // This is a bit suboptimal as we create a new any object to wrap the value
             auto v = AnyT<T>(value);
             prop_->SetValue(v);
-        }
-    }
-};
-
-/**
- * @brief Typed property_ptr with Get/Set accessors for type T.
- * @tparam T The value type of the property.
- */
-template<class T>
-class property_ptr_t : public property_ptr
-{
-public:
-    T Get() { return prop_ ? AnyT<T>(prop_->GetValue()).Get() : T{}; }
-    void Set(const T &value)
-    {
-        if (prop_) {
-            // This is a bit suboptimal as we create a new any object to wrap the value
-            prop_->SetValue(AnyT<T>(value));
         }
     }
 };

@@ -28,6 +28,12 @@ struct NoCopyMove : public NoCopy, public NoMove
     ~NoCopyMove() = default;
 };
 
+/** @brief Static descriptor for an interface type, providing its UID and name. */
+struct InterfaceInfo {
+    Uid uid;
+    std::string_view name;
+};
+
 /**
  * @brief Root interface for all LTK interfaces.
  *
@@ -90,6 +96,7 @@ class Interface : public IInterface
 {
 public:
     static constexpr Uid UID = TypeUid<T>();
+    static constexpr InterfaceInfo INFO { TypeUid<T>(), GetName<T>() };
     using Ptr = std::shared_ptr<T>;
     using ConstPtr = std::shared_ptr<const T>;
     using WeakPtr = std::weak_ptr<T>;
