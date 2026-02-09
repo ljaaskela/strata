@@ -65,7 +65,6 @@ public:
         }
     }
 
-    NO_COPY_MOVE(BaseObject)
 public:
     BaseObject() = default;
     ~BaseObject() override = default;
@@ -84,7 +83,6 @@ private:
 template<class FinalClass>
 class ObjectFactory : public IObjectFactory
 {
-    NO_COPY_MOVE(ObjectFactory)
 public:
     ObjectFactory() = default;
     ~ObjectFactory() override = default;
@@ -155,7 +153,7 @@ public:
 #define IMPLEMENT_CLASS_GENERATE_INFO(Name) \
 public: \
     static constexpr const std::string_view GetClassName() { return #Name; } \
-    static constexpr Uid GetClassUid() { return MakeHash(#Name); } \
+    static constexpr Uid GetClassUid() { return make_hash(#Name); } \
 \
 private:
 
