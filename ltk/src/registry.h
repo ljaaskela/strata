@@ -15,6 +15,7 @@ public:
     ReturnValue UnregisterType(const IObjectFactory &factory) override;
     IInterface::Ptr Create(Uid uid) const override;
 
+    const ClassInfo* GetClassInfo(Uid classUid) const override;
     IAny::Ptr CreateAny(Uid type) const override;
     IProperty::Ptr CreateProperty(Uid type, const IAny::Ptr& value) const override;
 

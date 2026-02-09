@@ -1,14 +1,18 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <array_view.h>
 #include <common.h>
 #include <interface/intf_interface.h>
 
-/** @brief Describes a registered class with its UID and human-readable name. */
+struct MemberDesc; // Forward declaration
+
+/** @brief Describes a registered class with its UID, name, and static metadata. */
 struct ClassInfo
 {
     const Uid uid;
     const std::string_view name;
+    const array_view<MemberDesc> members; // empty when no metadata
 };
 
 // Forward declarations for built-in implementation classes.
@@ -63,21 +67,21 @@ typename T::ConstPtr interface_pointer_cast(const std::shared_ptr<U> &obj)
 template <class T>
 T *interface_cast(IInterface *obj)
 {
-    return obj ? obj->GetInterface<T>() : nullptr;
+    return obj ? obj->template GetInterface<T>() : nullptr;
 }
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T>
 const T *interface_cast(const IInterface *obj)
 {
-    return obj ? obj->GetInterface<T>() : nullptr;
+    return obj ? obj->template GetInterface<T>() : nullptr;
 }
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T>
 T *interface_cast(const IInterface::Ptr &obj)
 {
-    return obj ? obj->GetInterface<T>() : nullptr;
+    return obj ? obj->template GetInterface<T>() : nullptr;
 }
 
 /**
@@ -87,7 +91,7 @@ T *interface_cast(const IInterface::Ptr &obj)
 template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
 const T *interface_cast(const std::shared_ptr<U> &obj)
 {
-    return obj ? obj->GetInterface<T>() : nullptr;
+    return obj ? obj->template GetInterface<T>() : nullptr;
 }
 
 /** @brief Standard return codes for LTK operations. Non-negative values indicate success. */

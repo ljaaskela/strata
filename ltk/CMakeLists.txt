@@ -5,6 +5,10 @@ project(ltk LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MSVC)
+    add_compile_options(/Zc:preprocessor)
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(ltk SHARED
@@ -15,6 +19,7 @@ add_library(ltk SHARED
     src/function.cpp
     src/function.h
     src/ltk_export.h
+    array_view.h
     common.h
     src/registry.cpp
     src/registry.h
@@ -37,5 +42,7 @@ add_library(ltk SHARED
     api/ltk.h
     ext/any.h
     ext/object.h
+    ext/metadata.h
+    ext/meta_object.h
     ext/event.h
     )

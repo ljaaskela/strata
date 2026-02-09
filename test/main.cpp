@@ -4,6 +4,7 @@
 #include <api/function.h>
 #include <api/property.h>
 #include <ext/any.h>
+#include <ext/meta_object.h>
 #include <interface/intf_external_any.h>
 #include <interface/intf_property.h>
 #include <interface/intf_registry.h>
@@ -55,11 +56,36 @@ public:
 private:
 };
 
+class IMyWidget : public Interface<IMyWidget>
+{
+public:
+    LTK_INTERFACE(
+        (PROP, float, Width),
+        (PROP, float, Height),
+        (EVT, OnClicked),
+        (FN, Reset)
+    )
+};
+
+class ISerializable : public Interface<ISerializable>
+{
+public:
+    LTK_INTERFACE(
+        (PROP, std::string, Name),
+        (FN, Serialize)
+    )
+};
+
+class MyWidget : public MetaObject<MyWidget, IMyWidget, ISerializable>
+{
+};
+
 int main()
 {
     auto &r = GetRegistry();
 
     r.RegisterType<MyDataAny>();
+    r.RegisterType<MyWidget>();
 
     auto prop = PropertyT<float>();
     prop.Set(5.f);
@@ -107,6 +133,64 @@ int main()
     std::cout << "sizeof(SimpleAny<float>) " << sizeof(SimpleAny<float>) << std::endl;
     std::cout << "sizeof(PropertyT<float>) " << sizeof(PropertyT<float>) << std::endl;
     std::cout << "sizeof(MyDataAny)        " << sizeof(MyDataAny) << std::endl;
+
+    // --- Static metadata via registry (no instance needed) ---
+    std::cout << "\n--- MyWidget static metadata ---" << std::endl;
+    if (auto* info = r.GetClassInfo(MyWidget::GetClassUid())) {
+        std::cout << "Class: " << info->name << " (" << info->members.size() << " members)" << std::endl;
+        for (auto& m : info->members) {
+            const char* kind = m.kind == MemberKind::Property ? "Property"
+                             : m.kind == MemberKind::Event    ? "Event"
+                                                              : "Function";
+            std::cout << "  " << kind << " \"" << m.name << "\"";
+            if (m.interfaceInfo) {
+                std::cout << " (from " << m.interfaceInfo->name << ")";
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    // --- Runtime metadata via IMetaData ---
+    std::cout << "\n--- MyWidget instance metadata ---" << std::endl;
+    auto widget = r.Create<IObject>(MyWidget::GetClassUid());
+    if (auto* meta = interface_cast<IMetaData>(widget)) {
+        for (auto& m : meta->GetMembers()) {
+            std::cout << "  member: " << m.name << std::endl;
+        }
+        if (auto p = meta->GetProperty("Width")) {
+            std::cout << "  GetProperty(\"Width\") ok" << std::endl;
+        }
+        if (auto e = meta->GetEvent("OnClicked")) {
+            std::cout << "  GetEvent(\"OnClicked\") ok" << std::endl;
+        }
+        if (auto f = meta->GetFunction("Reset")) {
+            std::cout << "  GetFunction(\"Reset\") ok" << std::endl;
+        }
+        if (!meta->GetProperty("Bogus")) {
+            std::cout << "  GetProperty(\"Bogus\") correctly returned null" << std::endl;
+        }
+    }
+
+    // --- Typed access via IMyWidget interface ---
+    std::cout << "\n--- MyWidget via IMyWidget interface ---" << std::endl;
+    if (auto* iw = interface_cast<IMyWidget>(widget)) {
+        auto width = iw->Width();
+        width.Set(42.f);
+        std::cout << "  Width().Set(42) -> Width().Get() = " << iw->Width().Get() << std::endl;
+
+        std::cout << "  Height() ok: " << (iw->Height() ? "yes" : "no") << std::endl;
+        std::cout << "  OnClicked() ok: " << (iw->OnClicked() ? "yes" : "no") << std::endl;
+        std::cout << "  Reset() ok: " << (iw->Reset() ? "yes" : "no") << std::endl;
+    }
+
+    // --- Typed access via ISerializable interface ---
+    std::cout << "\n--- MyWidget via ISerializable interface ---" << std::endl;
+    if (auto* is = interface_cast<ISerializable>(widget)) {
+        auto name = is->Name();
+        name.Set(std::string("MyWidget1"));
+        std::cout << "  Name().Set(\"MyWidget1\") -> Name().Get() = " << is->Name().Get() << std::endl;
+        std::cout << "  Serialize() ok: " << (is->Serialize() ? "yes" : "no") << std::endl;
+    }
 
     return 0;
 }
