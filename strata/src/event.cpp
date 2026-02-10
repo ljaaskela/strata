@@ -1,5 +1,7 @@
 #include "event.h"
 
+namespace strata {
+
 ReturnValue EventImpl::Invoke(const IAny *args) const
 {
     for (const auto &h : handlers_) {
@@ -39,3 +41,5 @@ ReturnValue EventImpl::RemoveHandler(const IFunction::ConstPtr &fn) const
     }
     return ReturnValue::NOTHING_TO_DO;
 }
+
+} // namespace strata

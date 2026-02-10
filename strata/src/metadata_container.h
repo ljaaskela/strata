@@ -6,6 +6,8 @@
 #include <interface/intf_registry.h>
 #include <vector>
 
+namespace strata {
+
 class MetadataContainer final : public BaseObject<IMetadata>
 {
 public:
@@ -24,5 +26,7 @@ private:
     mutable std::vector<std::pair<std::string_view, IEvent::Ptr>> events_;
     mutable std::vector<std::pair<std::string_view, IFunction::Ptr>> functions_;
 };
+
+} // namespace strata
 
 #endif // METADATA_CONTAINER_H

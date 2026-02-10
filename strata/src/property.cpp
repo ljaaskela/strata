@@ -1,6 +1,8 @@
 #include "property.h"
 #include <interface/intf_external_any.h>
 
+namespace strata {
+
 ReturnValue PropertyImpl::SetValue(const IAny &from)
 {
     auto ret = ReturnValue::FAIL;
@@ -34,3 +36,5 @@ IAny::Ptr PropertyImpl::GetAny() const
 {
     return data_;
 }
+
+} // namespace strata

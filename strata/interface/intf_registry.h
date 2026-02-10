@@ -9,6 +9,8 @@
 #include <interface/intf_property.h>
 #include <interface/types.h>
 
+namespace strata {
+
 /**
  * @brief Central registry for creating and managing Strata object types.
  *
@@ -60,5 +62,7 @@ public:
         return RegisterType(T::GetFactory());
     }
 };
+
+} // namespace strata
 
 #endif // INTF_REGISTRY_H

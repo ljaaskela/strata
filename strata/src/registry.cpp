@@ -7,6 +7,8 @@
 #include <interface/types.h>
 #include <iostream>
 
+namespace strata {
+
 void RegisterTypes(IRegistry &registry)
 {
     registry.RegisterType<PropertyImpl>();
@@ -98,3 +100,5 @@ IProperty::Ptr Registry::CreateProperty(Uid type, const IAny::Ptr &value) const
     }
     return {};
 }
+
+} // namespace strata

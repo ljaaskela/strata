@@ -3,6 +3,8 @@
 
 #include <common.h>
 
+namespace strata {
+
 /** @brief Mixin (inherit to add behavior) that deletes copy constructor and copy assignment operator. */
 struct NoCopy
 {
@@ -108,5 +110,7 @@ protected:
     Interface() = default;
     ~Interface() override = default;
 };
+
+} // namespace strata
 
 #endif // INTF_INTERFACE_H

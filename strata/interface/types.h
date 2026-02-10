@@ -5,6 +5,8 @@
 #include <common.h>
 #include <interface/intf_interface.h>
 
+namespace strata {
+
 struct MemberDesc; // Forward declaration
 
 /** @brief Describes a registered class with its UID, name, and static metadata. */
@@ -113,5 +115,7 @@ enum ReturnValue : int16_t {
 {
     return ret < 0;
 }
+
+} // namespace strata
 
 #endif

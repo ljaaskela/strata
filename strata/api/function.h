@@ -6,6 +6,8 @@
 #include <ext/object.h>
 #include <interface/intf_function.h>
 
+namespace strata {
+
 /** @brief Convenience wrapper that creates and owns an IFunction with a callback. */
 class Function : public Object<Function>
 {
@@ -30,5 +32,7 @@ public:
 private:
     IFunction::Ptr fn_;
 };
+
+} // namespace strata
 
 #endif // API_FUNCTION_H

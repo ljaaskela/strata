@@ -8,6 +8,8 @@
 
 #include <algorithm>
 
+namespace strata {
+
 /**
  * @brief Base class for IAny implementations built on the Object system.
  * @tparam FinalClass The final derived class (CRTP parameter).
@@ -121,5 +123,7 @@ class SimpleAny final : public SingleTypeAny<SimpleAny<T>, T>
 private:
     T data_;
 };
+
+} // namespace strata
 
 #endif // ANY_H

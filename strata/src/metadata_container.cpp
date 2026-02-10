@@ -1,5 +1,7 @@
 #include "metadata_container.h"
 
+namespace strata {
+
 MetadataContainer::MetadataContainer(array_view<MemberDesc> members, const IRegistry &registry)
     : members_(members), registry_(registry)
 {}
@@ -56,3 +58,5 @@ IFunction::Ptr MetadataContainer::GetFunction(std::string_view name) const
     }
     return {};
 }
+
+} // namespace strata

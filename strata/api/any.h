@@ -7,6 +7,8 @@
 #include <interface/intf_any.h>
 #include <interface/intf_registry.h>
 
+namespace strata {
+
 /** @brief Read-only wrapper around an IAny pointer with reference-counted ownership. */
 class ConstAny
 {
@@ -113,5 +115,7 @@ public:
 protected:
     void Create() { SetAnyDirect(GetRegistry().CreateAny(TYPE_UID)); }
 };
+
+} // namespace strata
 
 #endif // ANY_H

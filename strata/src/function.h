@@ -7,6 +7,8 @@
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
+namespace strata {
+
 class FunctionImpl final : public Object<FunctionImpl, IFunction, IFunctionInternal>
 {
 public:
@@ -17,5 +19,7 @@ public:
 private:
     IFunction::CallableFn *fn_{};
 };
+
+} // namespace strata
 
 #endif // FUNCTION_H

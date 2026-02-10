@@ -9,6 +9,8 @@
 #include <type_traits>
 #include <utility>
 
+namespace strata {
+
 // -- Constexpr metadata collection from interfaces --
 
 /** @brief Gets T::metadata if it exists, otherwise an empty array. */
@@ -48,5 +50,7 @@ struct collected_metadata<First, Rest...> {
         collected_metadata<Rest...>::value
     );
 };
+
+} // namespace strata
 
 #endif // EXT_METADATA_H

@@ -6,6 +6,8 @@
 #include <interface/intf_registry.h>
 #include <map>
 
+namespace strata {
+
 class Registry final : public Object<Registry, IRegistry>
 {
 public:
@@ -22,5 +24,7 @@ public:
 private:
     std::map<Uid, const IObjectFactory *> types_;
 };
+
+} // namespace strata
 
 #endif // REGISTRY_H

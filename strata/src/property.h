@@ -8,6 +8,8 @@
 #include <interface/intf_property.h>
 #include <interface/types.h>
 
+namespace strata {
+
 class PropertyImpl final : public Object<PropertyImpl, IProperty, IPropertyInternal>
 {
 public:
@@ -26,5 +28,7 @@ private:
     IAny::Ptr data_;
     LazyEvent onChanged_;
 };
+
+} // namespace strata
 
 #endif // PROPERTY_H

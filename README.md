@@ -2,6 +2,8 @@
 
 A C++17 component object model with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
 
+The name *Strata* (plural of *stratum*, meaning layers) reflects the library's layered architecture: abstract interfaces at the bottom, CRTP helpers and template implementations in the middle, and user-facing typed wrappers on top.
+
 ## Features
 
 - **Interface-based architecture** -- define abstract interfaces with properties, events, and functions

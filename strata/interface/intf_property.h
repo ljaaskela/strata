@@ -4,6 +4,8 @@
 #include <interface/intf_any.h>
 #include <interface/intf_event.h>
 
+namespace strata {
+
 class IProperty : public Interface<IProperty>
 {
 public:
@@ -43,5 +45,7 @@ public:
      */
     virtual IAny::Ptr GetAny() const = 0;
 };
+
+} // namespace strata
 
 #endif

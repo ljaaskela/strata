@@ -6,6 +6,8 @@
 #include <interface/intf_interface.h>
 #include <interface/types.h>
 
+namespace strata {
+
 /**
  * @brief Type-erased value container interface.
  *
@@ -103,5 +105,7 @@ inline bool IsCompatible(const IAny::ConstPtr &any, const IAny::ConstPtr &with)
 {
     return GetCompatibleType(any, with) != Uid{};
 }
+
+} // namespace strata
 
 #endif

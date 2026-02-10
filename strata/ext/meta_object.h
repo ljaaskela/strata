@@ -5,6 +5,8 @@
 #include <ext/metadata.h>
 #include <ext/object.h>
 
+namespace strata {
+
 /**
  * @brief CRTP base for Strata objects with metadata.
  *
@@ -74,5 +76,7 @@ private:
 
     refcnt_ptr<IMetadata> meta_;
 };
+
+} // namespace strata
 
 #endif // EXT_META_OBJECT_H
