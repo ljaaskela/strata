@@ -8,6 +8,8 @@
 #include <array>
 #include <vector>
 
+namespace strata {
+
 using std::array;
 using std::vector;
 
@@ -92,5 +94,7 @@ constexpr Uid TypeUid()
 {
     return make_hash(GetName<T...>());
 }
+
+} // namespace strata
 
 #endif // COMMON_H

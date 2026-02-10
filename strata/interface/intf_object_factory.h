@@ -4,6 +4,8 @@
 #include <interface/intf_object.h>
 #include <interface/types.h>
 
+namespace strata {
+
 /** @brief Interface for factories that create IObject instances of a specific class. */
 class IObjectFactory : public Interface<IObjectFactory>
 {
@@ -13,5 +15,7 @@ public:
     /** @brief Returns the ClassInfo describing the class this factory creates. */
     virtual const ClassInfo &GetClassInfo() const = 0;
 };
+
+} // namespace strata
 
 #endif // INTF_OBJECT_FACTORY_H

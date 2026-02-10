@@ -5,6 +5,8 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
+namespace strata {
+
 /**
  * @brief Interface for an event that supports multiple handler functions.
  *
@@ -39,5 +41,7 @@ public:
     }
     return ReturnValue::INVALID_ARGUMENT;
 }
+
+} // namespace strata
 
 #endif // INTF_EVENT_H

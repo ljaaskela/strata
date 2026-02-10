@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string_view>
 
+namespace strata {
+
 /** @brief Discriminator for the kind of member described by a MemberDesc. */
 enum class MemberKind : uint8_t { Property, Event, Function };
 
@@ -67,6 +69,8 @@ public:
      */
     virtual void SetMetadataContainer(IMetadata *metadata) = 0;
 };
+
+} // namespace strata
 
 // --- Preprocessor FOR_EACH machinery ---
 
@@ -125,9 +129,9 @@ public:
 
 // --- Metadata dispatch: tag -> MemberDesc initializer ---
 
-#define _STRATA_META_PROP(Type, Name) PropertyDesc<Type>(#Name, &INFO),
-#define _STRATA_META_EVT(Name)        EventDesc(#Name, &INFO),
-#define _STRATA_META_FN(Name)         FunctionDesc(#Name, &INFO),
+#define _STRATA_META_PROP(Type, Name) ::strata::PropertyDesc<Type>(#Name, &INFO),
+#define _STRATA_META_EVT(Name)        ::strata::EventDesc(#Name, &INFO),
+#define _STRATA_META_FN(Name)         ::strata::FunctionDesc(#Name, &INFO),
 #define _STRATA_META(Tag, ...)        _STRATA_EXPAND(_STRATA_CAT(_STRATA_META_, Tag)(__VA_ARGS__))
 
 /** @brief Generates a static constexpr metadata array from STRATA_P/STRATA_E/STRATA_F entries. */
@@ -137,18 +141,18 @@ public:
 // --- Accessor dispatch: tag -> typed non-virtual accessor method ---
 
 #define _STRATA_ACC_PROP(Type, Name) \
-    PropertyT<Type> Name() const { \
-        auto* meta_ = this->template GetInterface<IMetadata>(); \
-        return PropertyT<Type>(meta_ ? meta_->GetProperty(#Name) : nullptr); \
+    ::strata::PropertyT<Type> Name() const { \
+        auto* meta_ = this->template GetInterface<::strata::IMetadata>(); \
+        return ::strata::PropertyT<Type>(meta_ ? meta_->GetProperty(#Name) : nullptr); \
     }
 #define _STRATA_ACC_EVT(Name) \
-    IEvent::Ptr Name() const { \
-        auto* meta_ = this->template GetInterface<IMetadata>(); \
+    ::strata::IEvent::Ptr Name() const { \
+        auto* meta_ = this->template GetInterface<::strata::IMetadata>(); \
         return meta_ ? meta_->GetEvent(#Name) : nullptr; \
     }
 #define _STRATA_ACC_FN(Name) \
-    IFunction::Ptr Name() const { \
-        auto* meta_ = this->template GetInterface<IMetadata>(); \
+    ::strata::IFunction::Ptr Name() const { \
+        auto* meta_ = this->template GetInterface<::strata::IMetadata>(); \
         return meta_ ? meta_->GetFunction(#Name) : nullptr; \
     }
 #define _STRATA_ACC(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_ACC_, Tag)(__VA_ARGS__))

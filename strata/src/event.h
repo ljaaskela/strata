@@ -8,6 +8,8 @@
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
+namespace strata {
+
 class EventImpl final : public Object<EventImpl, IEvent, IFunction>
 {
 public:
@@ -24,5 +26,7 @@ protected: // IEvent
 private:
     mutable vector<IFunction::ConstPtr> handlers_;
 };
+
+} // namespace strata
 
 #endif // EVENT_H

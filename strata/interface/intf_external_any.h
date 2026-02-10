@@ -4,6 +4,8 @@
 #include <common.h>
 #include <interface/intf_event.h>
 
+namespace strata {
+
 /**
  * @brief The IExternalAny class can be implemented by any objects whose data can change
  *        without a property setting its value.
@@ -19,5 +21,7 @@ public:
      */
     virtual IEvent::Ptr OnDataChanged() const = 0;
 };
+
+} // namespace strata
 
 #endif // INTF_EXTERNAL_ANY_H
