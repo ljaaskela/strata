@@ -11,21 +11,21 @@ namespace strata {
 
 void RegisterTypes(IStrata &strata)
 {
-    strata.RegisterType<PropertyImpl>();
-    strata.RegisterType<EventImpl>();
-    strata.RegisterType<FunctionImpl>();
+    strata.register_type<PropertyImpl>();
+    strata.register_type<EventImpl>();
+    strata.register_type<FunctionImpl>();
 
-    strata.RegisterType<SimpleAny<float>>();
-    strata.RegisterType<SimpleAny<double>>();
-    strata.RegisterType<SimpleAny<uint8_t>>();
-    strata.RegisterType<SimpleAny<uint16_t>>();
-    strata.RegisterType<SimpleAny<uint32_t>>();
-    strata.RegisterType<SimpleAny<uint64_t>>();
-    strata.RegisterType<SimpleAny<int8_t>>();
-    strata.RegisterType<SimpleAny<int16_t>>();
-    strata.RegisterType<SimpleAny<int32_t>>();
-    strata.RegisterType<SimpleAny<int64_t>>();
-    strata.RegisterType<SimpleAny<std::string>>();
+    strata.register_type<SimpleAny<float>>();
+    strata.register_type<SimpleAny<double>>();
+    strata.register_type<SimpleAny<uint8_t>>();
+    strata.register_type<SimpleAny<uint16_t>>();
+    strata.register_type<SimpleAny<uint32_t>>();
+    strata.register_type<SimpleAny<uint64_t>>();
+    strata.register_type<SimpleAny<int8_t>>();
+    strata.register_type<SimpleAny<int16_t>>();
+    strata.register_type<SimpleAny<int32_t>>();
+    strata.register_type<SimpleAny<int64_t>>();
+    strata.register_type<SimpleAny<std::string>>();
 }
 
 StrataImpl::StrataImpl()
@@ -33,32 +33,32 @@ StrataImpl::StrataImpl()
     RegisterTypes(*this);
 }
 
-ReturnValue StrataImpl::RegisterType(const IObjectFactory &factory)
+ReturnValue StrataImpl::register_type(const IObjectFactory &factory)
 {
-    auto &info = factory.GetClassInfo();
+    auto &info = factory.get_class_info();
     std::cout << "Register " << info.name << " (uid: " << info.uid << ")" << std::endl;
     types_[info.uid] = &factory;
     return ReturnValue::SUCCESS;
 }
 
-ReturnValue StrataImpl::UnregisterType(const IObjectFactory &factory)
+ReturnValue StrataImpl::unregister_type(const IObjectFactory &factory)
 {
-    types_.erase(factory.GetClassInfo().uid);
+    types_.erase(factory.get_class_info().uid);
     return ReturnValue::SUCCESS;
 }
 
-IInterface::Ptr StrataImpl::Create(Uid uid) const
+IInterface::Ptr StrataImpl::create(Uid uid) const
 {
     if (auto fac = types_.find(uid); fac != types_.end()) {
-        if (auto object = fac->second->CreateInstance()) {
-            if (auto shared = object->GetInterface<ISharedFromObject>()) {
-                shared->SetSelf(object);
+        if (auto object = fac->second->create_instance()) {
+            if (auto shared = object->get_interface<ISharedFromObject>()) {
+                shared->set_self(object);
             }
-            auto& info = fac->second->GetClassInfo();
+            auto& info = fac->second->get_class_info();
             if (!info.members.empty()) {
                 if (auto *meta = interface_cast<IMetadataContainer>(object)) {
                     // Object takes ownership
-                    meta->SetMetadataContainer(new MetadataContainer(info.members, *this));
+                    meta->set_metadata_container(new MetadataContainer(info.members, *this));
                 }
             }
             return object;
@@ -67,32 +67,32 @@ IInterface::Ptr StrataImpl::Create(Uid uid) const
     return {};
 }
 
-const ClassInfo* StrataImpl::GetClassInfo(Uid classUid) const
+const ClassInfo* StrataImpl::get_class_info(Uid classUid) const
 {
     if (auto fac = types_.find(classUid); fac != types_.end()) {
-        return &fac->second->GetClassInfo();
+        return &fac->second->get_class_info();
     }
     return nullptr;
 }
 
-IAny::Ptr StrataImpl::CreateAny(Uid type) const
+IAny::Ptr StrataImpl::create_any(Uid type) const
 {
-    return interface_pointer_cast<IAny>(Create(type));
+    return interface_pointer_cast<IAny>(create(type));
 }
 
-IProperty::Ptr StrataImpl::CreateProperty(Uid type, const IAny::Ptr &value) const
+IProperty::Ptr StrataImpl::create_property(Uid type, const IAny::Ptr &value) const
 {
-    if (auto property = interface_pointer_cast<IProperty>(Create(ClassId::Property))) {
-        if (auto pi = property->GetInterface<IPropertyInternal>()) {
-            if (value && IsCompatible(value, type)) {
-                if (pi->SetAny(value)) {
+    if (auto property = interface_pointer_cast<IProperty>(create(ClassId::Property))) {
+        if (auto pi = property->get_interface<IPropertyInternal>()) {
+            if (value && is_compatible(value, type)) {
+                if (pi->set_any(value)) {
                     return property;
                 }
                 std::cerr << "Initial value is of incompatible type" << std::endl;
             }
             // Any was not specified for property instance, create new one
-            if (auto any = CreateAny(type)) {
-                if (pi->SetAny(any)) {
+            if (auto any = create_any(type)) {
+                if (pi->set_any(any)) {
                     return property;
                 }
             }

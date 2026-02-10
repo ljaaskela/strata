@@ -16,9 +16,9 @@ class RefCountedDispatch : public InterfaceDispatch<Interfaces...>
 {
 public:
     /** @brief Atomically increments the reference count. */
-    void Ref() override { data_.refCount++; }
+    void ref() override { data_.refCount++; }
     /** @brief Atomically decrements the reference count; deletes the object at zero. */
-    void UnRef() override
+    void unref() override
     {
         if (--data_.refCount == 0) {
             delete this;
@@ -35,7 +35,7 @@ protected:
         alignas(4) std::atomic<int32_t> refCount{1};
         alignas(4) int32_t flags{};
     };
-    constexpr ObjectData &GetObjectData() noexcept { return data_; }
+    constexpr ObjectData &get_object_data() noexcept { return data_; }
 
 private:
     ObjectData data_;

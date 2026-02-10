@@ -13,13 +13,13 @@ class StrataImpl final : public CoreObject<StrataImpl, IStrata>
 public:
     StrataImpl();
 
-    ReturnValue RegisterType(const IObjectFactory &factory) override;
-    ReturnValue UnregisterType(const IObjectFactory &factory) override;
-    IInterface::Ptr Create(Uid uid) const override;
+    ReturnValue register_type(const IObjectFactory &factory) override;
+    ReturnValue unregister_type(const IObjectFactory &factory) override;
+    IInterface::Ptr create(Uid uid) const override;
 
-    const ClassInfo* GetClassInfo(Uid classUid) const override;
-    IAny::Ptr CreateAny(Uid type) const override;
-    IProperty::Ptr CreateProperty(Uid type, const IAny::Ptr& value) const override;
+    const ClassInfo* get_class_info(Uid classUid) const override;
+    IAny::Ptr create_any(Uid type) const override;
+    IProperty::Ptr create_property(Uid type, const IAny::Ptr& value) const override;
 
 private:
     std::map<Uid, const IObjectFactory *> types_;

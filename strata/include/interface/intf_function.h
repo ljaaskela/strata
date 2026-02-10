@@ -18,15 +18,15 @@ public:
      * @param args Call args. Actual content dependent on the function implementation.
      * @return Function return value.
      */
-    virtual ReturnValue Invoke(const IAny *args) const = 0;
+    virtual ReturnValue invoke(const IAny *args) const = 0;
 };
 
 /** @brief Internal interface for configuring an IFunction's invoke callback. */
 class IFunctionInternal : public Interface<IFunctionInternal>
 {
 public:
-    /** @brief Sets the callback that will be called when IFunction::Invoke is called. */
-    virtual void SetInvokeCallback(IFunction::CallableFn *fn) = 0;
+    /** @brief Sets the callback that will be called when IFunction::invoke is called. */
+    virtual void set_invoke_callback(IFunction::CallableFn *fn) = 0;
 };
 
 } // namespace strata

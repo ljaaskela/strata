@@ -28,29 +28,29 @@ public:
 
 public: // IMetadata overrides
     /** @brief Returns the static metadata descriptors, or an empty view if none. */
-    array_view<MemberDesc> GetStaticMetadata() const override
+    array_view<MemberDesc> get_static_metadata() const override
     {
-        return meta_ ? meta_->GetStaticMetadata() : array_view<MemberDesc>{};
+        return meta_ ? meta_->get_static_metadata() : array_view<MemberDesc>{};
     }
     /** @brief Looks up a property by name, or returns nullptr. */
-    IProperty::Ptr GetProperty(std::string_view name) const override
+    IProperty::Ptr get_property(std::string_view name) const override
     {
-        return meta_ ? meta_->GetProperty(name) : nullptr;
+        return meta_ ? meta_->get_property(name) : nullptr;
     }
     /** @brief Looks up an event by name, or returns nullptr. */
-    IEvent::Ptr GetEvent(std::string_view name) const override
+    IEvent::Ptr get_event(std::string_view name) const override
     {
-        return meta_ ? meta_->GetEvent(name) : nullptr;
+        return meta_ ? meta_->get_event(name) : nullptr;
     }
     /** @brief Looks up a function by name, or returns nullptr. */
-    IFunction::Ptr GetFunction(std::string_view name) const override
+    IFunction::Ptr get_function(std::string_view name) const override
     {
-        return meta_ ? meta_->GetFunction(name) : nullptr;
+        return meta_ ? meta_->get_function(name) : nullptr;
     }
 
 public: // IMetadataContainer override
     /** @brief Accepts the runtime metadata container (called once by Strata at construction). */
-    void SetMetadataContainer(IMetadata *metadata) override
+    void set_metadata_container(IMetadata *metadata) override
     {
         // Allow one set (called by Strata at construction)
         if (!meta_) {
@@ -60,7 +60,7 @@ public: // IMetadataContainer override
 
 public:
     /** @brief Returns the singleton factory for creating instances of FinalClass (with metadata). */
-    static const IObjectFactory &GetFactory()
+    static const IObjectFactory &get_factory()
     {
         static Factory factory_;
         return factory_;
@@ -69,11 +69,11 @@ public:
 private:
     class Factory : public ObjectFactory<FinalClass>
     {
-        const ClassInfo &GetClassInfo() const override
+        const ClassInfo &get_class_info() const override
         {
             static constexpr ClassInfo info{
-                FinalClass::GetClassUid(),
-                FinalClass::GetClassName(),
+                FinalClass::get_class_uid(),
+                FinalClass::get_class_name(),
                 {FinalClass::metadata.data(), FinalClass::metadata.size()}
             };
             return info;

@@ -14,7 +14,7 @@ namespace strata {
 /**
  * @brief Default IObjectFactory implementation that creates instances of FinalClass.
  *
- * Created objects are wrapped in a shared_ptr with a custom deleter that calls UnRef().
+ * Created objects are wrapped in a shared_ptr with a custom deleter that calls unref().
  *
  * @tparam FinalClass The concrete class to instantiate.
  */
@@ -26,10 +26,10 @@ public:
     ~ObjectFactory() override = default;
 
 public:
-    IObject::Ptr CreateInstance() const override
+    IObject::Ptr create_instance() const override
     {
         // Custom deleter for factory-created shared_ptrs which just decrease refcount
-        return std::shared_ptr<FinalClass>(new FinalClass, [](FinalClass *p) { p->UnRef(); });
+        return std::shared_ptr<FinalClass>(new FinalClass, [](FinalClass *p) { p->unref(); });
     }
 };
 
@@ -51,29 +51,29 @@ public:
 
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr std::string_view GetClassName() noexcept { return GetName<FinalClass>(); }
+    static constexpr std::string_view get_class_name() noexcept { return get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass. */
-    static constexpr Uid GetClassUid() noexcept { return TypeUid<FinalClass>(); }
+    static constexpr Uid get_class_uid() noexcept { return type_uid<FinalClass>(); }
 
     /** @brief Stores a weak self-reference (called once by the factory). */
-    void SetSelf(const IObject::Ptr &self) override
+    void set_self(const IObject::Ptr &self) override
     {
         if (self_.expired()) { // Only allow one set (called by factory)
             self_ = self;
         }
     }
     /** @brief Returns a shared_ptr to this object, or nullptr if expired. */
-    IObject::Ptr GetSelf() const override { return self_.lock(); }
+    IObject::Ptr get_self() const override { return self_.lock(); }
 
     template<class T>
-    typename T::Ptr GetSelf() const
+    typename T::Ptr get_self() const
     {
         return interface_pointer_cast<T>(self_.lock());
     }
 
 public:
     /** @brief Returns the singleton factory for creating instances of FinalClass. */
-    static const IObjectFactory &GetFactory()
+    static const IObjectFactory &get_factory()
     {
         static Factory factory_;
         return factory_;
@@ -84,9 +84,9 @@ private:
 
     class Factory : public ObjectFactory<FinalClass>
     {
-        const ClassInfo &GetClassInfo() const override
+        const ClassInfo &get_class_info() const override
         {
-            static constexpr ClassInfo info{FinalClass::GetClassUid(), FinalClass::GetClassName()};
+            static constexpr ClassInfo info{FinalClass::get_class_uid(), FinalClass::get_class_name()};
             return info;
         }
     };

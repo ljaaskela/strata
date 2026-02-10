@@ -14,10 +14,10 @@ public:
     explicit MetadataContainer(array_view<MemberDesc> members, const IStrata &instance);
 
 public: // IMetadata
-    array_view<MemberDesc> GetStaticMetadata() const override;
-    IProperty::Ptr GetProperty(std::string_view name) const override;
-    IEvent::Ptr GetEvent(std::string_view name) const override;
-    IFunction::Ptr GetFunction(std::string_view name) const override;
+    array_view<MemberDesc> get_static_metadata() const override;
+    IProperty::Ptr get_property(std::string_view name) const override;
+    IEvent::Ptr get_event(std::string_view name) const override;
+    IFunction::Ptr get_function(std::string_view name) const override;
 
 private:
     array_view<MemberDesc> members_;

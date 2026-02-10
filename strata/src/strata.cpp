@@ -4,10 +4,10 @@
 
 namespace strata {
 
-STRATA_EXPORT IStrata &Strata()
+STRATA_EXPORT IStrata &instance()
 {
     static StrataImpl r;
-    return *(r.GetInterface<IStrata>());
+    return *(r.get_interface<IStrata>());
 }
 
 } // namespace strata

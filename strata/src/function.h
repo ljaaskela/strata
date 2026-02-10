@@ -13,8 +13,8 @@ class FunctionImpl final : public CoreObject<FunctionImpl, IFunction, IFunctionI
 {
 public:
     FunctionImpl() = default;
-    ReturnValue Invoke(const IAny *args) const override;
-    void SetInvokeCallback(IFunction::CallableFn *fn) override;
+    ReturnValue invoke(const IAny *args) const override;
+    void set_invoke_callback(IFunction::CallableFn *fn) override;
 
 private:
     IFunction::CallableFn *fn_{};
