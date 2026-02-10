@@ -5,10 +5,10 @@
 #include <api/property.h>
 #include <ext/any.h>
 #include <ext/event.h>
-#include <ext/meta_object.h>
+#include <ext/object.h>
 #include <interface/intf_external_any.h>
 #include <interface/intf_property.h>
-#include <interface/intf_registry.h>
+#include <interface/intf_strata.h>
 #include <interface/types.h>
 #include <iostream>
 
@@ -75,13 +75,13 @@ public:
     )
 };
 
-class MyWidget : public MetaObject<MyWidget, IMyWidget, ISerializable>
+class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 {
 };
 
 int main()
 {
-    auto &r = GetRegistry();
+    auto &r = Strata();
 
     r.RegisterType<MyDataAny>();
     r.RegisterType<MyWidget>();
@@ -133,7 +133,7 @@ int main()
     std::cout << "sizeof(PropertyT<float>) " << sizeof(PropertyT<float>) << std::endl;
     std::cout << "sizeof(MyDataAny)        " << sizeof(MyDataAny) << std::endl;
 
-    // --- Static metadata via registry (no instance needed) ---
+    // --- Static metadata via Strata (no instance needed) ---
     std::cout << "\n--- MyWidget static metadata ---" << std::endl;
     if (auto* info = r.GetClassInfo(MyWidget::GetClassUid())) {
         std::cout << "Class: " << info->name << " (" << info->members.size() << " members)" << std::endl;

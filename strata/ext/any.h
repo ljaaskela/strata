@@ -2,9 +2,9 @@
 #define EXT_ANY_H
 
 #include <common.h>
-#include <ext/object.h>
+#include <ext/core_object.h>
 #include <interface/intf_any.h>
-#include <interface/intf_registry.h>
+#include <interface/intf_strata.h>
 
 #include <algorithm>
 
@@ -16,7 +16,7 @@ namespace strata {
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
 template<class FinalClass, class... Interfaces>
-class BaseAny : public Object<FinalClass, IAny, Interfaces...>
+class BaseAny : public CoreObject<FinalClass, IAny, Interfaces...>
 {
 public:
     static constexpr const std::string_view GetClassName() { return GetName<FinalClass>(); }

@@ -5,7 +5,7 @@
 #include <api/function.h>
 #include <common.h>
 #include <interface/intf_property.h>
-#include <interface/intf_registry.h>
+#include <interface/intf_strata.h>
 #include <interface/types.h>
 #include <iostream>
 
@@ -53,7 +53,7 @@ public:
 protected:
     void Create()
     {
-        prop_ = GetRegistry().CreateProperty(GetTypeUid(), {});
+        prop_ = Strata().CreateProperty(GetTypeUid(), {});
         if (prop_) {
             internal_ = prop_->GetInterface<IPropertyInternal>();
         }

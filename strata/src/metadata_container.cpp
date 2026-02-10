@@ -2,8 +2,8 @@
 
 namespace strata {
 
-MetadataContainer::MetadataContainer(array_view<MemberDesc> members, const IRegistry &registry)
-    : members_(members), registry_(registry)
+MetadataContainer::MetadataContainer(array_view<MemberDesc> members, const IStrata &instance)
+    : members_(members), instance_(instance)
 {}
 
 array_view<MemberDesc> MetadataContainer::GetStaticMetadata() const
@@ -18,7 +18,7 @@ IProperty::Ptr MetadataContainer::GetProperty(std::string_view name) const
     }
     for (auto& desc : members_) {
         if (desc.kind == MemberKind::Property && desc.name == name) {
-            if (auto p = registry_.CreateProperty(desc.typeUid, {})) {
+            if (auto p = instance_.CreateProperty(desc.typeUid, {})) {
                 properties_.push_back({name, p});
                 return p;
             }
@@ -34,7 +34,7 @@ IEvent::Ptr MetadataContainer::GetEvent(std::string_view name) const
     }
     for (auto& desc : members_) {
         if (desc.kind == MemberKind::Event && desc.name == name) {
-            if (auto e = registry_.Create<IEvent>(ClassId::Event)) {
+            if (auto e = instance_.Create<IEvent>(ClassId::Event)) {
                 events_.push_back({name, e});
                 return e;
             }
@@ -50,7 +50,7 @@ IFunction::Ptr MetadataContainer::GetFunction(std::string_view name) const
     }
     for (auto& desc : members_) {
         if (desc.kind == MemberKind::Function && desc.name == name) {
-            if (auto f = registry_.Create<IFunction>(ClassId::Function)) {
+            if (auto f = instance_.Create<IFunction>(ClassId::Function)) {
                 functions_.push_back({name, f});
                 return f;
             }

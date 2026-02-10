@@ -174,14 +174,14 @@ public:
  * @par What the macro generates
  * For each member entry the macro produces:
  * -# A @c MemberDesc initializer in a @c static @c constexpr @c std::array
- *    named @c metadata, used for compile-time and registry-level introspection.
+ *    named @c metadata, used for compile-time and runtime introspection.
  * -# A non-virtual @c const accessor method on the interface:
  *    - @c PROP &rarr; <tt>PropertyT\<Type\> Name() const</tt>
  *    - @c EVT  &rarr; <tt>IEvent::Ptr Name() const</tt>
  *    - @c FN   &rarr; <tt>IFunction::Ptr Name() const</tt>
  *
  *    Each accessor obtains the runtime instance by querying the object's
- *    @c IMetadata interface, so it works on any @c MetaObject that implements
+ *    @c IMetadata interface, so it works on any @c Object that implements
  *    this interface.
  *
  * @par Example: defining an interface
@@ -199,16 +199,16 @@ public:
  * @endcode
  *
  * @par Example: implementing the interface
- * Concrete classes inherit from @c MetaObject, which automatically collects
+ * Concrete classes inherit from @c Object, which automatically collects
  * metadata from all listed interfaces and provides the @c IMetadata
  * implementation. No additional code is needed in the concrete class.
  * @code
- * class MyWidget : public MetaObject<MyWidget, IMyWidget> {};
+ * class MyWidget : public Object<MyWidget, IMyWidget> {};
  * @endcode
  *
  * @par Example: using accessors on an instance
  * @code
- * auto widget = registry.Create<IObject>(MyWidget::GetClassUid());
+ * auto widget = Strata().Create<IObject>(MyWidget::GetClassUid());
  * if (auto* iw = interface_cast<IMyWidget>(widget)) {
  *     iw->Width().Set(42.f);
  *     float w = iw->Width().Get();   // 42.f
@@ -219,7 +219,7 @@ public:
  *
  * @par Example: querying static metadata without an instance
  * @code
- * if (auto* info = registry.GetClassInfo(MyWidget::GetClassUid())) {
+ * if (auto* info = Strata().GetClassInfo(MyWidget::GetClassUid())) {
  *     for (auto& m : info->members) {
  *         // m.name, m.kind, m.typeUid
  *     }
@@ -229,7 +229,7 @@ public:
  * @note Up to 32 members are supported per interface.
  *
  * @see STRATA_METADATA For generating only the metadata array without accessors.
- * @see MetaObject    For the CRTP base that collects metadata from interfaces.
+ * @see Object       For the CRTP base that collects metadata from interfaces.
  * @see IMetadata     For the runtime metadata query interface.
  */
 #define STRATA_INTERFACE(...) \
