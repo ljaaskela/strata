@@ -1,5 +1,5 @@
-#ifndef INTF_REGISTRY_H
-#define INTF_REGISTRY_H
+#ifndef INTF_STRATA_H
+#define INTF_STRATA_H
 
 #include <functional>
 #include <string_view>
@@ -12,11 +12,11 @@
 namespace strata {
 
 /**
- * @brief Central registry for creating and managing Strata object types.
+ * @brief Central interface for creating and managing Strata object types.
  *
  * Types are registered via IObjectFactory instances and can be created by UID.
  */
-class IRegistry : public Interface<IRegistry>
+class IStrata : public Interface<IStrata>
 {
 public:
     using TypeCreateFn = std::function<IObject::Ptr()>;
@@ -65,4 +65,4 @@ public:
 
 } // namespace strata
 
-#endif // INTF_REGISTRY_H
+#endif // INTF_STRATA_H

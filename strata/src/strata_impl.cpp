@@ -1,5 +1,5 @@
 #include "metadata_container.h"
-#include "registry.h"
+#include "strata_impl.h"
 #include "event.h"
 #include "function.h"
 #include "property.h"
@@ -9,31 +9,31 @@
 
 namespace strata {
 
-void RegisterTypes(IRegistry &registry)
+void RegisterTypes(IStrata &strata)
 {
-    registry.RegisterType<PropertyImpl>();
-    registry.RegisterType<EventImpl>();
-    registry.RegisterType<FunctionImpl>();
+    strata.RegisterType<PropertyImpl>();
+    strata.RegisterType<EventImpl>();
+    strata.RegisterType<FunctionImpl>();
 
-    registry.RegisterType<SimpleAny<float>>();
-    registry.RegisterType<SimpleAny<double>>();
-    registry.RegisterType<SimpleAny<uint8_t>>();
-    registry.RegisterType<SimpleAny<uint16_t>>();
-    registry.RegisterType<SimpleAny<uint32_t>>();
-    registry.RegisterType<SimpleAny<uint64_t>>();
-    registry.RegisterType<SimpleAny<int8_t>>();
-    registry.RegisterType<SimpleAny<int16_t>>();
-    registry.RegisterType<SimpleAny<int32_t>>();
-    registry.RegisterType<SimpleAny<int64_t>>();
-    registry.RegisterType<SimpleAny<std::string>>();
+    strata.RegisterType<SimpleAny<float>>();
+    strata.RegisterType<SimpleAny<double>>();
+    strata.RegisterType<SimpleAny<uint8_t>>();
+    strata.RegisterType<SimpleAny<uint16_t>>();
+    strata.RegisterType<SimpleAny<uint32_t>>();
+    strata.RegisterType<SimpleAny<uint64_t>>();
+    strata.RegisterType<SimpleAny<int8_t>>();
+    strata.RegisterType<SimpleAny<int16_t>>();
+    strata.RegisterType<SimpleAny<int32_t>>();
+    strata.RegisterType<SimpleAny<int64_t>>();
+    strata.RegisterType<SimpleAny<std::string>>();
 }
 
-Registry::Registry()
+StrataImpl::StrataImpl()
 {
     RegisterTypes(*this);
 }
 
-ReturnValue Registry::RegisterType(const IObjectFactory &factory)
+ReturnValue StrataImpl::RegisterType(const IObjectFactory &factory)
 {
     auto &info = factory.GetClassInfo();
     std::cout << "Register " << info.name << " (uid: " << info.uid << ")" << std::endl;
@@ -41,13 +41,13 @@ ReturnValue Registry::RegisterType(const IObjectFactory &factory)
     return ReturnValue::SUCCESS;
 }
 
-ReturnValue Registry::UnregisterType(const IObjectFactory &factory)
+ReturnValue StrataImpl::UnregisterType(const IObjectFactory &factory)
 {
     types_.erase(factory.GetClassInfo().uid);
     return ReturnValue::SUCCESS;
 }
 
-IInterface::Ptr Registry::Create(Uid uid) const
+IInterface::Ptr StrataImpl::Create(Uid uid) const
 {
     if (auto fac = types_.find(uid); fac != types_.end()) {
         if (auto object = fac->second->CreateInstance()) {
@@ -67,7 +67,7 @@ IInterface::Ptr Registry::Create(Uid uid) const
     return {};
 }
 
-const ClassInfo* Registry::GetClassInfo(Uid classUid) const
+const ClassInfo* StrataImpl::GetClassInfo(Uid classUid) const
 {
     if (auto fac = types_.find(classUid); fac != types_.end()) {
         return &fac->second->GetClassInfo();
@@ -75,12 +75,12 @@ const ClassInfo* Registry::GetClassInfo(Uid classUid) const
     return nullptr;
 }
 
-IAny::Ptr Registry::CreateAny(Uid type) const
+IAny::Ptr StrataImpl::CreateAny(Uid type) const
 {
     return interface_pointer_cast<IAny>(Create(type));
 }
 
-IProperty::Ptr Registry::CreateProperty(Uid type, const IAny::Ptr &value) const
+IProperty::Ptr StrataImpl::CreateProperty(Uid type, const IAny::Ptr &value) const
 {
     if (auto property = interface_pointer_cast<IProperty>(Create(ClassId::Property))) {
         if (auto pi = property->GetInterface<IPropertyInternal>()) {

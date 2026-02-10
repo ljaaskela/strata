@@ -1,17 +1,17 @@
-#ifndef REGISTRY_H
-#define REGISTRY_H
+#ifndef STRATA_IMPL_H
+#define STRATA_IMPL_H
 
 #include <common.h>
-#include <ext/object.h>
-#include <interface/intf_registry.h>
+#include <ext/core_object.h>
+#include <interface/intf_strata.h>
 #include <map>
 
 namespace strata {
 
-class Registry final : public Object<Registry, IRegistry>
+class StrataImpl final : public CoreObject<StrataImpl, IStrata>
 {
 public:
-    Registry();
+    StrataImpl();
 
     ReturnValue RegisterType(const IObjectFactory &factory) override;
     ReturnValue UnregisterType(const IObjectFactory &factory) override;
@@ -27,4 +27,4 @@ private:
 
 } // namespace strata
 
-#endif // REGISTRY_H
+#endif // STRATA_IMPL_H

@@ -1,16 +1,16 @@
 #ifndef PROPERTY_H
 #define PROPERTY_H
 
-#include "registry.h"
+#include "strata_impl.h"
 #include <common.h>
 #include <ext/event.h>
-#include <ext/object.h>
+#include <ext/core_object.h>
 #include <interface/intf_property.h>
 #include <interface/types.h>
 
 namespace strata {
 
-class PropertyImpl final : public Object<PropertyImpl, IProperty, IPropertyInternal>
+class PropertyImpl final : public CoreObject<PropertyImpl, IProperty, IPropertyInternal>
 {
 public:
     PropertyImpl() = default;

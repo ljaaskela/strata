@@ -11,7 +11,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - **Events** -- observable multi-handler events
 - **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
 - **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
-- **Central registry** -- register types, create instances by UID, query class info without instantiation
+- **Central type system** -- register types, create instances by UID, query class info without instantiation
 - **Custom type support** -- extend with user-defined `IAny` implementations for external or shared data
 
 ## Building
@@ -47,14 +47,14 @@ public:
 };
 ```
 
-### Implement with MetaObject
+### Implement with Object
 
-`MetaObject` automatically collects metadata from all listed interfaces and provides the `IMetadata` implementation. No boilerplate needed.
+`Object` automatically collects metadata from all listed interfaces and provides the `IMetadata` implementation. No boilerplate needed.
 
 ```cpp
-#include <ext/meta_object.h>
+#include <ext/object.h>
 
-class MyWidget : public MetaObject<MyWidget, IMyWidget>
+class MyWidget : public Object<MyWidget, IMyWidget>
 {};
 ```
 
@@ -70,17 +70,17 @@ public:
     )
 };
 
-class MyWidget : public MetaObject<MyWidget, IMyWidget, ISerializable>
+class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 {};
 ```
 
 ### Register and create
 
 ```cpp
-auto& registry = GetRegistry();
-registry.RegisterType<MyWidget>();
+auto& s = Strata();
+s.RegisterType<MyWidget>();
 
-auto widget = registry.Create<IObject>(MyWidget::GetClassUid());
+auto widget = s.Create<IObject>(MyWidget::GetClassUid());
 ```
 
 ### Use typed accessors
@@ -97,10 +97,10 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 
 ### Query metadata
 
-Static metadata is available from the registry without creating an instance:
+Static metadata is available from Strata without creating an instance:
 
 ```cpp
-if (auto* info = registry.GetClassInfo(MyWidget::GetClassUid())) {
+if (auto* info = s.GetClassInfo(MyWidget::GetClassUid())) {
     for (auto& m : info->members) {
         // m.name, m.kind, m.typeUid, m.interfaceInfo
     }
@@ -176,7 +176,7 @@ strata/
 | `intf_function.h` | `IFunction` invocable callback |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
-| `intf_registry.h` | `IRegistry` for type registration and object creation |
+| `intf_strata.h` | `IStrata` for type registration and object creation |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
@@ -184,8 +184,8 @@ strata/
 
 | Header | Description |
 |---|---|
-| `object.h` | `BaseObject<Interfaces...>` dispatch + ref-counting; `Object<T, Interfaces...>` with factory |
-| `meta_object.h` | `MetaObject<T, Interfaces...>` adds `IMetadata` support with collected metadata |
+| `core_object.h` | `BaseObject<Interfaces...>` dispatch + ref-counting; `CoreObject<T, Interfaces...>` with factory |
+| `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
 | `metadata.h` | `collected_metadata<Interfaces...>` constexpr array concatenation |
 | `any.h` | `BaseAny`, `SingleTypeAny<T>`, `SimpleAny<T>` |
 | `event.h` | `LazyEvent` helper for deferred event creation |
@@ -194,7 +194,7 @@ strata/
 
 | Header | Description |
 |---|---|
-| `strata.h` | `GetRegistry()` singleton access |
+| `strata.h` | `Strata()` singleton access |
 | `property.h` | `PropertyT<T>` typed property wrapper |
 | `any.h` | `AnyT<T>` typed any wrapper |
 | `function.h` | `Function` wrapper with lambda support |
@@ -203,12 +203,12 @@ strata/
 
 | File | Description |
 |---|---|
-| `registry.cpp/h` | `Registry` implementing `IRegistry` |
+| `strata_impl.cpp/h` | `StrataImpl` implementing `IStrata` |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
 | `event.cpp/h` | `EventImpl` |
 | `function.cpp/h` | `FunctionImpl` |
-| `plugin.cpp` | DLL entry point, exports `GetRegistry()` |
+| `strata.cpp` | DLL entry point, exports `Strata()` |
 
 ## Key types
 
@@ -216,8 +216,8 @@ strata/
 |---|---|
 | `Uid` | 64-bit FNV-1a hash identifying types and interfaces |
 | `Interface<T>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases |
-| `Object<T, Interfaces...>` | CRTP base for concrete objects; auto UID/name, factory, ref-counting |
-| `MetaObject<T, Interfaces...>` | Extends `Object` with metadata from all interfaces |
+| `CoreObject<T, Interfaces...>` | CRTP base for concrete objects (without metadata); auto UID/name, factory, ref-counting |
+| `Object<T, Interfaces...>` | Extends `CoreObject` with metadata from all interfaces |
 | `PropertyT<T>` | Typed property with `Get()`/`Set()` and change events |
 | `AnyT<T>` | Typed view over `IAny` |
 | `Function` | Wraps `ReturnValue(const IAny*)` callbacks |

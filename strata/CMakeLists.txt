@@ -23,9 +23,9 @@ add_library(strata SHARED
     common.h
     src/metadata_container.cpp
     src/metadata_container.h
-    src/registry.cpp
-    src/registry.h
-    src/plugin.cpp
+    src/strata_impl.cpp
+    src/strata_impl.h
+    src/strata.cpp
     interface/intf_any.h
     interface/intf_external_any.h
     interface/intf_object.h
@@ -35,7 +35,7 @@ add_library(strata SHARED
     interface/intf_event.h
     interface/intf_property.h
     interface/intf_object_factory.h
-    interface/intf_registry.h
+    interface/intf_strata.h
     interface/intf_metadata.h
     interface/types.h
     api/any.h
@@ -43,9 +43,9 @@ add_library(strata SHARED
     api/function.h
     api/strata.h
     ext/any.h
-    ext/object.h
+    ext/core_object.h
     ext/metadata.h
-    ext/meta_object.h
+    ext/object.h
     ext/event.h
     )
 

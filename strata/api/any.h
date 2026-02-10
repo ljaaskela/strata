@@ -5,7 +5,7 @@
 #include <cassert>
 #include <common.h>
 #include <interface/intf_any.h>
-#include <interface/intf_registry.h>
+#include <interface/intf_strata.h>
 
 namespace strata {
 
@@ -56,7 +56,7 @@ protected:
 /**
  * @brief Typed wrapper for IAny that provides Get/Set accessors for type T.
  *
- * Can be constructed from an existing IAny or will create a new one from the registry.
+ * Can be constructed from an existing IAny or will create a new one from Strata.
  *
  * @tparam T The value type. Use const T for read-only access.
  */
@@ -86,7 +86,7 @@ public:
     AnyT(const T &value) noexcept
     {
         if (!IsCompatible(any_, TYPE_UID)) {
-            auto any = GetRegistry().CreateAny(TYPE_UID);
+            auto any = Strata().CreateAny(TYPE_UID);
             any_.reset(any.get());
         }
         any_->SetData(&value, TYPE_SIZE, TYPE_UID);
@@ -113,7 +113,7 @@ public:
     static const AnyT<const T> ConstRef(const IAny::ConstPtr &ref) { return AnyT<const T>(ref); }
 
 protected:
-    void Create() { SetAnyDirect(GetRegistry().CreateAny(TYPE_UID)); }
+    void Create() { SetAnyDirect(Strata().CreateAny(TYPE_UID)); }
 };
 
 } // namespace strata

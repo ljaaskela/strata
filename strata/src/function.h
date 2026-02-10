@@ -1,15 +1,15 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
-#include "registry.h"
+#include "strata_impl.h"
 #include <common.h>
-#include <ext/object.h>
+#include <ext/core_object.h>
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
 namespace strata {
 
-class FunctionImpl final : public Object<FunctionImpl, IFunction, IFunctionInternal>
+class FunctionImpl final : public CoreObject<FunctionImpl, IFunction, IFunctionInternal>
 {
 public:
     FunctionImpl() = default;
