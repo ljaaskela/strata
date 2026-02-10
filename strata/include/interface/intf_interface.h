@@ -45,10 +45,15 @@ struct InterfaceInfo {
 class IInterface : NoCopyMove
 {
 public:
+    /** @brief UID for the root interface (default-constructed, matches nothing specific). */
     static constexpr Uid UID{};
+    /** @brief Shared pointer to a mutable IInterface. */
     using Ptr = std::shared_ptr<IInterface>;
+    /** @brief Shared pointer to a const IInterface. */
     using ConstPtr = std::shared_ptr<const IInterface>;
+    /** @brief Weak pointer to a mutable IInterface. */
     using WeakPtr = std::weak_ptr<IInterface>;
+    /** @brief Weak pointer to a const IInterface. */
     using ConstWeakPtrr = std::weak_ptr<const IInterface>;
 
 public:
@@ -97,12 +102,19 @@ template<typename T>
 class Interface : public IInterface
 {
 public:
+    /** @brief Compile-time unique identifier for this interface type. */
     static constexpr Uid UID = TypeUid<T>();
+    /** @brief Static descriptor containing the UID and human-readable name. */
     static constexpr InterfaceInfo INFO { TypeUid<T>(), GetName<T>() };
+    /** @brief Shared pointer to a mutable T. */
     using Ptr = std::shared_ptr<T>;
+    /** @brief Shared pointer to a const T. */
     using ConstPtr = std::shared_ptr<const T>;
+    /** @brief Weak pointer to a mutable T. */
     using WeakPtr = std::weak_ptr<T>;
+    /** @brief Weak pointer to a const T. */
     using ConstWeakPtr = std::weak_ptr<const T>;
+    /** @brief Intrusive reference-counting pointer to T. */
     using RefPtr = refcnt_ptr<T>;
     using IInterface::GetInterface;
 
