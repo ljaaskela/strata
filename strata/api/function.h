@@ -3,13 +3,13 @@
 
 #include <api/strata.h>
 #include <common.h>
-#include <ext/object.h>
+#include <ext/core_object.h>
 #include <interface/intf_function.h>
 
 namespace strata {
 
 /** @brief Convenience wrapper that creates and owns an IFunction with a callback. */
-class Function : public Object<Function>
+class Function : public CoreObject<Function>
 {
 public:
     using CallbackFn = IFunction::CallableFn;
@@ -17,7 +17,7 @@ public:
     Function() = delete;
     Function(CallbackFn *cb)
     {
-        fn_ = GetRegistry().Create<IFunction>(ClassId::Function);
+        fn_ = Strata().Create<IFunction>(ClassId::Function);
         if (auto internal = interface_cast<IFunctionInternal>(fn_); internal && cb) {
             internal->SetInvokeCallback(cb);
         }

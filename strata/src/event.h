@@ -1,16 +1,16 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-#include "registry.h"
+#include "strata_impl.h"
 #include <common.h>
-#include <ext/object.h>
+#include <ext/core_object.h>
 #include <interface/intf_event.h>
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
 namespace strata {
 
-class EventImpl final : public Object<EventImpl, IEvent, IFunction>
+class EventImpl final : public CoreObject<EventImpl, IEvent, IFunction>
 {
 public:
     EventImpl() = default;

@@ -1,12 +1,12 @@
 #ifndef API_PLUGIN_H
 #define API_PLUGIN_H
 
-#include <interface/intf_registry.h>
+#include <interface/intf_strata.h>
 
 namespace strata {
 
-/** @brief Returns a reference to the global Strata registry singleton. */
-[[maybe_unused]] IRegistry &GetRegistry();
+/** @brief Returns a reference to the global Strata singleton. */
+[[maybe_unused]] IStrata &Strata();
 
 } // namespace strata
 
