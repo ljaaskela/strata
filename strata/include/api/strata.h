@@ -6,7 +6,7 @@
 namespace strata {
 
 /** @brief Returns a reference to the global Strata singleton. */
-[[maybe_unused]] IStrata &Strata();
+[[maybe_unused]] IStrata &instance();
 
 } // namespace strata
 

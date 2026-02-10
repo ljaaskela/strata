@@ -18,26 +18,26 @@ public:
     /**
      * @brief Returns an invocable which can be used to invoke the event.
      */
-    virtual const IFunction::ConstPtr GetInvocable() const = 0;
+    virtual const IFunction::ConstPtr get_invocable() const = 0;
     /**
      * @brief Adds a handler function for the event.
      */
-    virtual ReturnValue AddHandler(const IFunction::ConstPtr &fn) const = 0;
+    virtual ReturnValue add_handler(const IFunction::ConstPtr &fn) const = 0;
     /**
-     * @brief Removea an event handler function.
+     * @brief Removes an event handler function.
      */
-    virtual ReturnValue RemoveHandler(const IFunction::ConstPtr &fn) const = 0;
+    virtual ReturnValue remove_handler(const IFunction::ConstPtr &fn) const = 0;
 };
 
 /**
  * @brief Invokes an event
  * @param event Event to invoke
- * @param args Arguments for invokation
+ * @param args Arguments for invocation
  */
-[[maybe_unused]] static ReturnValue InvokeEvent(const IEvent::ConstPtr &event, const IAny *args)
+[[maybe_unused]] static ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *args)
 {
     if (event) {
-        return event->GetInvocable()->Invoke(args);
+        return event->get_invocable()->invoke(args);
     }
     return ReturnValue::INVALID_ARGUMENT;
 }

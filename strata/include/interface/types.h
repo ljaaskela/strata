@@ -24,9 +24,9 @@ class FunctionImpl;
 
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
-    inline constexpr Uid Property = TypeUid<PropertyImpl>();
-    inline constexpr Uid Event = TypeUid<EventImpl>();
-    inline constexpr Uid Function = TypeUid<FunctionImpl>();
+    inline constexpr Uid Property = type_uid<PropertyImpl>();
+    inline constexpr Uid Event = type_uid<EventImpl>();
+    inline constexpr Uid Function = type_uid<FunctionImpl>();
 }
 
 /**
@@ -38,7 +38,7 @@ namespace ClassId {
 template <class T>
 typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
 {
-    if (obj && obj->GetInterface(T::UID)) {
+    if (obj && obj->get_interface(T::UID)) {
         return std::dynamic_pointer_cast<T>(obj);
     }
     return nullptr;
@@ -54,7 +54,7 @@ typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
 template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
 typename T::ConstPtr interface_pointer_cast(const std::shared_ptr<U> &obj)
 {
-    if (obj && obj->GetInterface(T::UID)) {
+    if (obj && obj->get_interface(T::UID)) {
         return std::dynamic_pointer_cast<const T>(obj);
     }
     return nullptr;
@@ -69,21 +69,21 @@ typename T::ConstPtr interface_pointer_cast(const std::shared_ptr<U> &obj)
 template <class T>
 T *interface_cast(IInterface *obj)
 {
-    return obj ? obj->template GetInterface<T>() : nullptr;
+    return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T>
 const T *interface_cast(const IInterface *obj)
 {
-    return obj ? obj->template GetInterface<T>() : nullptr;
+    return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T>
 T *interface_cast(const IInterface::Ptr &obj)
 {
-    return obj ? obj->template GetInterface<T>() : nullptr;
+    return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /**
@@ -93,7 +93,7 @@ T *interface_cast(const IInterface::Ptr &obj)
 template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
 const T *interface_cast(const std::shared_ptr<U> &obj)
 {
-    return obj ? obj->template GetInterface<T>() : nullptr;
+    return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /** @brief Standard return codes for Strata operations. Non-negative values indicate success. */
@@ -105,13 +105,13 @@ enum ReturnValue : int16_t {
 };
 
 /** @brief Returns true if the return value indicates success (non-negative). */
-[[maybe_unused]] static constexpr bool Succeeded(ReturnValue ret)
+[[maybe_unused]] static constexpr bool succeeded(ReturnValue ret)
 {
     return ret >= 0;
 }
 
 /** @brief Returns true if the return value indicates failure (negative). */
-[[maybe_unused]] static constexpr bool Failed(ReturnValue ret)
+[[maybe_unused]] static constexpr bool failed(ReturnValue ret)
 {
     return ret < 0;
 }
