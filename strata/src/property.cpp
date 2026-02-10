@@ -3,36 +3,36 @@
 
 namespace strata {
 
-ReturnValue PropertyImpl::SetValue(const IAny &from)
+ReturnValue PropertyImpl::set_value(const IAny &from)
 {
     auto ret = ReturnValue::FAIL;
     if (data_) {
-        ret = data_->CopyFrom(from);
+        ret = data_->copy_from(from);
         if (ret == ReturnValue::SUCCESS) {
-            return InvokeEvent(OnChanged(), data_.get());
+            return invoke_event(on_changed(), data_.get());
         }
     }
     return ret;
 }
-const IAny::ConstPtr PropertyImpl::GetValue() const
+const IAny::ConstPtr PropertyImpl::get_value() const
 {
     return data_;
 }
-bool PropertyImpl::SetAny(const IAny::Ptr &value)
+bool PropertyImpl::set_any(const IAny::Ptr &value)
 {
     if (data_ && value) {
         std::cerr << "Property data already set" << std::endl;
         return false;
     }
     data_ = value;
-    if (auto external = data_->GetInterface<IExternalAny>()) {
-        // If the any type can be edited externally, connect any's OnDataChanged to
-        // our OnChanged
-        external->OnDataChanged()->AddHandler(OnChanged()->GetInvocable());
+    if (auto external = data_->get_interface<IExternalAny>()) {
+        // If the any type can be edited externally, connect any's on_data_changed to
+        // our on_changed
+        external->on_data_changed()->add_handler(on_changed()->get_invocable());
     }
-    return Succeeded(InvokeEvent(OnChanged(), data_.get()));
+    return succeeded(invoke_event(on_changed(), data_.get()));
 }
-IAny::Ptr PropertyImpl::GetAny() const
+IAny::Ptr PropertyImpl::get_any() const
 {
     return data_;
 }

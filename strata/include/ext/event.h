@@ -19,7 +19,7 @@ public:
     /** @brief Returns the event, creating it on first access. */
     operator IEvent::Ptr() const {
         if (!event_) {
-            event_ = Strata().Create<IEvent>(ClassId::Event);
+            event_ = instance().create<IEvent>(ClassId::Event);
         }
         return event_;
     }

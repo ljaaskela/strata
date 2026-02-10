@@ -39,10 +39,10 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, float, Width),
-        (PROP, float, Height),
-        (EVT, OnClicked),
-        (FN, Reset)
+        (PROP, float, width),
+        (PROP, float, height),
+        (EVT, on_clicked),
+        (FN, reset)
     )
 };
 ```
@@ -65,8 +65,8 @@ class ISerializable : public Interface<ISerializable>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, std::string, Name),
-        (FN, Serialize)
+        (PROP, std::string, name),
+        (FN, serialize)
     )
 };
 
@@ -77,21 +77,21 @@ class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 ### Register and create
 
 ```cpp
-auto& s = Strata();
-s.RegisterType<MyWidget>();
+auto& s = instance();
+s.register_type<MyWidget>();
 
-auto widget = s.Create<IObject>(MyWidget::GetClassUid());
+auto widget = s.create<IObject>(MyWidget::get_class_uid());
 ```
 
 ### Use typed accessors
 
 ```cpp
 if (auto* iw = interface_cast<IMyWidget>(widget)) {
-    iw->Width().Set(42.f);
-    float w = iw->Width().Get();  // 42.f
+    iw->width().set_value(42.f);
+    float w = iw->width().get_value();  // 42.f
 
-    IEvent::Ptr clicked = iw->OnClicked();
-    IFunction::Ptr reset = iw->Reset();
+    IEvent::Ptr clicked = iw->on_clicked();
+    IFunction::Ptr reset = iw->reset();
 }
 ```
 
@@ -100,7 +100,7 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 Static metadata is available from Strata without creating an instance:
 
 ```cpp
-if (auto* info = s.GetClassInfo(MyWidget::GetClassUid())) {
+if (auto* info = s.get_class_info(MyWidget::get_class_uid())) {
     for (auto& m : info->members) {
         // m.name, m.kind, m.typeUid, m.interfaceInfo
     }
@@ -111,9 +111,9 @@ Runtime metadata is available through `IMetadata` on any instance:
 
 ```cpp
 if (auto* meta = interface_cast<IMetadata>(widget)) {
-    auto prop  = meta->GetProperty("Width");   // IProperty::Ptr
-    auto event = meta->GetEvent("OnClicked");  // IEvent::Ptr
-    auto func  = meta->GetFunction("Reset");   // IFunction::Ptr
+    auto prop  = meta->get_property("width");       // IProperty::Ptr
+    auto event = meta->get_event("on_clicked");     // IEvent::Ptr
+    auto func  = meta->get_function("reset");       // IFunction::Ptr
 }
 ```
 
@@ -121,17 +121,17 @@ if (auto* meta = interface_cast<IMetadata>(widget)) {
 
 ```cpp
 auto prop = PropertyT<float>();
-prop.Set(5.f);
+prop.set_value(5.f);
 
 Function onChange([](const IAny* any) -> ReturnValue {
     if (auto v = AnyT<const float>(*any)) {
-        std::cout << "new value: " << v.Get() << std::endl;
+        std::cout << "new value: " << v.get_value() << std::endl;
     }
     return ReturnValue::SUCCESS;
 });
-prop.AddOnChanged(onChange);
+prop.add_on_changed(onChange);
 
-prop.Set(10.f);  // triggers onChange
+prop.set_value(10.f);  // triggers onChange
 ```
 
 ### Custom Any types
@@ -142,13 +142,13 @@ Implement `SingleTypeAny` to back a property with external or shared data:
 class MyDataAny final : public SingleTypeAny<MyDataAny, Data, IExternalAny>
 {
 public:
-    Data& Get() const override { return globalData_; }
-    ReturnValue Set(const Data& value) override {
+    Data& get_value() const override { return globalData_; }
+    ReturnValue set_value(const Data& value) override {
         globalData_ = value;
-        InvokeEvent(OnDataChanged(), this);
+        invoke_event(on_data_changed(), this);
         return ReturnValue::SUCCESS;
     }
-    IEvent::Ptr OnDataChanged() const override { return onChanged_; }
+    IEvent::Ptr on_data_changed() const override { return onChanged_; }
 };
 ```
 
@@ -162,7 +162,7 @@ strata/
     interface/           Abstract interfaces (pure virtual)
     ext/                 CRTP helpers and template implementations
     api/                 User-facing typed wrappers
-    common.h             Uid, TypeUid<T>(), GetName<T>()
+    common.h             Uid, type_uid<T>(), get_name<T>()
     array_view.h         Lightweight constexpr span-like view
   src/                   Internal runtime implementations (compiled into DLL)
 ```
@@ -171,10 +171,10 @@ strata/
 
 | Header | Description |
 |---|---|
-| `intf_interface.h` | `IInterface` root with UID-based `GetInterface()` and ref-counting; `Interface<T>` CRTP with auto UID |
+| `intf_interface.h` | `IInterface` root with UID-based `get_interface()` and ref-counting; `Interface<T>` CRTP with auto UID |
 | `intf_object.h` | `IObject` base, `ISharedFromObject` for self-pointer |
 | `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `STRATA_INTERFACE` macro |
-| `intf_property.h` | `IProperty` with type-erased get/set and OnChanged |
+| `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
 | `intf_event.h` | `IEvent` with add/remove handler |
 | `intf_function.h` | `IFunction` invocable callback |
 | `intf_any.h` | `IAny` type-erased value container |
@@ -187,7 +187,7 @@ strata/
 
 | Header | Description |
 |---|---|
-| `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `GetInterface` dispatching across a pack of interfaces |
+| `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces |
 | `refcounted_dispatch.h` | `RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
 | `core_object.h` | `ObjectFactory<T>` singleton factory; `CoreObject<T, Interfaces...>` CRTP with factory, self-pointer |
 | `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
@@ -199,7 +199,7 @@ strata/
 
 | Header | Description |
 |---|---|
-| `strata.h` | `Strata()` singleton access |
+| `strata.h` | `instance()` singleton access |
 | `property.h` | `PropertyT<T>` typed property wrapper |
 | `any.h` | `AnyT<T>` typed any wrapper |
 | `function.h` | `Function` wrapper with lambda support |
@@ -213,7 +213,7 @@ strata/
 | `property.cpp/h` | `PropertyImpl` |
 | `event.cpp/h` | `EventImpl` |
 | `function.cpp/h` | `FunctionImpl` |
-| `strata.cpp` | DLL entry point, exports `Strata()` |
+| `strata.cpp` | DLL entry point, exports `instance()` |
 
 ## Key types
 
@@ -221,11 +221,11 @@ strata/
 |---|---|
 | `Uid` | 64-bit FNV-1a hash identifying types and interfaces |
 | `Interface<T>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases |
-| `InterfaceDispatch<Interfaces...>` | Implements `GetInterface` dispatching across a pack of interfaces |
-| `RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`Ref`/`UnRef`) |
+| `InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces |
+| `RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |
 | `CoreObject<T, Interfaces...>` | CRTP base for concrete objects (without metadata); auto UID/name, factory, self-pointer |
 | `Object<T, Interfaces...>` | Extends `CoreObject` with metadata from all interfaces |
-| `PropertyT<T>` | Typed property with `Get()`/`Set()` and change events |
+| `PropertyT<T>` | Typed property with `get_value()`/`set_value()` and change events |
 | `AnyT<T>` | Typed view over `IAny` |
 | `Function` | Wraps `ReturnValue(const IAny*)` callbacks |
 | `MemberDesc` | Describes a property, event, or function member |
@@ -239,9 +239,72 @@ STRATA_INTERFACE(
     (EVT, Name),          // generates IEvent::Ptr Name() const
     (FN, Name)            // generates IFunction::Ptr Name() const
 )
+
+// A practical example of an interface which defines 3 members in its static metadata:
+
+class IMyWidget : public Interface<IMyWidget>
+{
+public:
+    STRATA_INTERFACE(
+        (PROP, float, width),
+        (EVT, on_clicked),
+        (FN, reset)
+    )
+};
+
 ```
 
 Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Members track which interface declared them via `InterfaceInfo`.
+
+### Manual metadata and accessors
+
+This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write the metadata array and accessor methods by hand. The macro generates two things:
+
+1. A `static constexpr std::array metadata` containing `MemberDesc` entries.
+2. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
+
+Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface above:
+
+```cpp
+class IMyWidget : public Interface<IMyWidget>
+{
+public:
+    // 1. Static metadata array
+    //    Each entry uses a helper: PropertyDesc<T>(), EventDesc(), or FunctionDesc().
+    //    Pass &INFO so each member knows which interface declared it.
+    //    INFO is provided by Interface<IMyWidget> automatically.
+    static constexpr std::array metadata = {
+        PropertyDesc<float>("width", &INFO),
+        EventDesc("on_clicked", &INFO),
+        FunctionDesc("reset", &INFO),
+    };
+
+    // 2. Typed accessor methods
+    //    Each accessor queries IMetadata on the concrete object (via get_interface)
+    //    and returns the runtime property/event/function by name.
+    //    The free functions get_property(), get_event(), get_function() handle
+    //    the null check on the IMetadata pointer.
+
+    PropertyT<float> width() const {
+        return PropertyT<float>(::strata::get_property(
+            this->template get_interface<IMetadata>(), "width"));
+    }
+
+    IEvent::Ptr on_clicked() const {
+        return ::strata::get_event(
+            this->template get_interface<IMetadata>(), "on_clicked");
+    }
+
+    IFunction::Ptr reset() const {
+        return ::strata::get_function(
+            this->template get_interface<IMetadata>(), "reset");
+    }
+};
+```
+
+The string names passed to `PropertyDesc` / `get_property` (etc.) must match exactly -- they are used for runtime lookup. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
+
+You can also use `STRATA_METADATA(...)` alone to generate only the metadata array without the accessor methods, then write the accessors yourself.
 
 ## Project structure
 
@@ -252,7 +315,7 @@ strata/
   strata/
     CMakeLists.txt
     include/              Public headers
-      common.h            Uid, TypeUid<T>(), GetName<T>()
+      common.h            Uid, type_uid<T>(), get_name<T>()
       array_view.h        Lightweight constexpr span-like view
       interface/          Abstract interfaces
       ext/                CRTP helpers

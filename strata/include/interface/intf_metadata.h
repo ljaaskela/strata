@@ -28,7 +28,7 @@ struct MemberDesc {
 template<class T>
 constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* info = nullptr)
 {
-    return {name, MemberKind::Property, TypeUid<T>(), info};
+    return {name, MemberKind::Property, type_uid<T>(), info};
 }
 
 /** @brief Creates an Event MemberDesc. */
@@ -48,15 +48,33 @@ class IMetadata : public Interface<IMetadata>
 {
 public:
     /** @brief Returns the static metadata descriptors for this object's class. */
-    virtual array_view<MemberDesc> GetStaticMetadata() const = 0;
+    virtual array_view<MemberDesc> get_static_metadata() const = 0;
 
     /** @brief Returns the runtime property instance for the named member, or nullptr. */
-    virtual IProperty::Ptr GetProperty(std::string_view name) const = 0;
+    virtual IProperty::Ptr get_property(std::string_view name) const = 0;
     /** @brief Returns the runtime event instance for the named member, or nullptr. */
-    virtual IEvent::Ptr GetEvent(std::string_view name) const = 0;
+    virtual IEvent::Ptr get_event(std::string_view name) const = 0;
     /** @brief Returns the runtime function instance for the named member, or nullptr. */
-    virtual IFunction::Ptr GetFunction(std::string_view name) const = 0;
+    virtual IFunction::Ptr get_function(std::string_view name) const = 0;
 };
+
+/** @brief Null-safe property lookup on an IMetadata pointer. */
+inline IProperty::Ptr get_property(const IMetadata* meta, std::string_view name)
+{
+    return meta ? meta->get_property(name) : nullptr;
+}
+
+/** @brief Null-safe event lookup on an IMetadata pointer. */
+inline IEvent::Ptr get_event(const IMetadata* meta, std::string_view name)
+{
+    return meta ? meta->get_event(name) : nullptr;
+}
+
+/** @brief Null-safe function lookup on an IMetadata pointer. */
+inline IFunction::Ptr get_function(const IMetadata* meta, std::string_view name)
+{
+    return meta ? meta->get_function(name) : nullptr;
+}
 
 /**
  * @brief Abstract interface for runtime metadata storage.
@@ -67,7 +85,7 @@ public:
     /**
      * @brief Set metadata container. Called internally by the library.
      */
-    virtual void SetMetadataContainer(IMetadata *metadata) = 0;
+    virtual void set_metadata_container(IMetadata *metadata) = 0;
 };
 
 } // namespace strata
@@ -142,18 +160,18 @@ public:
 
 #define _STRATA_ACC_PROP(Type, Name) \
     ::strata::PropertyT<Type> Name() const { \
-        auto* meta_ = this->template GetInterface<::strata::IMetadata>(); \
-        return ::strata::PropertyT<Type>(meta_ ? meta_->GetProperty(#Name) : nullptr); \
+        return ::strata::PropertyT<Type>(::strata::get_property( \
+            this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
 #define _STRATA_ACC_EVT(Name) \
     ::strata::IEvent::Ptr Name() const { \
-        auto* meta_ = this->template GetInterface<::strata::IMetadata>(); \
-        return meta_ ? meta_->GetEvent(#Name) : nullptr; \
+        return ::strata::get_event( \
+            this->template get_interface<::strata::IMetadata>(), #Name); \
     }
 #define _STRATA_ACC_FN(Name) \
     ::strata::IFunction::Ptr Name() const { \
-        auto* meta_ = this->template GetInterface<::strata::IMetadata>(); \
-        return meta_ ? meta_->GetFunction(#Name) : nullptr; \
+        return ::strata::get_function( \
+            this->template get_interface<::strata::IMetadata>(), #Name); \
     }
 #define _STRATA_ACC(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_ACC_, Tag)(__VA_ARGS__))
 
@@ -190,10 +208,10 @@ public:
  * {
  * public:
  *     STRATA_INTERFACE(
- *         (PROP, float, Width),
- *         (PROP, float, Height),
- *         (EVT, OnClicked),
- *         (FN, Reset)
+ *         (PROP, float, width),
+ *         (PROP, float, height),
+ *         (EVT, on_clicked),
+ *         (FN, reset)
  *     )
  * };
  * @endcode
@@ -208,18 +226,18 @@ public:
  *
  * @par Example: using accessors on an instance
  * @code
- * auto widget = Strata().Create<IObject>(MyWidget::GetClassUid());
+ * auto widget = instance().create<IObject>(MyWidget::get_class_uid());
  * if (auto* iw = interface_cast<IMyWidget>(widget)) {
- *     iw->Width().Set(42.f);
- *     float w = iw->Width().Get();   // 42.f
- *     IEvent::Ptr clicked = iw->OnClicked();
- *     IFunction::Ptr reset = iw->Reset();
+ *     iw->width().Set(42.f);
+ *     float w = iw->width().Get();   // 42.f
+ *     IEvent::Ptr clicked = iw->on_clicked();
+ *     IFunction::Ptr reset = iw->reset();
  * }
  * @endcode
  *
  * @par Example: querying static metadata without an instance
  * @code
- * if (auto* info = Strata().GetClassInfo(MyWidget::GetClassUid())) {
+ * if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
  *     for (auto& m : info->members) {
  *         // m.name, m.kind, m.typeUid
  *     }

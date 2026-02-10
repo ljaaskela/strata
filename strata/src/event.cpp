@@ -2,20 +2,20 @@
 
 namespace strata {
 
-ReturnValue EventImpl::Invoke(const IAny *args) const
+ReturnValue EventImpl::invoke(const IAny *args) const
 {
     for (const auto &h : handlers_) {
-        h->Invoke(args);
+        h->invoke(args);
     }
     return ReturnValue::SUCCESS;
 }
 
-const IFunction::ConstPtr EventImpl::GetInvocable() const
+const IFunction::ConstPtr EventImpl::get_invocable() const
 {
-    return GetSelf<IFunction>();
+    return get_self<IFunction>();
 }
 
-ReturnValue EventImpl::AddHandler(const IFunction::ConstPtr &fn) const
+ReturnValue EventImpl::add_handler(const IFunction::ConstPtr &fn) const
 {
     if (!fn) {
         return ReturnValue::INVALID_ARGUMENT;
@@ -29,7 +29,7 @@ ReturnValue EventImpl::AddHandler(const IFunction::ConstPtr &fn) const
     return ReturnValue::SUCCESS;
 }
 
-ReturnValue EventImpl::RemoveHandler(const IFunction::ConstPtr &fn) const
+ReturnValue EventImpl::remove_handler(const IFunction::ConstPtr &fn) const
 {
     auto pos = 0;
     for (const auto &h : handlers_) {

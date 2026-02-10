@@ -19,9 +19,9 @@ public:
     /** @brief Creates a Function backed by the given callback. */
     Function(CallbackFn *cb)
     {
-        fn_ = Strata().Create<IFunction>(ClassId::Function);
+        fn_ = instance().create<IFunction>(ClassId::Function);
         if (auto internal = interface_cast<IFunctionInternal>(fn_); internal && cb) {
-            internal->SetInvokeCallback(cb);
+            internal->set_invoke_callback(cb);
         }
     }
 
@@ -30,9 +30,9 @@ public:
     operator const IFunction::ConstPtr() const { return fn_; }
 
     /** @brief Invokes the function with no arguments. */
-    ReturnValue Invoke() const { return Invoke({}); }
+    ReturnValue invoke() const { return invoke({}); }
     /** @brief Invokes the function with the given @p args. */
-    ReturnValue Invoke(const IAny *args) const { return fn_->Invoke(args); }
+    ReturnValue invoke(const IAny *args) const { return fn_->invoke(args); }
 
 private:
     IFunction::Ptr fn_;

@@ -53,7 +53,7 @@ struct type_name_holder
  * @tparam T The type whose name to retrieve.
  */
 template<typename T>
-constexpr std::string_view GetName()
+constexpr std::string_view get_name()
 {
     constexpr auto &value = type_name_holder<T>::value;
     return std::string_view{value.data(), value.size()};
@@ -64,9 +64,9 @@ constexpr std::string_view GetName()
  * @tparam T The type to identify.
  */
 template<class... T>
-constexpr Uid TypeUid()
+constexpr Uid type_uid()
 {
-    return make_hash(GetName<T...>());
+    return make_hash(get_name<T...>());
 }
 
 } // namespace strata

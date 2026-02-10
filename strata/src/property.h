@@ -16,13 +16,13 @@ public:
     PropertyImpl() = default;
 
 protected: // IProperty
-    ReturnValue SetValue(const IAny &from) override;
-    const IAny::ConstPtr GetValue() const override;
-    IEvent::Ptr OnChanged() const override { return onChanged_; }
+    ReturnValue set_value(const IAny &from) override;
+    const IAny::ConstPtr get_value() const override;
+    IEvent::Ptr on_changed() const override { return onChanged_; }
 
 protected: // IPropertyInternal
-    bool SetAny(const IAny::Ptr &value) override;
-    IAny::Ptr GetAny() const override;
+    bool set_any(const IAny::Ptr &value) override;
+    IAny::Ptr get_any() const override;
 
 private:
     IAny::Ptr data_;

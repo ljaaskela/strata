@@ -9,8 +9,8 @@ namespace strata {
 /**
  * @brief Concrete implementation of IInterface for an arbitrary pack of interfaces.
  *
- * Inherits all Interfaces and dispatches GetInterface queries by UID.
- * Ref and UnRef are no-ops; override them in a derived class (e.g.
+ * Inherits all Interfaces and dispatches get_interface queries by UID.
+ * ref and unref are no-ops; override them in a derived class (e.g.
  * RefCountedDispatch) to add lifetime management.
  *
  * @tparam Interfaces The interfaces this class implements (each must derive from IInterface).
@@ -21,30 +21,30 @@ class InterfaceDispatch : public Interfaces...
 private:
     /** @brief Sets *interface to a T* pointer if uid matches T::UID. */
     template<class T>
-    constexpr void FindInterface(Uid uid, void **interface)
+    constexpr void find_interface(Uid uid, void **interface)
     {
         if (uid == T::UID) {
             *interface = static_cast<T *>(this);
         }
     }
 
-    /** @brief Recursion terminator for FindSiblings when the pack is empty. */
+    /** @brief Recursion terminator for find_siblings when the pack is empty. */
     template<class... B, class = std::enable_if_t<sizeof...(B) == 0>>
-    constexpr void FindSiblings(Uid, void **)
+    constexpr void find_siblings(Uid, void **)
     {}
-    /** @brief Walks the interface pack, calling FindInterface for each type until a match is found. */
+    /** @brief Walks the interface pack, calling find_interface for each type until a match is found. */
     template<class A, class... B>
-    constexpr void FindSiblings(Uid uid, void **interface)
+    constexpr void find_siblings(Uid uid, void **interface)
     {
-        FindInterface<A>(uid, interface);
+        find_interface<A>(uid, interface);
         if (*interface == nullptr) {
-            FindSiblings<B...>(uid, interface);
+            find_siblings<B...>(uid, interface);
         }
     }
 
     /** @brief Returns an IInterface* via the first type in the pack (used for IInterface::UID queries). */
     template<class First, class...>
-    constexpr IInterface *AsFirstInterface() { return static_cast<First *>(this); }
+    constexpr IInterface *as_first_interface() { return static_cast<First *>(this); }
 
 public:
     /**
@@ -53,32 +53,32 @@ public:
      * For IInterface::UID, returns a pointer cast through the first interface in the pack.
      * For all other UIDs, walks the pack and returns the first match, or nullptr.
      */
-    IInterface *GetInterface(Uid uid) override
+    IInterface *get_interface(Uid uid) override
     {
         void *interface = nullptr;
         if (uid == IInterface::UID) {
-            return AsFirstInterface<Interfaces...>();
+            return as_first_interface<Interfaces...>();
         }
-        FindSiblings<Interfaces...>(uid, &interface);
+        find_siblings<Interfaces...>(uid, &interface);
         return static_cast<IInterface *>(interface);
     }
-    /** @copydoc GetInterface(Uid) */
-    const IInterface *GetInterface(Uid uid) const override
+    /** @copydoc get_interface(Uid) */
+    const IInterface *get_interface(Uid uid) const override
     {
-        return const_cast<InterfaceDispatch *>(this)->GetInterface(uid);
+        return const_cast<InterfaceDispatch *>(this)->get_interface(uid);
     }
 
     /** @brief Type-safe convenience wrapper; resolves T::UID and casts the result to T*. */
     template<class T>
-    T *GetInterface()
+    T *get_interface()
     {
-        return static_cast<T *>(GetInterface(T::UID));
+        return static_cast<T *>(get_interface(T::UID));
     }
 
     /** @brief No-op. Override in a derived class to add reference counting. */
-    void Ref() override {}
+    void ref() override {}
     /** @brief No-op. Override in a derived class to add reference counting. */
-    void UnRef() override {}
+    void unref() override {}
 
 protected:
     InterfaceDispatch() = default;

@@ -58,30 +58,30 @@ public:
 
 public:
     /** @brief Returns a pointer to the requested interface, or nullptr if not supported. */
-    virtual IInterface* GetInterface(Uid uid) = 0;
-    /** @copydoc GetInterface(Uid) */
-    virtual const IInterface *GetInterface(Uid uid) const = 0;
+    virtual IInterface* get_interface(Uid uid) = 0;
+    /** @copydoc get_interface(Uid) */
+    virtual const IInterface *get_interface(Uid uid) const = 0;
 
     /**
      * @brief Type-safe interface query.
      * @tparam T The interface type to query for. Must have a static UID member.
      */
     template<class T>
-    T *GetInterface() noexcept
+    T *get_interface() noexcept
     {
-        return static_cast<T*>(GetInterface(T::UID));
+        return static_cast<T*>(get_interface(T::UID));
     }
-    /** @copydoc GetInterface() */
+    /** @copydoc get_interface() */
     template<class T>
-    const T *GetInterface() const noexcept
+    const T *get_interface() const noexcept
     {
-        return static_cast<const T *>(GetInterface(T::UID));
+        return static_cast<const T *>(get_interface(T::UID));
     }
 
     /** @brief Increments the reference count. */
-    virtual void Ref() = 0;
+    virtual void ref() = 0;
     /** @brief Decrements the reference count. May delete the object when it reaches zero. */
-    virtual void UnRef() = 0;
+    virtual void unref() = 0;
 
 protected:
     IInterface() = default;
@@ -103,9 +103,9 @@ class Interface : public IInterface
 {
 public:
     /** @brief Compile-time unique identifier for this interface type. */
-    static constexpr Uid UID = TypeUid<T>();
+    static constexpr Uid UID = type_uid<T>();
     /** @brief Static descriptor containing the UID and human-readable name. */
-    static constexpr InterfaceInfo INFO { TypeUid<T>(), GetName<T>() };
+    static constexpr InterfaceInfo INFO { type_uid<T>(), get_name<T>() };
     /** @brief Shared pointer to a mutable T. */
     using Ptr = std::shared_ptr<T>;
     /** @brief Shared pointer to a const T. */
@@ -116,7 +116,7 @@ public:
     using ConstWeakPtr = std::weak_ptr<const T>;
     /** @brief Intrusive reference-counting pointer to T. */
     using RefPtr = refcnt_ptr<T>;
-    using IInterface::GetInterface;
+    using IInterface::get_interface;
 
 protected:
     Interface() = default;

@@ -35,19 +35,19 @@ Data globalData_;
 class MyDataAny final : public SingleTypeAny<MyDataAny, Data, IExternalAny>
 {
 public:
-    Data &Get() const override { return globalData_; }
-    ReturnValue Set(const Data &value) override
+    Data &get_value() const override { return globalData_; }
+    ReturnValue set_value(const Data &value) override
     {
         if (value != globalData_) {
             globalData_.value = value.value;
             globalData_.name = value.name;
-            InvokeEvent(OnDataChanged(), this);
+            invoke_event(on_data_changed(), this);
             return ReturnValue::SUCCESS;
         }
         return ReturnValue::NOTHING_TO_DO;
     }
 
-    IEvent::Ptr OnDataChanged() const override
+    IEvent::Ptr on_data_changed() const override
     {
         return globalData_.onChanged;
     }
@@ -59,10 +59,10 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, float, Width),
-        (PROP, float, Height),
-        (EVT, OnClicked),
-        (FN, Reset)
+        (PROP, float, width),
+        (PROP, float, height),
+        (EVT, on_clicked),
+        (FN, reset)
     )
 };
 
@@ -70,8 +70,8 @@ class ISerializable : public Interface<ISerializable>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, std::string, Name),
-        (FN, Serialize)
+        (PROP, std::string, name),
+        (FN, serialize)
     )
 };
 
@@ -81,26 +81,26 @@ class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 
 int main()
 {
-    auto &r = Strata();
+    auto &r = instance();
 
-    r.RegisterType<MyDataAny>();
-    r.RegisterType<MyWidget>();
+    r.register_type<MyDataAny>();
+    r.register_type<MyWidget>();
 
     auto prop = PropertyT<float>();
-    prop.Set(5.f);
+    prop.set_value(5.f);
     auto prop2 = prop;
     auto prop3 = PropertyT<float>(prop);
 
-    auto value = prop.Get();
+    auto value = prop.get_value();
     std::cout << "Property<float> prop1 value is " << value << std::endl;
-    std::cout << "Property<float> prop2 value is " << prop2.Get() << std::endl;
-    std::cout << "Property<float> prop3 value is " << prop3.Get() << std::endl;
+    std::cout << "Property<float> prop2 value is " << prop2.get_value() << std::endl;
+    std::cout << "Property<float> prop3 value is " << prop3.get_value() << std::endl;
 
     AnyT<Data> data;                 // One view to globalData
     auto myprop = PropertyT<Data>(); // Property to global data
-    myprop.Set({10.f, "Hello"});
+    myprop.set_value({10.f, "Hello"});
 
-    std::cout << "Property<Data> value is " << myprop.Get().value << ":" << myprop.Get().name
+    std::cout << "Property<Data> value is " << myprop.get_value().value << ":" << myprop.get_value().name
               << std::endl;
 
     Function valueChanged([](const IAny *any) -> ReturnValue {
@@ -109,9 +109,9 @@ int main()
             return ReturnValue::INVALID_ARGUMENT;
         }
         if (auto v = AnyT<const float>(*any)) {
-            std::cout << "new value: " << v.Get();
+            std::cout << "new value: " << v.get_value();
         } else if (auto v = AnyT<const Data>(*any)) {
-            auto value = v.Get();
+            auto value = v.get_value();
             std::cout << "new value: " << value.name << ", " << value.value;
         } else {
             std::cout << "property not convertible to float or Data";
@@ -119,12 +119,12 @@ int main()
         std::cout << std::endl;
         return ReturnValue::SUCCESS;
     });
-    prop.AddOnChanged(valueChanged);
-    myprop.AddOnChanged(valueChanged);
+    prop.add_on_changed(valueChanged);
+    myprop.add_on_changed(valueChanged);
 
-    prop.Set(10.f);
-    data.Set({20.f, "Hello2"});   // Set global data directly
-    myprop.Set({30.f, "Hello3"}); // Set global data through property
+    prop.set_value(10.f);
+    data.set_value({20.f, "Hello2"});   // Set global data directly
+    myprop.set_value({30.f, "Hello3"}); // Set global data through property
 
     std::cout << "sizeof(float)            " << sizeof(float) << std::endl;
     std::cout << "sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << std::endl;
@@ -135,7 +135,7 @@ int main()
 
     // --- Static metadata via Strata (no instance needed) ---
     std::cout << "\n--- MyWidget static metadata ---" << std::endl;
-    if (auto* info = r.GetClassInfo(MyWidget::GetClassUid())) {
+    if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
         std::cout << "Class: " << info->name << " (" << info->members.size() << " members)" << std::endl;
         for (auto& m : info->members) {
             const char* kind = m.kind == MemberKind::Property ? "Property"
@@ -151,44 +151,44 @@ int main()
 
     // --- Runtime metadata via IMetadata ---
     std::cout << "\n--- MyWidget instance metadata ---" << std::endl;
-    auto widget = r.Create<IObject>(MyWidget::GetClassUid());
+    auto widget = r.create<IObject>(MyWidget::get_class_uid());
     if (auto* meta = interface_cast<IMetadata>(widget)) {
-        for (auto &m : meta->GetStaticMetadata()) {
+        for (auto &m : meta->get_static_metadata()) {
             std::cout << "  member: " << m.name << std::endl;
         }
-        if (auto p = meta->GetProperty("Width")) {
-            std::cout << "  GetProperty(\"Width\") ok" << std::endl;
+        if (auto p = meta->get_property("width")) {
+            std::cout << "  get_property(\"width\") ok" << std::endl;
         }
-        if (auto e = meta->GetEvent("OnClicked")) {
-            std::cout << "  GetEvent(\"OnClicked\") ok" << std::endl;
+        if (auto e = meta->get_event("on_clicked")) {
+            std::cout << "  get_event(\"on_clicked\") ok" << std::endl;
         }
-        if (auto f = meta->GetFunction("Reset")) {
-            std::cout << "  GetFunction(\"Reset\") ok" << std::endl;
+        if (auto f = meta->get_function("reset")) {
+            std::cout << "  get_function(\"reset\") ok" << std::endl;
         }
-        if (!meta->GetProperty("Bogus")) {
-            std::cout << "  GetProperty(\"Bogus\") correctly returned null" << std::endl;
+        if (!meta->get_property("Bogus")) {
+            std::cout << "  get_property(\"Bogus\") correctly returned null" << std::endl;
         }
     }
 
     // --- Typed access via IMyWidget interface ---
     std::cout << "\n--- MyWidget via IMyWidget interface ---" << std::endl;
     if (auto* iw = interface_cast<IMyWidget>(widget)) {
-        auto width = iw->Width();
-        width.Set(42.f);
-        std::cout << "  Width().Set(42) -> Width().Get() = " << iw->Width().Get() << std::endl;
+        auto w = iw->width();
+        w.set_value(42.f);
+        std::cout << "  width().set_value(42) -> width().get_value() = " << iw->width().get_value() << std::endl;
 
-        std::cout << "  Height() ok: " << (iw->Height() ? "yes" : "no") << std::endl;
-        std::cout << "  OnClicked() ok: " << (iw->OnClicked() ? "yes" : "no") << std::endl;
-        std::cout << "  Reset() ok: " << (iw->Reset() ? "yes" : "no") << std::endl;
+        std::cout << "  height() ok: " << (iw->height() ? "yes" : "no") << std::endl;
+        std::cout << "  on_clicked() ok: " << (iw->on_clicked() ? "yes" : "no") << std::endl;
+        std::cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << std::endl;
     }
 
     // --- Typed access via ISerializable interface ---
     std::cout << "\n--- MyWidget via ISerializable interface ---" << std::endl;
     if (auto* is = interface_cast<ISerializable>(widget)) {
-        auto name = is->Name();
-        name.Set(std::string("MyWidget1"));
-        std::cout << "  Name().Set(\"MyWidget1\") -> Name().Get() = " << is->Name().Get() << std::endl;
-        std::cout << "  Serialize() ok: " << (is->Serialize() ? "yes" : "no") << std::endl;
+        auto n = is->name();
+        n.set_value(std::string("MyWidget1"));
+        std::cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value() << std::endl;
+        std::cout << "  serialize() ok: " << (is->serialize() ? "yes" : "no") << std::endl;
     }
 
     return 0;

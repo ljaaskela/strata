@@ -6,7 +6,7 @@
 /**
  * @brief Intrusive reference-counting smart pointer for IInterface-derived types.
  *
- * Calls Ref() on acquisition and UnRef() on release. Unlike std::shared_ptr,
+ * Calls ref() on acquisition and unref() on release. Unlike std::shared_ptr,
  * the reference count is stored in the object itself.
  *
  * @tparam T An IInterface-derived type.
@@ -17,7 +17,7 @@ class refcnt_ptr
     static_assert(std::is_convertible_v<T *, IInterface *>, "T must derive from IInterface");
 public:
     constexpr refcnt_ptr() = default;
-    /** @brief Takes ownership of @p p, calling Ref() on it. */
+    /** @brief Takes ownership of @p p, calling ref() on it. */
     constexpr refcnt_ptr(T *p) noexcept { reset(p); }
     ~refcnt_ptr() noexcept { release(); }
     constexpr refcnt_ptr &operator=(const refcnt_ptr &o) noexcept
@@ -25,7 +25,7 @@ public:
         reset(o.ptr_);
         return *this;
     }
-    /** @brief Copy constructor — shares ownership by calling Ref(). */
+    /** @brief Copy constructor — shares ownership by calling ref(). */
     constexpr refcnt_ptr(const refcnt_ptr &o) noexcept { reset(o.ptr_); }
     /** @brief Move constructor — transfers ownership without touching the reference count. */
     constexpr refcnt_ptr(refcnt_ptr &&o) noexcept
@@ -48,7 +48,7 @@ public:
     {
         release();
         if (ptr) {
-            ptr->Ref();
+            ptr->ref();
             ptr_ = ptr;
         }
     }
@@ -57,7 +57,7 @@ private:
     constexpr void release() noexcept
     {
         if (ptr_) {
-            ptr_->UnRef();
+            ptr_->unref();
             ptr_ = {};
         }
     }

@@ -16,7 +16,7 @@ public:
     /** @brief Implicit conversion to a const IAny pointer. */
     operator const IAny *() const noexcept { return any_.get(); }
     /** @brief Returns the underlying const IAny pointer. */
-    const IAny *GetAnyInterface() const noexcept { return any_.get(); }
+    const IAny *get_any_interface() const noexcept { return any_.get(); }
     /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
 
@@ -24,23 +24,23 @@ protected:
     ConstAny() = default;
     virtual ~ConstAny() = default;
 
-    void SetAny(const IAny &any, const Uid &req) noexcept
+    void set_any(const IAny &any, const Uid &req) noexcept
     {
-        if (IsCompatible(any, req)) {
-            SetAnyDirect(any);
+        if (is_compatible(any, req)) {
+            set_any_direct(any);
         }
     }
-    void SetAny(const IAny::ConstPtr &any, const Uid &req) noexcept
+    void set_any(const IAny::ConstPtr &any, const Uid &req) noexcept
     {
-        if (IsCompatible(any, req)) {
-            SetAnyDirect(any);
+        if (is_compatible(any, req)) {
+            set_any_direct(any);
         }
     }
-    void SetAnyDirect(const IAny &any) noexcept
+    void set_any_direct(const IAny &any) noexcept
     {
         any_ = refcnt_ptr<IAny>(const_cast<IAny *>(&any));
     }
-    void SetAnyDirect(const IAny::ConstPtr &any) noexcept { SetAnyDirect(*(any.get())); }
+    void set_any_direct(const IAny::ConstPtr &any) noexcept { set_any_direct(*(any.get())); }
     refcnt_ptr<IAny> any_;
 };
 
@@ -51,16 +51,16 @@ public:
     /** @brief Implicit conversion to a mutable IAny pointer. */
     operator IAny *() { return any_.get(); }
     /** @brief Copies the value from @p other into the managed IAny. */
-    bool CopyFrom(const IAny &other) { return any_ && any_->CopyFrom(other); }
+    bool copy_from(const IAny &other) { return any_ && any_->copy_from(other); }
     /** @brief Returns the underlying mutable IAny pointer. */
-    IAny *GetAnyInterface() { return any_.get(); }
+    IAny *get_any_interface() { return any_.get(); }
 
 protected:
     Any() = default;
 };
 
 /**
- * @brief Typed wrapper for IAny that provides Get/Set accessors for type T.
+ * @brief Typed wrapper for IAny that provides get_value/set_value accessors for type T.
  *
  * Can be constructed from an existing IAny or will create a new one from Strata.
  *
@@ -73,63 +73,64 @@ class AnyT final : public Any
     static constexpr auto TYPE_SIZE = sizeof(T);
 
 public:
-    static constexpr Uid TYPE_UID = TypeUid<std::remove_const_t<T>>();
+    static constexpr Uid TYPE_UID = type_uid<std::remove_const_t<T>>();
 
     /** @brief Wraps an existing mutable IAny pointer (read-write only). */
     template<class Flag = std::enable_if_t<IsReadWrite>>
     constexpr AnyT(const IAny::Ptr &any) noexcept
     {
-        SetAny(any, TYPE_UID);
+        set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer. */
-    constexpr AnyT(const IAny::ConstPtr &any) noexcept { SetAny(any, TYPE_UID); }
+    constexpr AnyT(const IAny::ConstPtr &any) noexcept { set_any(any, TYPE_UID); }
     /** @brief Wraps a const IAny reference. */
-    constexpr AnyT(const IAny &any) noexcept { SetAny(any, TYPE_UID); }
+    constexpr AnyT(const IAny &any) noexcept { set_any(any, TYPE_UID); }
     /** @brief Move-constructs from an IAny rvalue. */
     constexpr AnyT(IAny &&any) noexcept
     {
-        if (IsCompatible(any, TYPE_UID)) {
+        if (is_compatible(any, TYPE_UID)) {
             any_ = std::move(any);
         }
     }
     /** @brief Default-constructs an IAny of type T via Strata. */
-    AnyT() noexcept { Create(); }
+    AnyT() noexcept { create(); }
     /** @brief Constructs an IAny of type T and initializes it with @p value. */
     AnyT(const T &value) noexcept
     {
-        if (!IsCompatible(any_, TYPE_UID)) {
-            auto any = Strata().CreateAny(TYPE_UID);
+        if (!is_compatible(any_, TYPE_UID)) {
+            auto any = instance().create_any(TYPE_UID);
             any_.reset(any.get());
         }
-        any_->SetData(&value, TYPE_SIZE, TYPE_UID);
+        any_->set_data(&value, TYPE_SIZE, TYPE_UID);
     }
+    /** @brief Returns a const reference to the underlying IAny. */
     operator const IAny &() const noexcept { return *(any_.get()); }
-
-    constexpr Uid GetTypeUid() const noexcept { return TYPE_UID; }
+    /** @brief Returns the type id of the any value. */
+    constexpr Uid get_type_uid() const noexcept { return TYPE_UID; }
     /** @brief Returns a copy of the stored value. */
-    T Get() const noexcept
+    T get_value() const noexcept
     {
         std::remove_const_t<T> value{};
         if (any_) {
-            any_->GetData(&value, sizeof(T), TYPE_UID);
+            any_->get_data(&value, sizeof(T), TYPE_UID);
         }
         return value;
     }
     /** @brief Overwrites the stored value with @p value. */
-    void Set(const T &value) noexcept
+    void set_value(const T &value) noexcept
     {
         if (any_) {
-            any_->SetData(&value, sizeof(T), TYPE_UID);
+            any_->set_data(&value, sizeof(T), TYPE_UID);
         }
     }
 
     /** @brief Creates a read-write typed view over an existing IAny pointer. */
-    static AnyT<T> Ref(const IAny::Ptr &ref) { return AnyT<T>(ref); }
+    static AnyT<T> ref(const IAny::Ptr &ref) { return AnyT<T>(ref); }
     /** @brief Creates a read-only typed view over an existing const IAny pointer. */
-    static const AnyT<const T> ConstRef(const IAny::ConstPtr &ref) { return AnyT<const T>(ref); }
+    static const AnyT<const T> const_ref(const IAny::ConstPtr &ref) { return AnyT<const T>(ref); }
 
 protected:
-    void Create() { SetAnyDirect(Strata().CreateAny(TYPE_UID)); }
+    void create() { set_any_direct(instance().create_any(TYPE_UID)); }
 };
 
 } // namespace strata

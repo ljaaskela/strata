@@ -11,9 +11,9 @@ class IObjectFactory : public Interface<IObjectFactory>
 {
 public:
     /** @brief Creates a new instance of the class this factory represents. */
-    virtual IObject::Ptr CreateInstance() const = 0;
+    virtual IObject::Ptr create_instance() const = 0;
     /** @brief Returns the ClassInfo describing the class this factory creates. */
-    virtual const ClassInfo &GetClassInfo() const = 0;
+    virtual const ClassInfo &get_class_info() const = 0;
 };
 
 } // namespace strata

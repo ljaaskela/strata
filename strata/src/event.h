@@ -16,12 +16,12 @@ public:
     EventImpl() = default;
 
 protected: // IFunction
-    ReturnValue Invoke(const IAny *args) const override;
+    ReturnValue invoke(const IAny *args) const override;
 
 protected: // IEvent
-    const IFunction::ConstPtr GetInvocable() const override;
-    ReturnValue AddHandler(const IFunction::ConstPtr &fn) const override;
-    ReturnValue RemoveHandler(const IFunction::ConstPtr &fn) const override;
+    const IFunction::ConstPtr get_invocable() const override;
+    ReturnValue add_handler(const IFunction::ConstPtr &fn) const override;
+    ReturnValue remove_handler(const IFunction::ConstPtr &fn) const override;
 
 private:
     mutable std::vector<IFunction::ConstPtr> handlers_;

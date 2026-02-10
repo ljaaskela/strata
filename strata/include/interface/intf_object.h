@@ -22,9 +22,9 @@ class ISharedFromObject : public Interface<ISharedFromObject>
 {
 public:
     /** @brief Stores the owning shared_ptr. Called by the factory after creation. */
-    virtual void SetSelf(const IObject::Ptr &self) = 0;
+    virtual void set_self(const IObject::Ptr &self) = 0;
     /** @brief Returns a shared_ptr to this object, or nullptr if expired. */
-    virtual IObject::Ptr GetSelf() const = 0;
+    virtual IObject::Ptr get_self() const = 0;
 };
 
 /**
@@ -37,7 +37,7 @@ template<class T>
 typename T::Ptr interface_pointer_cast(IObject *obj)
 {
     if (auto s = interface_pointer_cast<ISharedFromObject>(obj)) {
-        return interface_pointer_cast<T>(s->GetSelf());
+        return interface_pointer_cast<T>(s->get_self());
     }
     return {};
 }

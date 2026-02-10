@@ -2,7 +2,7 @@
 
 namespace strata {
 
-ReturnValue FunctionImpl::Invoke(const IAny *args) const
+ReturnValue FunctionImpl::invoke(const IAny *args) const
 {
     if (fn_) {
         return fn_(args);
@@ -10,7 +10,7 @@ ReturnValue FunctionImpl::Invoke(const IAny *args) const
     return ReturnValue::NOTHING_TO_DO;
 }
 
-void FunctionImpl::SetInvokeCallback(IFunction::CallableFn *fn)
+void FunctionImpl::set_invoke_callback(IFunction::CallableFn *fn)
 {
     fn_ = fn;
 }
