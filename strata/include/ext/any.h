@@ -19,7 +19,9 @@ template<class FinalClass, class... Interfaces>
 class BaseAny : public CoreObject<FinalClass, IAny, Interfaces...>
 {
 public:
+    /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr const std::string_view GetClassName() { return GetName<FinalClass>(); }
+    /** @brief Returns a default UID (overridden by typed subclasses). */
     static constexpr Uid GetClassUid() { return {}; }
 };
 
@@ -34,12 +36,14 @@ class BaseAnyT : public BaseAny<FinalClass>
 public:
     static constexpr Uid TYPE_UID = TypeUid<Types...>();
 
+    /** @brief Returns the list of type UIDs this any is compatible with. */
     const std::vector<Uid> &GetCompatibleTypes() const override
     {
         static std::vector<Uid> uids = {(TypeUid<Types>())...};
         return uids;
     }
 
+    /** @brief Returns the UID for the combined type pack. */
     static constexpr Uid GetClassUid() { return TYPE_UID; }
 };
 
@@ -51,11 +55,15 @@ class SingleTypeAny : public BaseAny<FinalClass, Interfaces...>
 {
 public:
     static constexpr Uid TYPE_UID = TypeUid<T>();
+    /** @brief Sets the stored value. Returns SUCCESS if changed, NOTHING_TO_DO if identical. */
     virtual ReturnValue Set(const T &value) = 0;
+    /** @brief Returns a const reference to the stored value. */
     virtual const T &Get() const = 0;
 
+    /** @brief Returns the UID for type T. */
     static constexpr Uid GetClassUid() { return TYPE_UID; }
 
+    /** @brief Returns a single-element list containing TYPE_UID. */
     const std::vector<Uid> &GetCompatibleTypes() const override
     {
         static std::vector<Uid> uids = {TYPE_UID};

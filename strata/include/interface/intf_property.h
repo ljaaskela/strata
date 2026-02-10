@@ -6,6 +6,7 @@
 
 namespace strata {
 
+/** @brief Interface for a type-erased property with change notification. */
 class IProperty : public Interface<IProperty>
 {
 public:
@@ -28,6 +29,7 @@ public:
     virtual IEvent::Ptr OnChanged() const = 0;
 };
 
+/** @brief Internal interface for initializing a property's backing IAny storage. */
 class IPropertyInternal : public Interface<IPropertyInternal>
 {
 public:

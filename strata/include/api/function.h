@@ -12,9 +12,11 @@ namespace strata {
 class Function : public CoreObject<Function>
 {
 public:
+    /** @brief Type alias for the native callback signature. */
     using CallbackFn = IFunction::CallableFn;
 
     Function() = delete;
+    /** @brief Creates a Function backed by the given callback. */
     Function(CallbackFn *cb)
     {
         fn_ = Strata().Create<IFunction>(ClassId::Function);
@@ -23,10 +25,13 @@ public:
         }
     }
 
+    /** @brief Implicit conversion to IFunction::Ptr. */
     operator IFunction::Ptr() { return fn_; }
     operator const IFunction::ConstPtr() const { return fn_; }
 
+    /** @brief Invokes the function with no arguments. */
     ReturnValue Invoke() const { return Invoke({}); }
+    /** @brief Invokes the function with the given @p args. */
     ReturnValue Invoke(const IAny *args) const { return fn_->Invoke(args); }
 
 private:

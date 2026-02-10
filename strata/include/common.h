@@ -8,12 +8,14 @@
 
 namespace strata {
 
+/** @brief Extracts a substring into a null-terminated std::array at compile time. */
 template<std::size_t... Idxs>
 constexpr auto substring_as_array(std::string_view str, std::index_sequence<Idxs...>)
 {
     return std::array{str[Idxs]..., '\0'};
 }
 
+/** @brief Returns the compiler-deduced name of T as a null-terminated std::array. */
 template<typename T>
 constexpr auto type_name_array()
 {
@@ -39,6 +41,7 @@ constexpr auto type_name_array()
     return substring_as_array(name, std::make_index_sequence<name.size()>{});
 }
 
+/** @brief Holds the compile-time name array for type T as a static constexpr member. */
 template<typename T>
 struct type_name_holder
 {

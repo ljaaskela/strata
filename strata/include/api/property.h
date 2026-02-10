@@ -23,24 +23,29 @@ public:
     {
         return prop_;
     }
+    /** @brief Returns true if the underlying IProperty is valid. */
     operator bool() const
     {
         return prop_.operator bool();
     }
+    /** @brief Returns the underlying IProperty pointer. */
     const IProperty::Ptr GetPropertyInterface()
     {
         return prop_;
     }
+    /** @copydoc GetPropertyInterface() */
     const IProperty::ConstPtr GetPropertyInterface() const
     {
         return prop_;
     }
+    /** @brief Subscribes @p fn to be called when the property value changes. */
     void AddOnChanged(const Function &fn)
     {
         if (prop_) {
             prop_->OnChanged()->AddHandler(fn);
         }
     }
+    /** @brief Unsubscribes @p fn from property change notifications. */
     void RemoveOnChanged(const Function &fn)
     {
         if (prop_) {
@@ -48,6 +53,7 @@ public:
         }
     }
 
+    /** @brief Returns the UID of the value type stored by this property. */
     virtual Uid GetTypeUid() const = 0;
 
 protected:
@@ -79,20 +85,24 @@ class PropertyT final : public Property
 {
 public:
     static constexpr Uid TYPE_UID = TypeUid<T>();
+    /** @brief Default-constructs a property of type T via Strata. */
     PropertyT()
     {
         Create();
     }
+    /** @brief Constructs a property of type T and sets its initial value. */
     PropertyT(const T& value)
     {
         Create();
         Set(value);
     }
+    /** @brief Wraps an existing IProperty pointer. */
     explicit PropertyT(IProperty::Ptr existing) : Property(std::move(existing)) {}
     Uid GetTypeUid() const override
     {
         return TYPE_UID;
     }
+    /** @brief Returns the current value of the property. */
     T Get() const {
         if (internal_) {
             // Typed accessor reference to property's any
@@ -100,6 +110,7 @@ public:
         }
         return {};
     }
+    /** @brief Sets the property to @p value. */
     void Set(const T& value) {
         if (internal_) {
             // This is a bit suboptimal as we create a new any object to wrap the value

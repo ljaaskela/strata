@@ -19,6 +19,7 @@ namespace strata {
 class IStrata : public Interface<IStrata>
 {
 public:
+    /** @brief Factory callable that creates an IObject instance. */
     using TypeCreateFn = std::function<IObject::Ptr()>;
 
     /** @brief Registers an object factory for the type it describes. */
