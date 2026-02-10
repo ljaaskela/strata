@@ -3,6 +3,8 @@
 
 #include <cstddef>
 
+namespace strata {
+
 /** @brief A simple constexpr span-like view over contiguous const data. */
 template<class T>
 struct array_view {
@@ -15,5 +17,7 @@ struct array_view {
     constexpr const T* end() const { return data_ + size_; }
     constexpr const T& operator[](size_t i) const { return data_[i]; }
 };
+
+} // namespace strata
 
 #endif // ARRAY_VIEW_H

@@ -9,6 +9,8 @@
 #include <interface/types.h>
 #include <iostream>
 
+namespace strata {
+
 /** @brief Convenience wrapper around an IProperty::Ptr with event subscription helpers. */
 class Property
 {
@@ -106,5 +108,7 @@ public:
         }
     }
 };
+
+} // namespace strata
 
 #endif // PROPERTY_H

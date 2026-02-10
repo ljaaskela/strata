@@ -5,6 +5,8 @@
 #include <interface/intf_any.h>
 #include <interface/intf_interface.h>
 
+namespace strata {
+
 /** @brief Interface for an invocable function object. */
 class IFunction : public Interface<IFunction>
 {
@@ -26,5 +28,7 @@ public:
     /** @brief Sets the callback that will be called when IFunction::Invoke is called. */
     virtual void SetInvokeCallback(IFunction::CallableFn *fn) = 0;
 };
+
+} // namespace strata
 
 #endif // INTF_FUNCTION_H

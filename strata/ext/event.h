@@ -5,6 +5,8 @@
 #include <interface/intf_event.h>
 #include <interface/types.h>
 
+namespace strata {
+
 /**
  * @brief Helper that lazily creates an IEvent on first access.
  *
@@ -22,5 +24,7 @@ public:
         return event_;
     }
 };
+
+} // namespace strata
 
 #endif // EXT_EVENT_H

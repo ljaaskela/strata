@@ -5,6 +5,8 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
+namespace strata {
+
 /** @brief Base interface for all Strata objects. */
 class IObject : public Interface<IObject>
 {
@@ -39,5 +41,7 @@ typename T::Ptr interface_pointer_cast(IObject *obj)
     }
     return {};
 }
+
+} // namespace strata
 
 #endif // INTF_OBJECT_H

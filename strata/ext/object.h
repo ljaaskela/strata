@@ -8,6 +8,8 @@
 #include <interface/intf_object_factory.h>
 #include <interface/intf_registry.h>
 
+namespace strata {
+
 /**
  * @brief Base implementation of IObject that supports multiple interfaces.
  *
@@ -180,5 +182,7 @@ private:
         }
     };
 };
+
+} // namespace strata
 
 #endif // EXT_OBJECT_H
