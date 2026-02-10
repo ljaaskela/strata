@@ -19,6 +19,7 @@ struct type_metadata {
     static constexpr std::array<MemberDesc, 0> value{};
 };
 
+/** @brief Specialization that extracts T::metadata when it exists. */
 template<class T>
 struct type_metadata<T, std::void_t<decltype(T::metadata)>> {
     static constexpr auto value = T::metadata;
@@ -38,11 +39,13 @@ constexpr std::array<T, N1 + N2> concat_arrays(std::array<T, N1> a, std::array<T
 template<class...>
 struct collected_metadata;
 
+/** @brief Base case: no interfaces yield an empty metadata array. */
 template<>
 struct collected_metadata<> {
     static constexpr std::array<MemberDesc, 0> value{};
 };
 
+/** @brief Recursive case: concatenates First::metadata with the rest. */
 template<class First, class... Rest>
 struct collected_metadata<First, Rest...> {
     static constexpr auto value = concat_arrays(

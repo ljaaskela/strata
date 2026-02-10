@@ -43,6 +43,7 @@ private:
     }
 
 public:
+    /** @brief Dispatches an interface query across IObject and all Interfaces by UID. */
     IInterface *GetInterface(Uid uid) override
     {
         void *interface = nullptr;
@@ -55,6 +56,7 @@ public:
         }
         return static_cast<IInterface *>(interface);
     }
+    /** @copydoc GetInterface(Uid) */
     const IInterface *GetInterface(Uid uid) const override
     {
         return const_cast<BaseObject *>(this)->GetInterface(uid);
@@ -66,7 +68,9 @@ public:
         return static_cast<T *>(GetInterface(T::UID));
     }
 
+    /** @brief Atomically increments the reference count. */
     void Ref() override { data_.refCount++; }
+    /** @brief Atomically decrements the reference count; deletes the object at zero. */
     void UnRef() override
     {
         if (--data_.refCount == 0) {
@@ -146,15 +150,19 @@ public:
     ~CoreObject() override = default;
 
 public:
+    /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr std::string_view GetClassName() noexcept { return GetName<FinalClass>(); }
+    /** @brief Returns the compile-time UID of FinalClass. */
     static constexpr Uid GetClassUid() noexcept { return TypeUid<FinalClass>(); }
 
+    /** @brief Stores a weak self-reference (called once by the factory). */
     void SetSelf(const IObject::Ptr &self) override
     {
         if (self_.expired()) { // Only allow one set (called by factory)
             self_ = self;
         }
     }
+    /** @brief Returns a shared_ptr to this object, or nullptr if expired. */
     IObject::Ptr GetSelf() const override { return self_.lock(); }
 
     template<class T>
@@ -164,6 +172,7 @@ public:
     }
 
 public:
+    /** @brief Returns the singleton factory for creating instances of FinalClass. */
     static const IObjectFactory &GetFactory()
     {
         static Factory factory_;

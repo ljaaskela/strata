@@ -13,8 +13,11 @@ namespace strata {
 class ConstAny
 {
 public:
+    /** @brief Implicit conversion to a const IAny pointer. */
     operator const IAny *() const noexcept { return any_.get(); }
+    /** @brief Returns the underlying const IAny pointer. */
     const IAny *GetAnyInterface() const noexcept { return any_.get(); }
+    /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
 
 protected:
@@ -45,8 +48,11 @@ protected:
 class Any : public ConstAny
 {
 public:
+    /** @brief Implicit conversion to a mutable IAny pointer. */
     operator IAny *() { return any_.get(); }
+    /** @brief Copies the value from @p other into the managed IAny. */
     bool CopyFrom(const IAny &other) { return any_ && any_->CopyFrom(other); }
+    /** @brief Returns the underlying mutable IAny pointer. */
     IAny *GetAnyInterface() { return any_.get(); }
 
 protected:
@@ -69,20 +75,26 @@ class AnyT final : public Any
 public:
     static constexpr Uid TYPE_UID = TypeUid<std::remove_const_t<T>>();
 
+    /** @brief Wraps an existing mutable IAny pointer (read-write only). */
     template<class Flag = std::enable_if_t<IsReadWrite>>
     constexpr AnyT(const IAny::Ptr &any) noexcept
     {
         SetAny(any, TYPE_UID);
     }
+    /** @brief Wraps an existing const IAny pointer. */
     constexpr AnyT(const IAny::ConstPtr &any) noexcept { SetAny(any, TYPE_UID); }
+    /** @brief Wraps a const IAny reference. */
     constexpr AnyT(const IAny &any) noexcept { SetAny(any, TYPE_UID); }
+    /** @brief Move-constructs from an IAny rvalue. */
     constexpr AnyT(IAny &&any) noexcept
     {
         if (IsCompatible(any, TYPE_UID)) {
             any_ = std::move(any);
         }
     }
+    /** @brief Default-constructs an IAny of type T via Strata. */
     AnyT() noexcept { Create(); }
+    /** @brief Constructs an IAny of type T and initializes it with @p value. */
     AnyT(const T &value) noexcept
     {
         if (!IsCompatible(any_, TYPE_UID)) {
@@ -94,6 +106,7 @@ public:
     operator const IAny &() const noexcept { return *(any_.get()); }
 
     constexpr Uid GetTypeUid() const noexcept { return TYPE_UID; }
+    /** @brief Returns a copy of the stored value. */
     T Get() const noexcept
     {
         std::remove_const_t<T> value{};
@@ -102,6 +115,7 @@ public:
         }
         return value;
     }
+    /** @brief Overwrites the stored value with @p value. */
     void Set(const T &value) noexcept
     {
         if (any_) {
@@ -109,7 +123,9 @@ public:
         }
     }
 
+    /** @brief Creates a read-write typed view over an existing IAny pointer. */
     static AnyT<T> Ref(const IAny::Ptr &ref) { return AnyT<T>(ref); }
+    /** @brief Creates a read-only typed view over an existing const IAny pointer. */
     static const AnyT<const T> ConstRef(const IAny::ConstPtr &ref) { return AnyT<const T>(ref); }
 
 protected:
