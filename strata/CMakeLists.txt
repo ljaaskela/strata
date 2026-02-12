@@ -12,9 +12,7 @@ endif()
 add_library(strata SHARED
     src/property.cpp
     src/property.h
-    src/event.cpp
-    src/event.h
-    src/function.cpp
+src/function.cpp
     src/function.h
     src/strata_export.h
     include/array_view.h

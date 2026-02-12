@@ -1,7 +1,6 @@
-#include "metadata_container.h"
 #include "strata_impl.h"
-#include "event.h"
 #include "function.h"
+#include "metadata_container.h"
 #include "property.h"
 #include <ext/any.h>
 #include <interface/types.h>
@@ -12,7 +11,6 @@ namespace strata {
 void RegisterTypes(IStrata &strata)
 {
     strata.register_type<PropertyImpl>();
-    strata.register_type<EventImpl>();
     strata.register_type<FunctionImpl>();
 
     strata.register_type<SimpleAny<float>>();
@@ -50,16 +48,17 @@ ReturnValue StrataImpl::unregister_type(const IObjectFactory &factory)
 IInterface::Ptr StrataImpl::create(Uid uid) const
 {
     if (auto fac = types_.find(uid); fac != types_.end()) {
-        if (auto object = fac->second->create_instance()) {
+        auto *factory = fac->second;
+        if (auto object = factory->create_instance()) {
             if (auto shared = object->get_interface<ISharedFromObject>()) {
+                // Object can provide shared_ptr to itself
                 shared->set_self(object);
             }
-            auto& info = fac->second->get_class_info();
-            if (!info.members.empty()) {
-                if (auto *meta = interface_cast<IMetadataContainer>(object)) {
-                    // Object takes ownership
-                    meta->set_metadata_container(new MetadataContainer(info.members, object.get()));
-                }
+            if (auto *meta = interface_cast<IMetadataContainer>(object)) {
+                // Object can contain metadata
+                auto &info = factory->get_class_info();
+                // Object takes ownership of the MetadataContainer
+                meta->set_metadata_container(new MetadataContainer(info.members, object.get()));
             }
             return object;
         }
