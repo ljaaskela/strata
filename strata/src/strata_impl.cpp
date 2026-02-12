@@ -31,24 +31,43 @@ StrataImpl::StrataImpl()
     RegisterTypes(*this);
 }
 
+const IObjectFactory* StrataImpl::find(Uid uid) const
+{
+    Entry key{uid, nullptr};
+    auto it = std::lower_bound(types_.begin(), types_.end(), key);
+    if (it != types_.end() && it->uid == uid) {
+        return it->factory;
+    }
+    return nullptr;
+}
+
 ReturnValue StrataImpl::register_type(const IObjectFactory &factory)
 {
     auto &info = factory.get_class_info();
     std::cout << "Register " << info.name << " (uid: " << info.uid << ")" << std::endl;
-    types_[info.uid] = &factory;
+    Entry entry{info.uid, &factory};
+    auto it = std::lower_bound(types_.begin(), types_.end(), entry);
+    if (it != types_.end() && it->uid == info.uid) {
+        it->factory = &factory;
+    } else {
+        types_.insert(it, entry);
+    }
     return ReturnValue::SUCCESS;
 }
 
 ReturnValue StrataImpl::unregister_type(const IObjectFactory &factory)
 {
-    types_.erase(factory.get_class_info().uid);
+    Entry key{factory.get_class_info().uid, nullptr};
+    auto it = std::lower_bound(types_.begin(), types_.end(), key);
+    if (it != types_.end() && it->uid == key.uid) {
+        types_.erase(it);
+    }
     return ReturnValue::SUCCESS;
 }
 
 IInterface::Ptr StrataImpl::create(Uid uid) const
 {
-    if (auto fac = types_.find(uid); fac != types_.end()) {
-        auto *factory = fac->second;
+    if (auto *factory = find(uid)) {
         if (auto object = factory->create_instance()) {
             if (auto shared = object->get_interface<ISharedFromObject>()) {
                 // Object can provide shared_ptr to itself
@@ -68,8 +87,8 @@ IInterface::Ptr StrataImpl::create(Uid uid) const
 
 const ClassInfo* StrataImpl::get_class_info(Uid classUid) const
 {
-    if (auto fac = types_.find(classUid); fac != types_.end()) {
-        return &fac->second->get_class_info();
+    if (auto *factory = find(classUid)) {
+        return &factory->get_class_info();
     }
     return nullptr;
 }
