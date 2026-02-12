@@ -4,7 +4,8 @@
 #include <common.h>
 #include <ext/core_object.h>
 #include <interface/intf_strata.h>
-#include <map>
+#include <algorithm>
+#include <vector>
 
 namespace strata {
 
@@ -22,7 +23,13 @@ public:
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value) const override;
 
 private:
-    std::map<Uid, const IObjectFactory *> types_;
+    struct Entry {
+        Uid uid;
+        const IObjectFactory *factory;
+        bool operator<(const Entry& o) const { return uid < o.uid; }
+    };
+    const IObjectFactory* find(Uid uid) const;
+    std::vector<Entry> types_;
 };
 
 } // namespace strata
