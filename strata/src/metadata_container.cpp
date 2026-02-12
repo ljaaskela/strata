@@ -1,5 +1,4 @@
 #include "metadata_container.h"
-#include "event.h"
 #include "function.h"
 #include "property.h"
 
@@ -47,8 +46,6 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
         break;
     }
     case MemberKind::Event:
-        created = make_shared_impl<EventImpl>();
-        break;
     case MemberKind::Function:
         created = make_shared_impl<FunctionImpl>();
         break;
@@ -74,7 +71,7 @@ IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberK
             // virtual (via STRATA_INTERFACE), bind the FunctionImpl so that
             // invoke() routes through the static trampoline to the virtual
             // method on the owning object's interface subobject.
-            if (kind == MemberKind::Function && member.fnTrampoline && owner_) {
+            if ((kind == MemberKind::Function || kind == MemberKind::Event) && member.fnTrampoline && owner_) {
                 if (auto* fi = interface_cast<IFunctionInternal>(created)) {
                     // Resolve the interface pointer that declared this function.
                     // This is the 'self' the trampoline will static_cast back to

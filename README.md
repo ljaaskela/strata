@@ -301,8 +301,7 @@ strata/
 | `strata_impl.cpp/h` | `StrataImpl` implementing `IStrata` |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
-| `event.cpp/h` | `EventImpl` |
-| `function.cpp/h` | `FunctionImpl` |
+| `function.cpp/h` | `FunctionImpl` (implements both `IFunction` and `IEvent`) |
 | `strata.cpp` | DLL entry point, exports `instance()` |
 
 ## Key types
