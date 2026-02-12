@@ -19,16 +19,19 @@ class IEvent : public Interface<IEvent, IFunction>
 public:
     /**
      * @brief Adds a handler function for the event.
-     * @param fn Handler to register.
+     * @param fn Handler to register. A handler can only be added once.
      * @param type Immediate handlers fire synchronously; Deferred handlers are queued for update().
      */
     virtual ReturnValue add_handler(const IFunction::ConstPtr &fn, InvokeType type = Immediate) const = 0;
     /**
      * @brief Removes an event handler function.
-     * @param fn Handler to remove.
-     * @param type Must match the InvokeType used when the handler was added.
+     * @param fn Handler to remove (searched in both immediate and deferred lists).
      */
-    virtual ReturnValue remove_handler(const IFunction::ConstPtr &fn, InvokeType type = Immediate) const = 0;
+    virtual ReturnValue remove_handler(const IFunction::ConstPtr &fn) const = 0;
+    /**
+     * @brief Returns true if the event has any handlers.
+     */
+    virtual bool has_handlers() const = 0;
 };
 
 /**
