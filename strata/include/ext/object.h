@@ -19,7 +19,7 @@ namespace strata::ext {
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class Object : public ObjectCore<FinalClass, IMetadata, IMetadataContainer, Interfaces...>
+class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>
 {
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
