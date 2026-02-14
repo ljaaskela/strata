@@ -339,8 +339,8 @@ int main()
         std::cout << "  sizeof(MyWidget) = " << sizeof(MyWidget) << std::endl;
         std::cout << "  sizeof(ObjectCore<X>) [minimal] = "
                   << sizeof(ext::ObjectCore<MyWidget>) << std::endl;
-        std::cout << "  sizeof(ObjectCore<X, ...5 interfaces>) = "
-                  << sizeof(ext::ObjectCore<MyWidget, IMetadata, IMetadataContainer, IMyWidget, ISerializable>) << std::endl;
+        std::cout << "  sizeof(ObjectCore<X, ...4 interfaces>) = "
+                  << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << std::endl;
     }
 
     return 0;

@@ -422,7 +422,7 @@ Measured sizes (MSVC x64):
 | Configuration | Interfaces | Size |
 |---|---|---|
 | `ext::ObjectCore<X>` (minimal) | 1 (ISharedFromObject) | **40 bytes** |
-| `ext::ObjectCore<X, IMetadata, IMetadataContainer, IMyWidget, ISerializable>` | 5 | **136 bytes** |
+| `ext::ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>` | 4 | **112 bytes** |
 
 ### MetadataContainer
 
@@ -460,22 +460,22 @@ The `states_` tuple contains one `State` struct per interface that declares prop
 
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata and IMetadataContainer, totaling 5 interfaces in the dispatch pack (ISharedFromObject subsumes IObject).
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (ISharedFromObject subsumes IObject, IMetadataContainer subsumes IMetadata and IPropertyState).
 
 | Component | Size (x64) |
 |---|---|
-| ext::ObjectCore (5 interfaces) | 136 |
+| ext::ObjectCore (4 interfaces) | 112 |
 | `meta_` (`unique_ptr<IMetadata>`) | 8 |
 | `states_` (`IMyWidget::State` (8) + `ISerializable::State` (32)) | 40 |
-| **sizeof(MyWidget)** | **184 bytes** |
+| **sizeof(MyWidget)** | **160 bytes** |
 
 MetadataContainer (64 bytes) is heap-allocated separately. Member instances are created lazily as accessed.
 
 | Scenario | MyWidget | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| No members accessed | 184 | 64 | 0 | **248 bytes** |
-| 3 members accessed | 184 | 64 | 3 × 24 = 72 | **320 bytes** |
-| All 6 members accessed | 184 | 64 | 6 × 24 = 144 | **392 bytes** |
+| No members accessed | 160 | 64 | 0 | **224 bytes** |
+| 3 members accessed | 160 | 64 | 3 × 24 = 72 | **296 bytes** |
+| All 6 members accessed | 160 | 64 | 6 × 24 = 144 | **368 bytes** |
 
 ### Base types
 
