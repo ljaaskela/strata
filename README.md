@@ -20,6 +20,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Virtual function dispatch](#virtual-function-dispatch)
   - [Properties with change notifications](#properties-with-change-notifications)
   - [Custom Any types](#custom-any-types)
+  - [Direct state access](#direct-state-access)
   - [Deferred invocation](#deferred-invocation)
 - [Architecture](#architecture)
   - [interface/](#interface)
@@ -244,6 +245,40 @@ public:
     }
     IEvent::Ptr on_data_changed() const override { return onChanged_; }
 };
+```
+
+### Direct state access
+
+Each interface that declares `PROP` members gets a `State` struct with one field per property, initialized with its declared default. `ext::Object` stores these structs inline, and properties read/write directly into them via `ext::AnyRef<T>`. You can also access the state struct directly through `IPropertyState`, bypassing the property layer entirely.
+
+```cpp
+auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+auto* iw = interface_cast<IMyWidget>(widget);
+auto* ps = interface_cast<IPropertyState>(widget);
+
+// Typed access: returns IMyWidget::State*
+auto* state = ps->get_property_state<IMyWidget>();
+
+// State fields are initialized with STRATA_INTERFACE defaults
+state->width;   // 100.f
+state->height;  // 50.f
+
+// Write through property API, state reflects it
+iw->width().set_value(200.f);
+state->width;   // 200.f
+
+// Write to state directly, property reads it back
+state->height = 75.f;
+iw->height().get_value();  // 75.f
+```
+
+This is useful for bulk operations like serialization, snapshotting (via `memcpy` for trivially-copyable state), or cases where you want to process raw data without going through the property layer.
+
+Each interface's state is independent:
+
+```cpp
+auto* ws = ps->get_property_state<IMyWidget>();       // IMyWidget::State*
+auto* ss = ps->get_property_state<ISerializable>();   // ISerializable::State*
 ```
 
 ### Deferred invocation
