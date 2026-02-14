@@ -145,7 +145,7 @@ inline IFunction::Ptr get_function(const IMetadata* meta, std::string_view name)
 /**
  * @brief Abstract interface for runtime metadata storage.
  */
-class IMetadataContainer : public Interface<IMetadataContainer>
+class IMetadataContainer : public Interface<IMetadataContainer, IMetadata>
 {
 public:
     /**
