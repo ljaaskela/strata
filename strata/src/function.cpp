@@ -47,26 +47,22 @@ void FunctionImpl::invoke_handlers(FnArgs args) const
     for (const auto &h : immediate_handlers()) {
         h->invoke(args);
     }
-    if (auto deferred = deferred_handlers(); !deferred.empty()) {
-        // Clone each arg for deferred tasks
-        std::vector<IAny::Ptr> clonedArgs;
-        std::vector<const IAny*> ptrs;
-        clonedArgs.reserve(args.count);
-        ptrs.reserve(args.count);
-        for (size_t i = 0; i < args.count; ++i) {
-            clonedArgs.push_back(args[i] ? args[i]->clone() : nullptr);
-            ptrs.push_back(clonedArgs.back().get());
-        }
-        FnArgs clonedFnArgs{ptrs.data(), ptrs.size()};
+    auto deferred = deferred_handlers();
+    if (deferred.empty()) return;
 
-        std::vector<IStrata::DeferredTask> tasks;
-        tasks.reserve(deferred.size());
-        for (const auto &h : deferred) {
-            // Share the same cloned args across all deferred tasks
-            tasks.push_back({h, clonedArgs});
-        }
-        instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
+    // Clone args once, share across all deferred tasks
+    std::vector<IAny::Ptr> clonedArgs;
+    clonedArgs.reserve(args.count);
+    for (size_t i = 0; i < args.count; ++i) {
+        clonedArgs.push_back(args[i] ? args[i]->clone() : nullptr);
     }
+
+    std::vector<IStrata::DeferredTask> tasks;
+    tasks.reserve(deferred.size());
+    for (const auto &h : deferred) {
+        tasks.push_back({h, clonedArgs});
+    }
+    instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
 }
 
 void FunctionImpl::set_invoke_callback(IFunction::CallableFn *fn)
