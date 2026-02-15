@@ -18,7 +18,7 @@ namespace strata {
 enum class MemberKind : uint8_t { Property, Event, Function };
 
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
-using FnTrampoline = ReturnValue(*)(void* self, const IAny* args);
+using FnTrampoline = ReturnValue(*)(void* self, FnArgs args);
 
 /** @brief Kind-specific data for Property members. */
 struct PropertyKind {
@@ -162,7 +162,7 @@ public:
  */
 [[maybe_unused]] static ReturnValue invoke_function(const IInterface *o,
                                                     std::string_view name,
-                                                    const IAny *args = nullptr)
+                                                    FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_function(meta->get_function(name), args) : ReturnValue::INVALID_ARGUMENT;
@@ -171,7 +171,7 @@ public:
 /** @copydoc invoke_function */
 [[maybe_unused]] static ReturnValue invoke_function(const IInterface::Ptr &o,
                                                     std::string_view name,
-                                                    const IAny *args = nullptr)
+                                                    FnArgs args = {})
 {
     return invoke_function(o.get(), name, args);
 }
@@ -179,20 +179,45 @@ public:
 /** @copydoc invoke_function */
 [[maybe_unused]] static ReturnValue invoke_function(const IInterface::ConstPtr &o,
                                                     std::string_view name,
-                                                    const IAny *args = nullptr)
+                                                    FnArgs args = {})
 {
     return invoke_function(o.get(), name, args);
 }
 
+/** @brief Invoke a named function with a single IAny argument. */
+[[maybe_unused]] static ReturnValue invoke_function(const IInterface *o,
+                                                    std::string_view name,
+                                                    const IAny *arg)
+{
+    FnArgs args{&arg, 1};
+    return invoke_function(o, name, args);
+}
+
+/** @copydoc invoke_function */
+[[maybe_unused]] static ReturnValue invoke_function(const IInterface::Ptr &o,
+                                                    std::string_view name,
+                                                    const IAny *arg)
+{
+    return invoke_function(o.get(), name, arg);
+}
+
+/** @copydoc invoke_function */
+[[maybe_unused]] static ReturnValue invoke_function(const IInterface::ConstPtr &o,
+                                                    std::string_view name,
+                                                    const IAny *arg)
+{
+    return invoke_function(o.get(), name, arg);
+}
+
 /**
- * @brief Invoke a event from target object metadata.
+ * @brief Invoke an event from target object metadata.
  * @param o The object to query for the event.
  * @param name Name of the event to query.
  * @param args Event arguments.
  */
 [[maybe_unused]] static ReturnValue invoke_event(const IInterface::Ptr &o,
                                                  std::string_view name,
-                                                 const IAny *args = nullptr)
+                                                 FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
@@ -201,10 +226,28 @@ public:
 /** @copydoc invoke_event */
 [[maybe_unused]] static ReturnValue invoke_event(const IInterface::ConstPtr &o,
                                                  std::string_view name,
-                                                 const IAny *args = nullptr)
+                                                 FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @brief Invoke a named event with a single IAny argument. */
+[[maybe_unused]] static ReturnValue invoke_event(const IInterface::Ptr &o,
+                                                 std::string_view name,
+                                                 const IAny *arg)
+{
+    FnArgs args{&arg, 1};
+    return invoke_event(o, name, args);
+}
+
+/** @copydoc invoke_event */
+[[maybe_unused]] static ReturnValue invoke_event(const IInterface::ConstPtr &o,
+                                                 std::string_view name,
+                                                 const IAny *arg)
+{
+    FnArgs args{&arg, 1};
+    return invoke_event(o, name, args);
 }
 
 } // namespace strata
@@ -303,8 +346,8 @@ public:
 #define _STRATA_TRAMPOLINE_PROP(...)
 #define _STRATA_TRAMPOLINE_EVT(Name)
 #define _STRATA_TRAMPOLINE_FN(Name) \
-    virtual ::strata::ReturnValue fn_##Name(const ::strata::IAny*) = 0; \
-    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, const ::strata::IAny* args) { \
+    virtual ::strata::ReturnValue fn_##Name(::strata::FnArgs) = 0; \
+    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
         return static_cast<_strata_intf_type*>(self)->fn_##Name(args); \
     }
 #define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))

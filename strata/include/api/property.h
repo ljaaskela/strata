@@ -1,8 +1,9 @@
 #ifndef API_PROPERTY_H
 #define API_PROPERTY_H
 
-#include <api/function.h>
+#include <api/strata.h>
 #include <common.h>
+#include <interface/intf_function.h>
 #include <interface/intf_property.h>
 #include <interface/intf_strata.h>
 #include <interface/types.h>
@@ -37,14 +38,14 @@ public:
         return prop_;
     }
     /** @brief Subscribes @p fn to be called when the property value changes. */
-    void add_on_changed(const Function &fn)
+    void add_on_changed(const IFunction::ConstPtr &fn)
     {
         if (prop_) {
             prop_->on_changed()->add_handler(fn);
         }
     }
     /** @brief Unsubscribes @p fn from property change notifications. */
-    void remove_on_changed(const Function &fn)
+    void remove_on_changed(const IFunction::ConstPtr &fn)
     {
         if (prop_) {
             prop_->on_changed()->remove_handler(fn);

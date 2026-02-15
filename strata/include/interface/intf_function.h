@@ -10,19 +10,28 @@ namespace strata {
 /** @brief Specifies whether an invocation should execute immediately or be deferred to update(). */
 enum InvokeType : uint8_t { Immediate = 0, Deferred = 1 };
 
+/** @brief Non-owning view of function arguments. */
+struct FnArgs {
+    const IAny* const* data = nullptr;
+    size_t count = 0;
+
+    const IAny* operator[](size_t i) const { return i < count ? data[i] : nullptr; }
+    bool empty() const { return count == 0; }
+};
+
 /** @brief Interface for an invocable function object. */
 class IFunction : public Interface<IFunction>
 {
 public:
     /** @brief Function pointer type for invoke callbacks. */
-    using CallableFn = ReturnValue(const IAny *);
+    using CallableFn = ReturnValue(FnArgs);
     /**
      * @brief Called to invoke the function.
-     * @param args Call args. Actual content dependent on the function implementation.
+     * @param args Call args as a non-owning view.
      * @param type Immediate executes now; Deferred queues for the next update() call.
      * @return Function return value.
      */
-    virtual ReturnValue invoke(const IAny *args, InvokeType type = Immediate) const = 0;
+    virtual ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const = 0;
 };
 
 /**
@@ -37,7 +46,7 @@ class IFunctionInternal : public Interface<IFunctionInternal>
 {
 public:
     /** @brief Function pointer type for bound trampoline callbacks. */
-    using BoundFn = ReturnValue(void* context, const IAny*);
+    using BoundFn = ReturnValue(void* context, FnArgs);
 
     /** @brief Sets the callback that will be called when IFunction::invoke is called. */
     virtual void set_invoke_callback(IFunction::CallableFn *fn) = 0;
@@ -56,14 +65,28 @@ public:
  * @param args Arguments for invocation.
  * @param type Immediate executes now; Deferred queues for the next update() call.
  */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, const IAny *args = nullptr, InvokeType type = Immediate)
+[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, FnArgs args = {}, InvokeType type = Immediate)
 {
     return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
 }
 
 /** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *args = nullptr, InvokeType type = Immediate)
+[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, FnArgs args = {}, InvokeType type = Immediate)
 {
+    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @brief Invokes a function with a single IAny argument. */
+[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, const IAny *arg, InvokeType type = Immediate)
+{
+    FnArgs args{&arg, 1};
+    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @copydoc invoke_function */
+[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *arg, InvokeType type = Immediate)
+{
+    FnArgs args{&arg, 1};
     return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
 }
 
