@@ -8,7 +8,7 @@ ReturnValue PropertyImpl::set_value(const IAny &from)
     if (data_) {
         auto ret = data_->copy_from(from);
         if (ret == ReturnValue::SUCCESS && !external_) {
-            return invoke_event(on_changed(), data_.get());
+            invoke_event(on_changed(), data_.get());
         }
         return ret;
     }
