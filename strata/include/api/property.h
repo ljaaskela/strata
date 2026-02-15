@@ -1,6 +1,7 @@
 #ifndef API_PROPERTY_H
 #define API_PROPERTY_H
 
+#include <api/any.h>
 #include <api/strata.h>
 #include <common.h>
 #include <interface/intf_function.h>
@@ -19,6 +20,8 @@ namespace strata {
 template<class T>
 class ConstProperty
 {
+    ConstProperty() = delete;
+
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
 
@@ -55,7 +58,7 @@ public:
 
     /** @brief Returns the current value of the property. */
     T get_value() const {
-        T value{};
+        std::remove_const_t<T> value{};
         if (auto internal = get_internal()) {
             if (auto any = internal->get_any()) {
                 any->get_data(&value, sizeof(T), TYPE_UID);
@@ -65,7 +68,6 @@ public:
     }
 
 protected:
-    ConstProperty() = default;
     IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
     IProperty::Ptr prop_;
 };
@@ -80,27 +82,42 @@ template<class T>
 class Property : public ConstProperty<T>
 {
     using Base = ConstProperty<T>;
+    Property() = delete;
+
 public:
-    /** @brief Default-constructs a property of type T via Strata. */
-    Property() { this->prop_ = instance().create_property(Base::TYPE_UID, {}); }
-
-    /** @brief Constructs a property of type T and sets its initial value. */
-    Property(const T& value)
-    {
-        this->prop_ = instance().create_property(Base::TYPE_UID, {});
-        set_value(value);
-    }
-
     /** @brief Wraps an existing IProperty pointer. */
     explicit Property(IProperty::Ptr existing) : Base(std::move(existing)) {}
 
     /** @brief Sets the property to @p value. */
-    void set_value(const T& value) {
+    ReturnValue set_value(const T &value)
+    {
         if (auto internal = this->get_internal()) {
-            internal->set_data(&value, sizeof(T), Base::TYPE_UID);
+            return internal->set_data(&value, sizeof(T), Base::TYPE_UID);
         }
+        return ReturnValue::FAIL;
     }
 };
+
+/**
+ * @brief A helper template for creating a new read-only poperty instance
+ */
+template<class T, class = std::enable_if_t<std::is_const_v<T>>>
+ConstProperty<std::remove_const_t<T>> create_property(const T &value = {})
+{
+    using Type = std::remove_const_t<T>;
+    Any<Type> v(value);
+    return ConstProperty<Type>(instance().create_property<Type>(v.clone(), ObjectFlags::ReadOnly));
+}
+
+/**
+ * @brief A helper template for creating a new poperty instance
+ */
+template<class T, class = std::enable_if_t<!std::is_const_v<T>>>
+Property<T> create_property(const T &value = {})
+{
+    Any<T> v(value);
+    return Property<T>(instance().create_property<T>(v.clone()));
+}
 
 } // namespace strata
 
