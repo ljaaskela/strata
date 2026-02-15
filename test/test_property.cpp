@@ -8,28 +8,30 @@
 
 using namespace strata;
 
+// ReadWrite property
+
 TEST(Property, DefaultConstructedHasInitialValue)
 {
-    Property<float> p;
+    auto p = create_property<float>();
     EXPECT_FLOAT_EQ(p.get_value(), 0.f);
 }
 
 TEST(Property, ConstructWithValue)
 {
-    Property<int> p(42);
+    auto p = create_property<int>(42);
     EXPECT_EQ(p.get_value(), 42);
 }
 
 TEST(Property, SetGetRoundTrip)
 {
-    Property<float> p;
+    auto p = create_property<float>();
     p.set_value(3.14f);
     EXPECT_FLOAT_EQ(p.get_value(), 3.14f);
 }
 
 TEST(Property, CopySemanticsShareSameIProperty)
 {
-    Property<float> p;
+    auto p = create_property<float>();
     p.set_value(10.f);
     Property<float> copy = p;
     EXPECT_FLOAT_EQ(copy.get_value(), 10.f);
@@ -44,7 +46,7 @@ TEST(Property, OnChangedEventFires)
     int callCount = 0;
     float receivedValue = 0.f;
 
-    Property<float> p;
+    auto p = create_property<float>();
 
     Callback handler([&](FnArgs args) -> ReturnValue {
         callCount++;
@@ -63,7 +65,7 @@ TEST(Property, OnChangedEventFires)
 
 TEST(Property, SetSameValueReturnsNothingToDo)
 {
-    Property<int> p(5);
+    auto p = create_property<int>(5);
 
     auto iprop = p.get_property_interface();
     ASSERT_TRUE(iprop);
@@ -75,12 +77,10 @@ TEST(Property, SetSameValueReturnsNothingToDo)
 
 TEST(Property, SetDifferentValueReturnsSuccess)
 {
-    Property<int> p(5);
-    auto iprop = p.get_property_interface();
-    ASSERT_TRUE(iprop);
+    auto p = create_property<int>(5);
+    ASSERT_TRUE(p);
 
-    Any<int> val(10);
-    auto result = iprop->set_value(val);
+    auto result = p.set_value(10);
     EXPECT_EQ(result, ReturnValue::SUCCESS);
     EXPECT_EQ(p.get_value(), 10);
 }
@@ -89,7 +89,7 @@ TEST(Property, OnChangedDoesNotFireOnSameValue)
 {
     int callCount = 0;
 
-    Property<int> p(5);
+    auto p = create_property<int>(5);
 
     Callback handler([&](FnArgs) -> ReturnValue {
         callCount++;
@@ -97,12 +97,37 @@ TEST(Property, OnChangedDoesNotFireOnSameValue)
     });
 
     p.add_on_changed(handler);
-    p.set_value(5); // same value
+    EXPECT_EQ(p.set_value(5), ReturnValue::NOTHING_TO_DO); // same value
     EXPECT_EQ(callCount, 0);
 }
 
 TEST(Property, BoolConversion)
 {
-    Property<float> p;
+    auto p = create_property<float>();
     EXPECT_TRUE(p);
+}
+
+// ReadOnly property
+
+TEST(Property, DefaultConstructedReadOnlyHasInitialValue)
+{
+    auto p = create_property<const float>();
+    EXPECT_FLOAT_EQ(p.get_value(), 0.f);
+}
+
+TEST(Property, ConstructReadOnlyWithValue)
+{
+    auto p = create_property<const int>(42);
+    EXPECT_EQ(p.get_value(), 42);
+}
+
+TEST(Property, ConstructReadOnlySetFails)
+{
+    auto p = create_property<const int>(42);
+    EXPECT_EQ(p.get_value(), 42);
+
+    // Can still create a "ReadWrite" Property<T> using the interface, but writes should still fail.
+    Property<int> pp(p.get_property_interface());
+    EXPECT_TRUE(pp);
+    EXPECT_EQ(pp.set_value(1), ReturnValue::READ_ONLY);
 }

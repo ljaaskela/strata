@@ -98,10 +98,11 @@ IAny::Ptr StrataImpl::create_any(Uid type) const
     return interface_pointer_cast<IAny>(create(type));
 }
 
-IProperty::Ptr StrataImpl::create_property(Uid type, const IAny::Ptr &value) const
+IProperty::Ptr StrataImpl::create_property(Uid type, const IAny::Ptr &value, int32_t flags) const
 {
     if (auto property = interface_pointer_cast<IProperty>(create(ClassId::Property))) {
         if (auto pi = property->get_interface<IPropertyInternal>()) {
+            pi->set_flags(flags);
             if (value && is_compatible(value, type)) {
                 if (pi->set_any(value)) {
                     return property;

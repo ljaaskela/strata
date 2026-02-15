@@ -35,7 +35,9 @@ public:
     /** @brief Creates a new IAny value container for the given type UID. */
     virtual IAny::Ptr create_any(Uid type) const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
-    virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value) const = 0;
+    virtual IProperty::Ptr create_property(Uid type,
+                                           const IAny::Ptr &value,
+                                           int32_t flags = ObjectFlags::None) const = 0;
     /** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
     struct DeferredArgs : public ::strata::NoCopyMove
     {
@@ -85,9 +87,10 @@ public:
      * @tparam T The value type for the property.
      */
     template<class T>
-    IProperty::Ptr create_property(const IAny::Ptr& value = {}) const
+    IProperty::Ptr create_property(const IAny::Ptr &value = {},
+                                   int32_t flags = ObjectFlags::None) const
     {
-        return create_property(type_uid<T>(), value);
+        return create_property(type_uid<T>(), value, flags);
     }
     /**
      * @brief Creates an instance and casts it to the specified interface type.

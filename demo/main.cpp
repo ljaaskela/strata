@@ -105,7 +105,7 @@ int main()
     r.register_type<MyDataAny>();
     r.register_type<MyWidget>();
 
-    auto prop = Property<float>();
+    auto prop = Property<float>(instance().create_property<float>());
     prop.set_value(5.f);
     auto prop2 = prop;
     auto prop3 = Property<float>(prop);
@@ -116,11 +116,11 @@ int main()
     std::cout << "Property<float> prop3 value is " << prop3.get_value() << std::endl;
 
     Any<Data> data;                 // One view to globalData
-    auto myprop = Property<Data>(); // Property to global data
+    auto myprop = Property<Data>(instance().create_property<Data>()); // Property to global data
     myprop.set_value({10.f, "Hello"});
 
-    std::cout << "Property<Data> value is " << myprop.get_value().value << ":" << myprop.get_value().name
-              << std::endl;
+    std::cout << "Property<Data> value is " << myprop.get_value().value << ":"
+              << myprop.get_value().name << std::endl;
 
     Callback valueChanged([](FnArgs args) -> ReturnValue {
         std::cout << "Property value changed, ";
@@ -144,7 +144,6 @@ int main()
     prop.set_value(10.f);
     data.set_value({20.f, "Hello2"});   // Set global data directly
     myprop.set_value({30.f, "Hello3"}); // Set global data through property
-
     std::cout << "sizeof(float)            " << sizeof(float) << std::endl;
     std::cout << "sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << std::endl;
     std::cout << "sizeof(Any<float>)      " << sizeof(Any<float>) << std::endl;
