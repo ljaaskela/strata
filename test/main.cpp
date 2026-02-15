@@ -77,10 +77,12 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset(const IAny *args) override
+    ReturnValue fn_reset(FnArgs args) override
     {
-        Any<const int> value(args);
-        if (value) {
+        if (auto ctx = FunctionContext(args, 2)) {
+            std::cout << "  MyWidget::fn_reset called with " << ctx.size() << " args"
+                      << std::endl;
+        } else if (auto value = Any<const int>(args[0])) {
             std::cout << "  MyWidget::fn_reset called with value " << value.get_value()
                       << std::endl;
         } else {
@@ -89,7 +91,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
         return ReturnValue::SUCCESS;
     }
 
-    ReturnValue fn_serialize(const IAny *) override
+    ReturnValue fn_serialize(FnArgs) override
     {
         std::cout << "  MyWidget::fn_serialize called!" << std::endl;
         return ReturnValue::SUCCESS;
@@ -120,14 +122,14 @@ int main()
     std::cout << "Property<Data> value is " << myprop.get_value().value << ":" << myprop.get_value().name
               << std::endl;
 
-    Function valueChanged([](const IAny *any) -> ReturnValue {
+    Function valueChanged([](FnArgs args) -> ReturnValue {
         std::cout << "Property value changed, ";
-        if (!any) {
+        if (!args[0]) {
             return ReturnValue::INVALID_ARGUMENT;
         }
-        if (auto v = Any<const float>(*any)) {
+        if (auto v = Any<const float>(*args[0])) {
             std::cout << "new value: " << v.get_value();
-        } else if (auto v = Any<const Data>(*any)) {
+        } else if (auto v = Any<const Data>(*args[0])) {
             auto value = v.get_value();
             std::cout << "new value: " << value.name << ", " << value.value;
         } else {
@@ -341,6 +343,43 @@ int main()
                   << sizeof(ext::ObjectCore<MyWidget>) << std::endl;
         std::cout << "  sizeof(ObjectCore<X, ...4 interfaces>) = "
                   << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << std::endl;
+    }
+
+    // --- FunctionContext: multi-arg function invocation ---
+    std::cout << "\n--- FunctionContext multi-arg ---" << std::endl;
+    {
+        Function add([](FnArgs args) -> ReturnValue {
+            auto ctx = FunctionContext(args, 2);
+            if (!ctx) {
+                std::cout << "  add: expected 2 args" << std::endl;
+                return ReturnValue::INVALID_ARGUMENT;
+            }
+            auto a = ctx.arg<float>(0);
+            auto b = Any<const int>(ctx.arg(1));
+            if (a && b) {
+                std::cout << "  add(" << a.get_value() << ", " << b.get_value()
+                          << ") = " << (a.get_value() + b.get_value()) << std::endl;
+            }
+            return ReturnValue::SUCCESS;
+        });
+
+        // Variadic invoke with raw values — auto-wraps in Any<T> + FunctionContext
+        invoke_function(IFunction::Ptr(add), 10.f, 20);
+
+        // Same for named dispatch
+        invoke_function(widget.get(), "reset", 1.f, 2u);
+
+        // Explicit IAny* args
+        Any<float> arg0(3.f);
+        Any<int> arg1(7);
+        const IAny* ptrs[] = {arg0, arg1};
+        FnArgs fnArgs{ptrs, 2};
+        FunctionContext ctx(fnArgs, 2);
+        std::cout << "  arg_count = " << ctx.size() << std::endl;
+        invoke_function(IFunction::Ptr(add), Any<float>(3.f), Any<int>(7));
+
+        // Direct FnArgs invocation
+        add.invoke(fnArgs);
     }
 
     return 0;

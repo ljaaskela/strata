@@ -39,14 +39,28 @@ public:
  * @param event Event to invoke.
  * @param args Arguments for invocation.
  */
-[[maybe_unused]] static ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *args)
+[[maybe_unused]] static ReturnValue invoke_event(const IEvent::ConstPtr &event, FnArgs args)
 {
     return event ? event->invoke(args) : ReturnValue::INVALID_ARGUMENT;
 }
 
 /** @copydoc invoke_event */
-[[maybe_unused]] static ReturnValue invoke_event(const IEvent::Ptr &event, const IAny *args)
+[[maybe_unused]] static ReturnValue invoke_event(const IEvent::Ptr &event, FnArgs args)
 {
+    return event ? event->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @brief Invokes an event with a single IAny argument. */
+[[maybe_unused]] static ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *arg)
+{
+    FnArgs args{&arg, 1};
+    return event ? event->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @copydoc invoke_event */
+[[maybe_unused]] static ReturnValue invoke_event(const IEvent::Ptr &event, const IAny *arg)
+{
+    FnArgs args{&arg, 1};
     return event ? event->invoke(args) : ReturnValue::INVALID_ARGUMENT;
 }
 

@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <string_view>
+#include <vector>
 
 #include <interface/intf_object.h>
 #include <interface/intf_object_factory.h>
@@ -39,8 +40,8 @@ public:
     {
         /** @brief The function to invoke. */
         IFunction::ConstPtr fn;
-        /** @brief Function args. Typically should be cloned from any source args. */
-        IAny::Ptr args;
+        /** @brief Function args. Each element is a cloned IAny. */
+        std::vector<IAny::Ptr> args;
     };
     /**
      * @brief Enqueues tasks to be executed on the next update() call.

@@ -38,6 +38,7 @@ src/function.cpp
     include/api/any.h
     include/api/property.h
     include/api/function.h
+    include/api/function_context.h
     include/api/strata.h
     include/ext/any.h
     include/ext/core_object.h
