@@ -11,24 +11,20 @@
 
 namespace strata {
 
-/**
- * @brief Read-only typed property wrapper with get_value accessor for type T.
- *
- * Returned by RPROP accessors. Provides read and observe operations but no set_value.
- * @tparam T The value type stored by the property.
- */
-template<class T>
-class ConstProperty
+namespace detail {
+
+/** @brief Non-template storage for ConstProperty<T>. Compiled once regardless of T instantiations. */
+class PropertyStorage
 {
-    ConstProperty() = delete;
+protected:
+    PropertyStorage() = delete;
+    explicit PropertyStorage(IProperty::Ptr existing) : prop_(std::move(existing)) {}
 
 public:
-    static constexpr Uid TYPE_UID = type_uid<T>();
-
-    /** @brief Wraps an existing IProperty pointer. */
-    explicit ConstProperty(IProperty::Ptr existing) : prop_(std::move(existing)) {}
-
+    /** @brief Returns wrapped IProperty interface. */
     operator const IProperty::Ptr() { return prop_; }
+
+    /** @brief Returns wrapped IProperty interface. */
     operator const IProperty::ConstPtr() const { return prop_; }
 
     /** @brief Returns true if the underlying IProperty is valid. */
@@ -56,20 +52,39 @@ public:
         }
     }
 
+protected:
+    IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
+    IProperty::Ptr prop_;
+};
+
+} // namespace detail
+
+/**
+ * @brief Read-only typed property wrapper with get_value accessor for type T.
+ *
+ * Returned by RPROP accessors. Provides read and observe operations but no set_value.
+ * @tparam T The value type stored by the property.
+ */
+template<class T>
+class ConstProperty : public detail::PropertyStorage
+{
+public:
+    using Type = std::remove_const_t<T>;
+    static constexpr Uid TYPE_UID = type_uid<Type>();
+
+    /** @brief Wraps an existing IProperty pointer. */
+    explicit ConstProperty(IProperty::Ptr existing) : PropertyStorage(std::move(existing)) {}
+
     /** @brief Returns the current value of the property. */
     T get_value() const {
-        std::remove_const_t<T> value{};
+        Type value{};
         if (auto internal = get_internal()) {
             if (auto any = internal->get_any()) {
-                any->get_data(&value, sizeof(T), TYPE_UID);
+                any->get_data(&value, sizeof(Type), TYPE_UID);
             }
         }
         return value;
     }
-
-protected:
-    IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
-    IProperty::Ptr prop_;
 };
 
 /**
@@ -82,17 +97,17 @@ template<class T>
 class Property : public ConstProperty<T>
 {
     using Base = ConstProperty<T>;
-    Property() = delete;
+    using Type = typename Base::Type;
 
 public:
     /** @brief Wraps an existing IProperty pointer. */
     explicit Property(IProperty::Ptr existing) : Base(std::move(existing)) {}
 
     /** @brief Sets the property to @p value. */
-    ReturnValue set_value(const T &value)
+    ReturnValue set_value(const Type &value)
     {
         if (auto internal = this->get_internal()) {
-            return internal->set_data(&value, sizeof(T), Base::TYPE_UID);
+            return internal->set_data(&value, sizeof(Type), Base::TYPE_UID);
         }
         return ReturnValue::FAIL;
     }
