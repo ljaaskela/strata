@@ -10,20 +10,13 @@
 
 namespace strata {
 
-/** @brief Read-only wrapper around an IAny pointer with reference-counted ownership. */
-class ConstAny
-{
-public:
-    /** @brief Implicit conversion to a const IAny pointer. */
-    operator const IAny *() const noexcept { return any_.get(); }
-    /** @brief Returns the underlying const IAny pointer. */
-    const IAny *get_any_interface() const noexcept { return any_.get(); }
-    /** @brief Returns true if the wrapper holds a valid IAny. */
-    operator bool() const noexcept { return any_.operator bool(); }
+namespace detail {
 
+/** @brief Non-template storage for Any<T>. Compiled once regardless of T instantiations. */
+class AnyStorage
+{
 protected:
-    ConstAny() = default;
-    virtual ~ConstAny() = default;
+    AnyStorage() = default;
 
     void set_any(const IAny &any, const Uid &req) noexcept
     {
@@ -42,33 +35,22 @@ protected:
         any_ = refcnt_ptr<IAny>(const_cast<IAny *>(&any));
     }
     void set_any_direct(const IAny::ConstPtr &any) noexcept { set_any_direct(*(any.get())); }
+
     refcnt_ptr<IAny> any_;
 };
 
-/** @brief Read-write wrapper around an IAny pointer. */
-class AnyBase : public ConstAny
-{
-public:
-    /** @brief Implicit conversion to a mutable IAny pointer. */
-    operator IAny *() { return any_.get(); }
-    /** @brief Copies the value from @p other into the managed IAny. */
-    bool copy_from(const IAny &other) { return any_ && any_->copy_from(other); }
-    /** @brief Returns the underlying mutable IAny pointer. */
-    IAny *get_any_interface() { return any_.get(); }
-
-protected:
-    AnyBase() = default;
-};
+} // namespace detail
 
 /**
  * @brief Typed wrapper for IAny that provides get_value/set_value accessors for type T.
  *
  * Can be constructed from an existing IAny or will create a new one from Strata.
+ * Use const T for read-only access.
  *
- * @tparam T The value type. Use const T for read-only access.
+ * @tparam T The value type.
  */
 template<class T>
-class Any final : public AnyBase
+class Any final : detail::AnyStorage
 {
     static constexpr bool IsReadWrite = !std::is_const_v<T>;
     static constexpr bool IsReadOnly = !IsReadWrite;
@@ -111,7 +93,7 @@ public:
         }
     }
     /** @brief Default-constructs an IAny of type T via Strata. */
-    Any() noexcept { create(); }
+    Any() noexcept { set_any_direct(instance().create_any(TYPE_UID)); }
     /** @brief Constructs an IAny of type T and initializes it with @p value. */
     Any(const T &value) noexcept
     {
@@ -121,10 +103,30 @@ public:
         }
         any_->set_data(&value, TYPE_SIZE, TYPE_UID);
     }
+
+    /** @brief Implicit conversion to a const IAny pointer. */
+    operator const IAny *() const noexcept { return any_.get(); }
+    /** @brief Implicit conversion to a mutable IAny pointer (read-write only). */
+    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    operator IAny *() noexcept { return any_.get(); }
     /** @brief Returns a const reference to the underlying IAny. */
     operator const IAny &() const noexcept { return *(any_.get()); }
+    /** @brief Returns true if the wrapper holds a valid IAny. */
+    operator bool() const noexcept { return any_.operator bool(); }
+
+    /** @brief Returns the underlying const IAny pointer. */
+    const IAny *get_any_interface() const noexcept { return any_.get(); }
+    /** @brief Returns the underlying mutable IAny pointer (read-write only). */
+    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    IAny *get_any_interface() noexcept { return any_.get(); }
+
+    /** @brief Copies the value from @p other into the managed IAny (read-write only). */
+    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    bool copy_from(const IAny &other) { return any_ && any_->copy_from(other); }
+
     /** @brief Returns the type id of the any value. */
     constexpr Uid get_type_uid() const noexcept { return TYPE_UID; }
+
     /** @brief Returns a copy of the stored value. */
     T get_value() const noexcept
     {
@@ -147,9 +149,6 @@ public:
     static Any<T> ref(const IAny::Ptr &ref) { return Any<T>(ref); }
     /** @brief Creates a read-only typed view over an existing const IAny pointer. */
     static const Any<const T> const_ref(const IAny::ConstPtr &ref) { return Any<const T>(ref); }
-
-protected:
-    void create() { set_any_direct(instance().create_any(TYPE_UID)); }
 };
 
 } // namespace strata
