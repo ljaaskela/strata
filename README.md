@@ -112,8 +112,8 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
-    ReturnValue fn_reset(const IAny*) override {
-        // implementation with access to 'this'
+    ReturnValue fn_reset(FnArgs args) override {
+        // implementation with access to 'this' and args
         return ReturnValue::SUCCESS;
     }
 };
@@ -133,8 +133,8 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset(const IAny*) override { /* ... */ return ReturnValue::SUCCESS; }
-    ReturnValue fn_serialize(const IAny*) override { /* ... */ return ReturnValue::SUCCESS; }
+    ReturnValue fn_reset(FnArgs args) override { /* ... */ return ReturnValue::SUCCESS; }
+    ReturnValue fn_serialize(FnArgs) override { /* ... */ return ReturnValue::SUCCESS; }
 };
 ```
 
@@ -161,7 +161,7 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 
 ### Virtual function dispatch
 
-`(FN, Name)` in `STRATA_INTERFACE` generates a virtual method `fn_Name(const IAny*)` on the interface. Implementing classes override this virtual to provide logic. The override is automatically wired so that calling `invoke()` on the runtime `IFunction` routes to the virtual method.
+`(FN, Name)` in `STRATA_INTERFACE` generates a virtual method `fn_Name(FnArgs)` on the interface. Implementing classes override this virtual to provide logic. The override is automatically wired so that calling `invoke()` on the runtime `IFunction` routes to the virtual method.
 
 ```cpp
 class IMyWidget : public Interface<IMyWidget>
@@ -169,13 +169,13 @@ class IMyWidget : public Interface<IMyWidget>
 public:
     STRATA_INTERFACE(
         (PROP, float, width, 0.f),
-        (FN, reset)          // generates: virtual fn_reset(const IAny*)
+        (FN, reset)          // generates: virtual fn_reset(FnArgs)
     )
 };
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
-    ReturnValue fn_reset(const IAny*) override {
+    ReturnValue fn_reset(FnArgs) override {
         std::cout << "reset!" << std::endl;
         return ReturnValue::SUCCESS;
     }
@@ -189,6 +189,43 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 ```
 
 Each `fn_Name` is pure virtual, so implementing classes must override it. An explicit `set_invoke_callback()` takes priority over the virtual.
+
+#### Function arguments
+
+Functions receive arguments as `FnArgs` — a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`.
+
+For multi-arg callbacks, use `FunctionContext` to validate the expected argument count:
+
+```cpp
+ReturnValue fn_reset(FnArgs args) override {
+    if (auto ctx = FunctionContext(args, 2)) {
+        auto a = ctx.arg<float>(0);
+        auto b = ctx.arg<int>(1);
+        // ...
+    }
+    return ReturnValue::SUCCESS;
+}
+```
+
+Single-argument callbacks can access the argument directly:
+
+```cpp
+ReturnValue fn_reset(FnArgs args) override {
+    if (auto value = Any<const int>(args[0])) {
+        // use value.get_value()
+    }
+    return ReturnValue::SUCCESS;
+}
+```
+
+Callers use variadic `invoke_function` overloads — values are automatically wrapped:
+
+```cpp
+invoke_function(iw->reset());                      // no args
+invoke_function(iw->reset(), Any<int>(42));         // single IAny arg
+invoke_function(iw->reset(), 1.f, 2u);             // multi-value (auto-wrapped)
+invoke_function(widget.get(), "reset", 1.f, 2u);   // by name
+```
 
 ### Query metadata
 
@@ -218,8 +255,8 @@ if (auto* meta = interface_cast<IMetadata>(widget)) {
 auto prop = Property<float>();
 prop.set_value(5.f);
 
-Function onChange([](const IAny* any) -> ReturnValue {
-    if (auto v = Any<const float>(*any)) {
+Function onChange([](FnArgs args) -> ReturnValue {
+    if (auto v = Any<const float>(args[0])) {
         std::cout << "new value: " << v.get_value() << std::endl;
     }
     return ReturnValue::SUCCESS;
@@ -336,7 +373,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `STRATA_INTERFACE` macro |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
 | `intf_event.h` | `IEvent` (inherits `IFunction`) with add/remove handler (immediate or deferred) |
-| `intf_function.h` | `IFunction` invocable callback with `InvokeType` support |
+| `intf_function.h` | `FnArgs` argument view, `IFunction` invocable callback with `InvokeType` support |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
 | `intf_strata.h` | `IStrata` for type registration and object creation |
@@ -366,7 +403,8 @@ User-facing typed wrappers.
 | `strata.h` | `instance()` singleton access |
 | `property.h` | `Property<T>` typed property wrapper |
 | `any.h` | `Any<T>` typed any wrapper |
-| `function.h` | `Function` wrapper with lambda support |
+| `function.h` | `Function` wrapper with lambda support, variadic `invoke_function` overloads |
+| `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
 
 ### src/
 
@@ -429,10 +467,12 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | `ext::ObjectCore<T, Interfaces...>` | Minimal CRTP base for objects (without metadata); auto UID/name, factory, self-pointer |
 | `ext::Object<T, Interfaces...>` | Full CRTP base; extends `ObjectCore` with metadata from all interfaces |
 | `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
-| `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with cloned `IAny::Ptr` args |
+| `FnArgs` | Non-owning view of function arguments (`{const IAny* const* data, size_t count}`) with bounds-checked `operator[]` |
+| `FunctionContext` | Lightweight view over `FnArgs` with count validation and typed `arg<T>(i)` access |
+| `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with a cloned `std::vector<IAny::Ptr>` of args |
 | `Property<T>` | Typed property with `get_value()`/`set_value()` and change events |
 | `Any<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |
-| `Function` | Wraps `ReturnValue(const IAny*)` callbacks |
+| `Function` | Wraps `ReturnValue(FnArgs)` callbacks |
 | `ext::LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
@@ -588,13 +628,13 @@ The `handlers_` vector is partitioned:
 STRATA_INTERFACE(
     (PROP, Type, Name, Default),  // generates Property<Type> Name() const
     (EVT, Name),          // generates IEvent::Ptr Name() const
-    (FN, Name)            // generates virtual fn_Name(const IAny*),
+    (FN, Name)            // generates virtual fn_Name(FnArgs),
                           //          IFunction::Ptr Name() const
 )
 ```
 
 For each `(FN, Name)` entry the macro generates:
-1. A pure `virtual ReturnValue fn_Name(const IAny*) = 0` method
+1. A pure `virtual ReturnValue fn_Name(FnArgs) = 0` method
 2. A static trampoline that routes `IFunction::invoke()` to `fn_Name()`
 3. A `MemberDesc` with the trampoline pointer in the metadata array
 4. An accessor `IFunction::Ptr Name() const`
@@ -697,8 +737,8 @@ public:
     //    The static trampoline casts the void* context back to the interface
     //    type and calls the virtual. _strata_intf_type is a protected alias
     //    for T provided by Interface<T>.
-    virtual ReturnValue fn_reset(const IAny*) = 0;
-    static ReturnValue _strata_trampoline_reset(void* self, const IAny* args) {
+    virtual ReturnValue fn_reset(FnArgs) = 0;
+    static ReturnValue _strata_trampoline_reset(void* self, FnArgs args) {
         return static_cast<_strata_intf_type*>(self)->fn_reset(args);
     }
 };

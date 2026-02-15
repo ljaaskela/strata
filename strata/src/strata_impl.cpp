@@ -136,7 +136,12 @@ void StrataImpl::update() const
     }
     for (auto &task : tasks) {
         if (task.fn) {
-            task.fn->invoke(task.args.get());
+            std::vector<const IAny*> ptrs;
+            ptrs.reserve(task.args.size());
+            for (auto &a : task.args) {
+                ptrs.push_back(a.get());
+            }
+            task.fn->invoke(FnArgs{ptrs.data(), ptrs.size()});
         }
     }
 }

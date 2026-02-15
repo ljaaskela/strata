@@ -3,17 +3,19 @@
 
 namespace strata {
 
-ReturnValue FunctionImpl::callback_trampoline(void* ctx, const IAny* args)
+ReturnValue FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
 {
     return reinterpret_cast<IFunction::CallableFn*>(ctx)(args);
 }
 
-ReturnValue FunctionImpl::invoke(const IAny *args, InvokeType type) const
+ReturnValue FunctionImpl::invoke(FnArgs args, InvokeType type) const
 {
     if (type == Deferred) {
         IStrata::DeferredTask task;
         task.fn = get_self<IFunction>();
-        task.args = args ? args->clone() : nullptr;
+        for (size_t i = 0; i < args.count; ++i) {
+            task.args.push_back(args[i] ? args[i]->clone() : nullptr);
+        }
         instance().queue_deferred_tasks(array_view(&task, 1));
         return ReturnValue::SUCCESS;
     }
@@ -40,18 +42,28 @@ array_view<IFunction::ConstPtr> FunctionImpl::deferred_handlers() const
     return {handlers_.data() + deferred_begin_, handlers_.size() - deferred_begin_};
 }
 
-void FunctionImpl::invoke_handlers(const IAny *args) const
+void FunctionImpl::invoke_handlers(FnArgs args) const
 {
     for (const auto &h : immediate_handlers()) {
         h->invoke(args);
     }
     if (auto deferred = deferred_handlers(); !deferred.empty()) {
-        // Single clone shared across all deferred tasks: invoke() takes const IAny*, so handlers cannot mutate.
-        auto cloned = args ? args->clone() : nullptr;
+        // Clone each arg for deferred tasks
+        std::vector<IAny::Ptr> clonedArgs;
+        std::vector<const IAny*> ptrs;
+        clonedArgs.reserve(args.count);
+        ptrs.reserve(args.count);
+        for (size_t i = 0; i < args.count; ++i) {
+            clonedArgs.push_back(args[i] ? args[i]->clone() : nullptr);
+            ptrs.push_back(clonedArgs.back().get());
+        }
+        FnArgs clonedFnArgs{ptrs.data(), ptrs.size()};
+
         std::vector<IStrata::DeferredTask> tasks;
         tasks.reserve(deferred.size());
         for (const auto &h : deferred) {
-            tasks.push_back({h, cloned});
+            // Share the same cloned args across all deferred tasks
+            tasks.push_back({h, clonedArgs});
         }
         instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
     }
