@@ -11,6 +11,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - [Features](#features)
 - [Project structure](#project-structure)
 - [Building](#building)
+- [Testing](#testing)
 - [Quick start](#quick-start)
   - [Define an interface](#define-an-interface)
   - [Implement with Object](#implement-with-object)
@@ -68,19 +69,37 @@ strata/
   demo/
     CMakeLists.txt
     main.cpp              Feature demonstration
+  test/
+    CMakeLists.txt
+    third_party/
+      googletest-1.14.0.tar.gz  Vendored GoogleTest
+    test_uid.cpp          Uid construction, parsing, validation
+    test_any.cpp          IAny / AnyValue / AnyRef type erasure
+    test_property.cpp     Property<T> wrapper and change events
+    test_function.cpp     Function, FnArgs, FunctionContext, events
+    test_object.cpp       Object system, interfaces, metadata
 ```
 
 ## Building
 
-Requires CMake 3.5+ and a C++17 compiler. Tested with MSVC 2019.
+Requires CMake 3.14+ and a C++17 compiler. Tested with MSVC 2019.
 
 ```bash
-mkdir build && cd build
-cmake ..
-cmake --build .
+cmake -B build
+cmake --build build --config Release
 ```
 
-Output: `build/bin/strata.dll` (shared library) and `build/bin/demo.exe` (demo).
+Output: `build/bin/Release/strata.dll` (shared library), `build/bin/Release/demo.exe` (demo), and `build/bin/Release/tests.exe` (unit tests).
+
+## Testing
+
+Unit tests use [GoogleTest 1.14.0](https://github.com/google/googletest), vendored as a tarball in `test/third_party/`. It is extracted into the build directory automatically during CMake configuration.
+
+```bash
+build/bin/Release/tests.exe
+```
+
+The test suite covers Uid construction/validation, Any/AnyValue/AnyRef type erasure, Property get/set/change events, Function/FnArgs/FunctionContext invocation, event handler add/remove, deferred execution, and the full object system (registration, interface casting, metadata lookup, property defaults, state-backed storage).
 
 ## Quick start
 
