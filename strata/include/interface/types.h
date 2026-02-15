@@ -108,6 +108,12 @@ enum ReturnValue : int16_t {
     READ_ONLY = -3,        ///< Write rejected: target is read-only.
 };
 
+/** @brief General-purpose object flags. Checked by runtime implementations. */
+namespace ObjectFlags {
+constexpr int32_t None = 0;
+constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
+} // namespace ObjectFlags
+
 /** @brief Returns true if the return value indicates success (non-negative). */
 inline constexpr bool succeeded(ReturnValue ret)
 {

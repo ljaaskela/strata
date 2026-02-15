@@ -50,10 +50,6 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
                         }
                     }
                 }
-                // Apply flags (e.g. ReadOnly) to the PropertyImpl
-                if (pk->flags) {
-                    pi->set_flags(pk->flags);
-                }
                 // Fallback to cloning default
                 if (!pi->get_any() && pk->getDefault) {
                     if (auto* def = pk->getDefault()) {
@@ -61,6 +57,10 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
                             pi->set_any(any);
                         }
                     }
+                }
+                // Apply flags (e.g. ReadOnly) to the PropertyImpl
+                if (pk->flags) {
+                    pi->set_flags(pk->flags);
                 }
             }
         }

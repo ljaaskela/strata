@@ -3,14 +3,9 @@
 
 #include <atomic>
 #include <ext/interface_dispatch.h>
+#include <interface/types.h>
 
 namespace strata {
-
-/** @brief General-purpose object flags. Checked by runtime implementations. */
-namespace ObjectFlags {
-constexpr int32_t None = 0;
-constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
-} // namespace ObjectFlags
 
 namespace ext {
 /**

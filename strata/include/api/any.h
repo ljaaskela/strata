@@ -127,6 +127,9 @@ public:
     /** @brief Returns the type id of the any value. */
     constexpr Uid get_type_uid() const noexcept { return TYPE_UID; }
 
+    /** @brief Return a clone of the any value */
+    IAny::Ptr clone() const { return any_ ? any_->clone() : nullptr; }
+
     /** @brief Returns a copy of the stored value. */
     T get_value() const noexcept
     {
