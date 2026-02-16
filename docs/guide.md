@@ -6,6 +6,24 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 
 `STRATA_INTERFACE` supports three function forms. `(FN, Name)` generates a zero-arg virtual `fn_Name()`. `(FN, Name, (T1, a1), ...)` generates a typed virtual `fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs`. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
 
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant IFunction
+    participant Trampoline
+    participant MyWidget
+
+    Note over Caller: invoke_function(iw, "add", Any<int>(10), Any<float>(3.f))
+
+    Caller->>IFunction: invoke(FnArgs)
+    IFunction->>Trampoline: target_fn_(context, FnArgs)
+    Note over Trampoline: FnBind extracts typed<br>args from FnArgs
+    Trampoline->>MyWidget: fn_add(int 10, float 3.f)
+    MyWidget-->>Trampoline: ReturnValue::SUCCESS
+    Trampoline-->>IFunction: ReturnValue::SUCCESS
+    IFunction-->>Caller: ReturnValue::SUCCESS
+```
+
 ```cpp
 class IMyWidget : public Interface<IMyWidget>
 {
@@ -188,6 +206,28 @@ auto* ss = ps->get_property_state<ISerializable>();   // ISerializable::State*
 ## Deferred invocation
 
 Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::strata::instance().update()` is called.
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Event
+    participant IStrata
+    participant Immediate as Immediate Handler
+    participant Deferred as Deferred Handler
+
+    Caller->>Event: invoke(args)
+    Event->>Immediate: invoke(args)
+    Immediate-->>Event: SUCCESS
+    Note over Event: Deferred handler queued<br>(args cloned)
+    Event-->>Caller: SUCCESS
+
+    Note over Caller: ... later ...
+
+    Caller->>IStrata: update()
+    IStrata->>Deferred: invoke(cloned args)
+    Deferred-->>IStrata: SUCCESS
+    IStrata-->>Caller: done
+```
 
 ### Defer at the call site
 
