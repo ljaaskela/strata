@@ -13,15 +13,18 @@
 #include <interface/types.h>
 #include <iostream>
 
-using namespace std;
+using std::cout;
+using std::endl;
+using std::string;
 using namespace strata;
 
+// Custom data
 struct Data
 {
     Data() = default;
-    Data(float v, const std::string &n) : value(v), name(n) {}
+    Data(float v, const string &n) : value(v), name(n) {}
     float value;
-    std::string name;
+    string name;
     constexpr bool operator!=(const Data &other) const noexcept
     {
         return value != other.value && name != other.name;
@@ -32,7 +35,7 @@ struct Data
 
 Data globalData_;
 
-// Custom any type which accesses global data
+// Custom any type which accesses global data (of type Data)
 class MyDataAny final : public ext::AnyCore<MyDataAny, Data, IExternalAny>
 {
 public:
@@ -56,6 +59,7 @@ public:
 private:
 };
 
+// Application-specific interface definitions (IMyWidget and ISerializable)
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
@@ -72,38 +76,37 @@ class ISerializable : public Interface<ISerializable>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, std::string, name, ""),
+        (PROP, string, name, ""),
         (FN_RAW, serialize)
     )
 };
 
+// MyWidget concrete class implementation, implements IMyWidget and ISerializable
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
     ReturnValue fn_reset() override
     {
-        std::cout << "  MyWidget::fn_reset called!" << std::endl;
+        cout << "  MyWidget::fn_reset called!" << endl;
         return ReturnValue::SUCCESS;
     }
 
     ReturnValue fn_add(int x, float y) override
     {
-        std::cout << "  MyWidget::fn_add(" << x << ", " << y << ") = " << (x + y) << std::endl;
+        cout << "  MyWidget::fn_add(" << x << ", " << y << ") = " << (x + y) << endl;
         return ReturnValue::SUCCESS;
     }
 
     ReturnValue fn_serialize(FnArgs) override
     {
-        std::cout << "  MyWidget::fn_serialize called (raw)!" << std::endl;
+        cout << "  MyWidget::fn_serialize called (raw)!" << endl;
         return ReturnValue::SUCCESS;
     }
 };
 
-int main()
+// Create a Property<float>, show copy semantics and get/set round-trip.
+void demo_properties()
 {
-    auto &r = instance();
-
-    r.register_type<MyDataAny>();
-    r.register_type<MyWidget>();
+    cout << endl << "=== demo_properties ===" << endl;
 
     auto prop = Property<float>(instance().create_property<float>());
     prop.set_value(5.f);
@@ -111,31 +114,54 @@ int main()
     auto prop3 = Property<float>(prop);
 
     auto value = prop.get_value();
-    std::cout << "Property<float> prop1 value is " << value << std::endl;
-    std::cout << "Property<float> prop2 value is " << prop2.get_value() << std::endl;
-    std::cout << "Property<float> prop3 value is " << prop3.get_value() << std::endl;
+    cout << "Property<float> prop1 value is " << value << endl;
+    cout << "Property<float> prop2 value is " << prop2.get_value() << endl;
+    cout << "Property<float> prop3 value is " << prop3.get_value() << endl;
+
+    cout << "=== demo_properties done ===" << endl;
+}
+
+// Use Any<Data> backed by MyDataAny to access global storage through a property.
+void demo_custom_any()
+{
+    cout << endl << "=== demo_custom_any ===" << endl;
 
     Any<Data> data;                 // One view to globalData
     auto myprop = Property<Data>(instance().create_property<Data>()); // Property to global data
     myprop.set_value({10.f, "Hello"});
 
-    std::cout << "Property<Data> value is " << myprop.get_value().value << ":"
-              << myprop.get_value().name << std::endl;
+    cout << "Property<Data> value is " << myprop.get_value().value << ":"
+              << myprop.get_value().name << endl;
+
+    cout << "=== demo_custom_any done ===" << endl;
+}
+
+// Subscribe to on_changed events on both float and Data properties, then trigger changes.
+void demo_change_notifications()
+{
+    cout << endl << "=== demo_change_notifications ===" << endl;
+
+    auto prop = Property<float>(instance().create_property<float>());
+    prop.set_value(5.f);
+
+    Any<Data> data;
+    auto myprop = Property<Data>(instance().create_property<Data>());
+    myprop.set_value({10.f, "Hello"});
 
     Callback valueChanged([](FnArgs args) -> ReturnValue {
-        std::cout << "Property value changed, ";
+        cout << "Property value changed, ";
         if (!args[0]) {
             return ReturnValue::INVALID_ARGUMENT;
         }
         if (auto v = Any<const float>(*args[0])) {
-            std::cout << "new value: " << v.get_value();
+            cout << "new value: " << v.get_value();
         } else if (auto v = Any<const Data>(*args[0])) {
             auto value = v.get_value();
-            std::cout << "new value: " << value.name << ", " << value.value;
+            cout << "new value: " << value.name << ", " << value.value;
         } else {
-            std::cout << "property not convertible to float or Data";
+            cout << "property not convertible to float or Data";
         }
-        std::cout << std::endl;
+        cout << endl;
         return ReturnValue::SUCCESS;
     });
     prop.add_on_changed(valueChanged);
@@ -144,89 +170,109 @@ int main()
     prop.set_value(10.f);
     data.set_value({20.f, "Hello2"});   // Set global data directly
     myprop.set_value({30.f, "Hello3"}); // Set global data through property
-    std::cout << "sizeof(float)            " << sizeof(float) << std::endl;
-    std::cout << "sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << std::endl;
-    std::cout << "sizeof(Any<float>)      " << sizeof(Any<float>) << std::endl;
-    std::cout << "sizeof(AnyValue<float>) " << sizeof(ext::AnyValue<float>) << std::endl;
-    std::cout << "sizeof(Property<float>) " << sizeof(Property<float>) << std::endl;
-    std::cout << "sizeof(MyDataAny)        " << sizeof(MyDataAny) << std::endl;
+
+    cout << "=== demo_change_notifications done ===" << endl;
+}
+
+// Query class info and member metadata from the registry without creating an instance.
+void demo_static_metadata()
+{
+    cout << endl << "=== demo_static_metadata ===" << endl;
+
+    auto& r = instance();
 
     // --- Static metadata via Strata (no instance needed) ---
-    std::cout << "\n--- MyWidget static metadata ---" << std::endl;
+    cout << "MyWidget static metadata:" << endl;
     if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
-        std::cout << "Class: " << info->name << " (" << info->members.size() << " members)" << std::endl;
+        cout << "  Class: " << info->name << " (" << info->members.size() << " members)" << endl;
         for (auto& m : info->members) {
             const char* kind = m.kind == MemberKind::Property ? "Property"
                              : m.kind == MemberKind::Event    ? "Event"
                                                               : "Function";
-            std::cout << "  " << kind << " \"" << m.name << "\"";
+            cout << "    " << kind << " \"" << m.name << "\"";
             if (m.interfaceInfo) {
-                std::cout << " (from " << m.interfaceInfo->name << ")";
+                cout << " (from " << m.interfaceInfo->name << ")";
             }
             if (m.propertyKind()) {
-                std::cout << " [has default]";
+                cout << " [has default]";
             }
-            std::cout << std::endl;
+            cout << endl;
         }
     }
 
     // --- Static defaults (no instance needed) ---
-    std::cout << "\n--- Static metadata defaults ---" << std::endl;
+    cout << endl << "  Static metadata defaults:" << endl;
     if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
         for (auto& m : info->members) {
             if (auto* pk = m.propertyKind()) {
                 auto* def = pk->getDefault ? pk->getDefault() : nullptr;
-                std::cout << "  " << m.name << " default IAny: " << (def ? "ok" : "null") << std::endl;
+                cout << "    " << m.name << " default IAny: " << (def ? "ok" : "null") << endl;
             }
         }
         // Typed access to specific defaults
-        std::cout << "  width default = " << get_default_value<float>(info->members[0]) << std::endl;
-        std::cout << "  height default = " << get_default_value<float>(info->members[1]) << std::endl;
+        cout << "    width default = " << get_default_value<float>(info->members[0]) << endl;
+        cout << "    height default = " << get_default_value<float>(info->members[1]) << endl;
         // ISerializable::name (no custom default, should be "")
-        std::cout << "  name default = \"" << get_default_value<std::string>(info->members[4]) << "\"" << std::endl;
+        cout << "    name default = \"" << get_default_value<string>(info->members[4]) << "\""
+             << endl;
     }
+
+    cout << "=== demo_static_metadata done ===" << endl;
+}
+
+// Enumerate members and look up properties/events/functions by name on a live object.
+void demo_runtime_metadata(IObject::Ptr& widget)
+{
+    cout << endl << "=== demo_runtime_metadata ===" << endl;
 
     // --- Runtime metadata via IMetadata ---
-    std::cout << "\n--- MyWidget instance metadata ---" << std::endl;
-    auto widget = r.create<IObject>(MyWidget::get_class_uid());
+    cout << "MyWidget instance metadata:" << endl;
     if (auto* meta = interface_cast<IMetadata>(widget)) {
         for (auto &m : meta->get_static_metadata()) {
-            std::cout << "  member: " << m.name << std::endl;
+            cout << "    member: " << m.name << endl;
         }
         if (auto p = meta->get_property("width")) {
-            std::cout << "  get_property(\"width\") ok" << std::endl;
+            cout << "    get_property(\"width\") ok" << endl;
         }
         if (auto e = meta->get_event("on_clicked")) {
-            std::cout << "  get_event(\"on_clicked\") ok" << std::endl;
+            cout << "    get_event(\"on_clicked\") ok" << endl;
         }
         if (auto f = meta->get_function("reset")) {
-            std::cout << "  get_function(\"reset\") ok" << std::endl;
+            cout << "    get_function(\"reset\") ok" << endl;
         }
         if (!meta->get_property("Bogus")) {
-            std::cout << "  get_property(\"Bogus\") correctly returned null" << std::endl;
+            cout << "    get_property(\"Bogus\") correctly returned null" << endl;
         }
     }
 
+    cout << "=== demo_runtime_metadata done ===" << endl;
+}
+
+// Access properties, events, and functions through IMyWidget typed interface accessors.
+void demo_interfaces(IObject::Ptr& widget)
+{
+    cout << endl << "=== demo_interfaces ===" << endl;
+
     // --- Typed access via IMyWidget interface ---
-    std::cout << "\n--- MyWidget via IMyWidget interface ---" << std::endl;
+    cout << "MyWidget via IMyWidget interface:" << endl;
     if (auto* iw = interface_cast<IMyWidget>(widget)) {
         // Verify runtime properties start with declared defaults
-        std::cout << "  width() initial value = " << iw->width().get_value() << " (expected 100)" << std::endl;
-        std::cout << "  height() initial value = " << iw->height().get_value() << " (expected 50)" << std::endl;
+        cout << "  width() initial value = " << iw->width().get_value() << " (expected 100)" << endl;
+        cout << "  height() initial value = " << iw->height().get_value() << " (expected 50)" << endl;
 
         auto w = iw->width();
         w.set_value(42.f);
-        std::cout << "  width().set_value(42) -> width().get_value() = " << iw->width().get_value() << std::endl;
+        cout << "  width().set_value(42) -> width().get_value() = " << iw->width().get_value() << endl;
 
-        std::cout << "  height() ok: " << (iw->height() ? "yes" : "no") << std::endl;
-        std::cout << "  on_clicked() ok: " << (iw->on_clicked() ? "yes" : "no") << std::endl;
-        std::cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << std::endl;
+        cout << "  height() ok: " << (iw->height() ? "yes" : "no") << endl;
+        cout << "  on_clicked() ok: " << (iw->on_clicked() ? "yes" : "no") << endl;
+        cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << endl;
 
-        std::cout << "  Invoking reset() (zero-arg)..." << std::endl;
+        cout << "  Invoking reset() (zero-arg)..." << endl;
         invoke_function(iw->reset()); // Invoke by interface accessor
         invoke_function(iw, "reset"); // Invoke by name
 
-        std::cout << "  Invoking add() (typed args)..." << std::endl;
+        cout << "  Invoking add() (typed args)..." << endl;
         invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f));
 
         // Inspect typed arg metadata
@@ -234,19 +280,27 @@ int main()
             for (auto& m : info->members) {
                 if (auto* fk = m.functionKind()) {
                     if (!fk->args.empty()) {
-                        std::cout << "  Function \"" << m.name << "\" args:";
+                        cout << "  Function \"" << m.name << "\" args:";
                         for (auto& arg : fk->args) {
-                            std::cout << " " << arg.name;
+                            cout << " " << arg.name;
                         }
-                        std::cout << std::endl;
+                        cout << endl;
                     }
                 }
             }
         }
     }
 
+    cout << "=== demo_interfaces done ===" << endl;
+}
+
+// Construct Uid from hex ints and string, verify constexpr parsing and STRATA_UID.
+void demo_uid()
+{
+    cout << endl << "=== demo_uid ===" << endl;
+
     // --- Uid from string ---
-    std::cout << "\n--- Uid from string ---" << std::endl;
+    cout << "Uid from string:" << endl;
     constexpr Uid a(0xcc262192d151941f, 0xd542d4c622b50b09);
     constexpr Uid b("cc262192-d151-941f-d542-d4c622b50b09");
     static_assert(a == b, "Uid string parsing mismatch");
@@ -256,8 +310,8 @@ int main()
     static_assert(!is_valid_uid_format("cc262192Xd151-941f-d542-d4c622b50b09")); // wrong dash
     static_assert(!is_valid_uid_format("gg262192-d151-941f-d542-d4c622b50b09")); // bad hex
     // constexpr Uid bad("not-a-uid"); // would fail to compile
-    std::cout << "  from ints:   " << a << std::endl;
-    std::cout << "  from string: " << b << std::endl;
+    cout << "  from ints:   " << a << endl;
+    cout << "  from string: " << b << endl;
 
     // Verify STRATA_UID macro on Interface template
     static_assert(ISerializable::UID == type_uid<ISerializable>(), "auto UID should match type_uid");
@@ -265,21 +319,37 @@ int main()
     // A hypothetical interface with a fixed UID:
     // class IFixed : public Interface<IFixed, STRATA_UID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")> {};
     // would have IFixed::UID == customUid
-    std::cout << "  STRATA_UID:  " << customUid << std::endl;
+    cout << "  STRATA_UID:  " << customUid << endl;
+
+    cout << "=== demo_uid done ===" << endl;
+}
+
+// Access the ISerializable interface on MyWidget: set name, invoke serialize.
+void demo_serializable(IObject::Ptr& widget)
+{
+    cout << endl << "=== demo_serializable ===" << endl;
 
     // --- Typed access via ISerializable interface ---
-    std::cout << "\n--- MyWidget via ISerializable interface ---" << std::endl;
+    cout << "MyWidget via ISerializable interface:" << endl;
     if (auto* is = interface_cast<ISerializable>(widget)) {
         auto n = is->name();
-        n.set_value(std::string("MyWidget1"));
-        std::cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value() << std::endl;
-        std::cout << "  serialize() ok: " << (is->serialize() ? "yes" : "no") << std::endl;
-        std::cout << "  Invoking serialize() (FN_RAW)..." << std::endl;
+        n.set_value(string("MyWidget1"));
+        cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value() << endl;
+        cout << "  serialize() ok: " << (is->serialize() ? "yes" : "no") << endl;
+        cout << "  Invoking serialize() (FN_RAW)..." << endl;
         invoke_function(is, "serialize");
     }
 
+    cout << "=== demo_serializable done ===" << endl;
+}
+
+// AnyRef<T> points at external memory: read/write through the ref, memcpy snapshot, clone.
+void demo_any_ref()
+{
+    cout << endl << "=== demo_any_ref ===" << endl;
+
     // --- AnyRef: external struct storage ---
-    std::cout << "\n--- AnyRef<T> with struct storage ---" << std::endl;
+    cout << "AnyRef<T> with struct storage:" << endl;
     {
         struct WidgetState {
             float width = 100.f;
@@ -289,93 +359,103 @@ int main()
         ext::AnyRef<float> widthRef(&state.width);
         ext::AnyRef<float> heightRef(&state.height);
 
-        std::cout << "  state = {" << state.width << ", " << state.height << "}" << std::endl;
-        std::cout << "  widthRef.get_value() = " << widthRef.get_value() << std::endl;
+        cout << "  state = {" << state.width << ", " << state.height << "}" << endl;
+        cout << "  widthRef.get_value() = " << widthRef.get_value() << endl;
 
         // Write through the any, reads back from struct
         widthRef.set_value(42.f);
-        std::cout << "  widthRef.set_value(42) -> state.width = " << state.width << std::endl;
+        cout << "  widthRef.set_value(42) -> state.width = " << state.width << endl;
 
         // Write directly to struct, reads back through the any
         state.height = 99.f;
-        std::cout << "  state.height = 99 -> heightRef.get_value() = " << heightRef.get_value() << std::endl;
+        cout << "  state.height = 99 -> heightRef.get_value() = " << heightRef.get_value() << endl;
 
         // Snapshot via memcpy
         WidgetState snapshot;
-        std::memcpy(&snapshot, &state, sizeof(WidgetState));
+        memcpy(&snapshot, &state, sizeof(WidgetState));
         state.width = 0.f;
-        std::cout << "  memcpy snapshot, then state.width = 0" << std::endl;
-        std::cout << "  snapshot.width = " << snapshot.width << " (preserved)" << std::endl;
-        std::cout << "  widthRef.get_value() = " << widthRef.get_value() << " (follows live state)" << std::endl;
+        cout << "  memcpy snapshot, then state.width = 0" << endl;
+        cout << "  snapshot.width = " << snapshot.width << " (preserved)" << endl;
+        cout << "  widthRef.get_value() = " << widthRef.get_value() << " (follows live state)" << endl;
 
         // Clone produces an owned AnyValue copy
         auto cloned = widthRef.clone();
         state.width = 777.f;
         float clonedValue{};
         cloned->get_data(&clonedValue, sizeof(float), type_uid<float>());
-        std::cout << "  clone() after state.width = 777 -> cloned value = " << clonedValue << " (independent)" << std::endl;
+        cout << "  clone() after state.width = 777 -> cloned value = " << clonedValue << " (independent)" << endl;
 
-        std::cout << "  sizeof(AnyRef<float>) " << sizeof(ext::AnyRef<float>) << std::endl;
+        cout << "  sizeof(AnyRef<float>) " << sizeof(ext::AnyRef<float>) << endl;
     }
 
+    cout << "=== demo_any_ref done ===" << endl;
+}
+
+// Read/write properties through IPropertyState raw struct pointers for zero-overhead access.
+void demo_direct_state()
+{
+    cout << endl << "=== demo_direct_state ===" << endl;
+
+    auto& r = instance();
+
     // --- State-backed property storage ---
-    std::cout << "\n--- State-backed property storage ---" << std::endl;
+    cout << "State-backed property storage:" << endl;
     {
         auto widget2 = r.create<IObject>(MyWidget::get_class_uid());
         auto* iw = interface_cast<IMyWidget>(widget2);
         auto* ps = interface_cast<IPropertyState>(widget2);
         if (iw && ps) {
             auto *state = ps->get_property_state<IMyWidget>();
-            std::cout << "  IMyWidget::State* = " << (state ? "ok" : "null") << std::endl;
+            cout << "  IMyWidget::State* = " << (state ? "ok" : "null") << endl;
             if (state) {
                 // Verify defaults in state struct
-                std::cout << "  state->width = " << state->width << " (expected 100)" << std::endl;
-                std::cout << "  state->height = " << state->height << " (expected 50)" << std::endl;
+                cout << "  state->width = " << state->width << " (expected 100)" << endl;
+                cout << "  state->height = " << state->height << " (expected 50)" << endl;
 
                 // Write through property, verify state reflects it
                 iw->width().set_value(200.f);
-                std::cout << "  After width().set_value(200): state->width = " << state->width << std::endl;
+                cout << "  After width().set_value(200): state->width = " << state->width << endl;
 
                 // Write to state directly, verify property reads it
                 state->height = 75.f;
-                std::cout << "  After state->height = 75: height().get_value() = " << iw->height().get_value() << std::endl;
+                cout << "  After state->height = 75: height().get_value() = " << iw->height().get_value() << endl;
             }
 
             // ISerializable state
             auto* is = interface_cast<ISerializable>(widget2);
             if (is) {
                 auto* sstate = static_cast<ISerializable::State*>(ps->get_property_state(ISerializable::UID));
-                std::cout << "  ISerializable::State* = " << (sstate ? "ok" : "null") << std::endl;
+                cout << "  ISerializable::State* = " << (sstate ? "ok" : "null") << endl;
                 if (sstate) {
-                    is->name().set_value(std::string("TestName"));
-                    std::cout << "  After name().set_value(\"TestName\"): sstate->name = " << sstate->name << std::endl;
+                    is->name().set_value(string("TestName"));
+                    cout << "  After name().set_value(\"TestName\"): sstate->name = " << sstate->name << endl;
                 }
             }
         }
-
-        std::cout << "  sizeof(IMyWidget::State) = " << sizeof(IMyWidget::State) << std::endl;
-        std::cout << "  sizeof(ISerializable::State) = " << sizeof(ISerializable::State) << std::endl;
-        std::cout << "  sizeof(MyWidget) = " << sizeof(MyWidget) << std::endl;
-        std::cout << "  sizeof(ObjectCore<X>) [minimal] = "
-                  << sizeof(ext::ObjectCore<MyWidget>) << std::endl;
-        std::cout << "  sizeof(ObjectCore<X, ...4 interfaces>) = "
-                  << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << std::endl;
     }
 
+    cout << "=== demo_direct_state done ===" << endl;
+}
+
+// Invoke functions with FunctionContext for multi-arg dispatch, variadic helpers, and raw FnArgs.
+void demo_function_context(IObject::Ptr& widget)
+{
+    cout << endl << "=== demo_function_context ===" << endl;
+
     // --- FunctionContext: multi-arg function invocation ---
-    std::cout << "\n--- FunctionContext multi-arg ---" << std::endl;
+    cout << "FunctionContext multi-arg:" << endl;
     {
         Callback add([](FnArgs args) -> ReturnValue {
             auto ctx = FunctionContext(args, 2);
             if (!ctx) {
-                std::cout << "  add: expected 2 args" << std::endl;
+                cout << "  add: expected 2 args" << endl;
                 return ReturnValue::INVALID_ARGUMENT;
             }
             auto a = ctx.arg<float>(0);
             auto b = Any<const int>(ctx.arg(1));
             if (a && b) {
-                std::cout << "  add(" << a.get_value() << ", " << b.get_value()
-                          << ") = " << (a.get_value() + b.get_value()) << std::endl;
+                cout << "  add(" << a.get_value() << ", " << b.get_value()
+                          << ") = " << (a.get_value() + b.get_value()) << endl;
             }
             return ReturnValue::SUCCESS;
         });
@@ -392,12 +472,59 @@ int main()
         const IAny* ptrs[] = {arg0, arg1};
         FnArgs fnArgs{ptrs, 2};
         FunctionContext ctx(fnArgs, 2);
-        std::cout << "  arg_count = " << ctx.size() << std::endl;
+        cout << "  arg_count = " << ctx.size() << endl;
         invoke_function(IFunction::Ptr(add), Any<float>(3.f), Any<int>(7));
 
         // Direct FnArgs invocation
         add.invoke(fnArgs);
     }
+
+    cout << "=== demo_function_context done ===" << endl;
+}
+
+// Print sizeof for key types: state structs, MyWidget, ObjectCore variants.
+void demo_sizes()
+{
+    cout << endl << "=== demo_sizes ===" << endl;
+
+    cout << "  sizeof(float)            " << sizeof(float) << endl;
+    cout << "  sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << endl;
+    cout << "  sizeof(Any<float>)      " << sizeof(Any<float>) << endl;
+    cout << "  sizeof(AnyValue<float>) " << sizeof(ext::AnyValue<float>) << endl;
+    cout << "  sizeof(Property<float>) " << sizeof(Property<float>) << endl;
+    cout << "  sizeof(MyDataAny)        " << sizeof(MyDataAny) << endl;
+    cout << "  sizeof(IMyWidget::State) = " << sizeof(IMyWidget::State) << endl;
+    cout << "  sizeof(ISerializable::State) = " << sizeof(ISerializable::State) << endl;
+    cout << "  sizeof(MyWidget) = " << sizeof(MyWidget) << endl;
+    cout << "  sizeof(ObjectCore<X>) [minimal] = "
+              << sizeof(ext::ObjectCore<MyWidget>) << endl;
+    cout << "  sizeof(ObjectCore<X, ...4 interfaces>) = "
+              << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << endl;
+
+    cout << "=== demo_sizes done ===" << endl;
+}
+
+int main()
+{
+    auto &r = instance();
+
+    r.register_type<MyDataAny>();
+    r.register_type<MyWidget>();
+
+    demo_properties();
+    demo_custom_any();
+    demo_change_notifications();
+    demo_static_metadata();
+
+    auto widget = r.create<IObject>(MyWidget::get_class_uid());
+    demo_runtime_metadata(widget);
+    demo_interfaces(widget);
+    demo_uid();
+    demo_serializable(widget);
+    demo_any_ref();
+    demo_direct_state();
+    demo_function_context(widget);
+    demo_sizes();
 
     return 0;
 }
