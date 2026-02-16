@@ -2,12 +2,23 @@
 
 The library is organized in four layers:
 
+```mermaid
+block
+columns 1
+  block
+    api["<b>api/</b><br>User-facing typed wrappers"]
+    ext["<b>ext/</b><br>CRTP helpers and templates"]
+  end
+  interface["<b>interface/</b><br>Abstract interfaces (ABI contracts)"]
+  src["<b>src/</b><br>DLL internals"]
+```
+
 ```
 strata/
   include/               Public headers (available to DLL consumers)
     interface/           Abstract interfaces (pure virtual)
-    ext/                 CRTP helpers and template implementations
-    api/                 User-facing typed wrappers
+    ext/                 CRTP helpers and template implementations for application-defined objects/types
+    api/                 User-facing typed wrappers for API usage
     common.h             Uid, type_uid<T>(), get_name<T>()
     array_view.h         Lightweight constexpr span-like view
   src/                   Internal runtime implementations (compiled into DLL)
@@ -72,6 +83,130 @@ Internal runtime implementations (compiled into the DLL).
 | `strata.cpp` | DLL entry point, exports `instance()` |
 
 ## Type hierarchy across layers
+
+### Interface inheritance
+
+```mermaid
+classDiagram
+    direction TB
+
+    class IInterface {
+        <<interface>>
+        get_interface()
+        ref() / unref()
+    }
+
+    class IObject {
+        <<interface>>
+    }
+    class ISharedFromObject {
+        <<interface>>
+        shared_from_object()
+    }
+    class IAny {
+        <<interface>>
+        get_data() / set_data()
+        clone()
+    }
+
+    class IPropertyState {
+        <<interface>>
+        get_property_state()
+    }
+    class IMetadata {
+        <<interface>>
+        get_property() / get_event() / get_function()
+    }
+    class IMetadataContainer {
+        <<interface>>
+    }
+
+    class IProperty {
+        <<interface>>
+        get/set via IAny
+    }
+    class IFunction {
+        <<interface>>
+        invoke()
+    }
+    class IEvent {
+        <<interface>>
+        add/remove handler
+    }
+
+    class IExternalAny {
+        <<interface>>
+    }
+    class IStrata {
+        <<interface>>
+        register/create/update
+    }
+
+    IInterface <|-- IObject
+    IObject <|-- ISharedFromObject
+    IObject <|-- IAny
+
+    IInterface <|-- IPropertyState
+    IPropertyState <|-- IMetadata
+    IMetadata <|-- IMetadataContainer
+
+    IInterface <|-- IProperty
+    IInterface <|-- IFunction
+    IFunction <|-- IEvent
+
+    IInterface <|-- IExternalAny
+    IInterface <|-- IStrata
+```
+
+### ext/ class hierarchy
+
+```mermaid
+classDiagram
+    direction TB
+
+    class InterfaceDispatch~Interfaces...~ {
+        get_interface()
+    }
+    class RefCountedDispatch~Interfaces...~ {
+        ref() / unref()
+    }
+
+    class ObjectCore~Final, Interfaces...~ {
+        self_ weak_ptr
+        factory, UID, name
+    }
+    class Object~Final, Interfaces...~ {
+        meta_ unique_ptr
+        states_ tuple
+    }
+
+    class AnyBase~Final, Interfaces...~ {
+        clone, factory
+    }
+    class AnyMulti~Final, Types...~ {
+        multi-type UID
+    }
+    class AnyCore~Final, T~ {
+        virtual get/set
+    }
+    class AnyValue~T~ {
+        inline storage
+    }
+    class AnyRef~T~ {
+        external reference
+    }
+
+    InterfaceDispatch <|-- RefCountedDispatch
+
+    RefCountedDispatch <|-- ObjectCore
+    ObjectCore <|-- Object
+
+    RefCountedDispatch <|-- AnyBase
+    AnyBase <|-- AnyMulti
+    AnyMulti <|-- AnyCore
+    AnyCore <|-- AnyValue
+    AnyCore <|-- AnyRef
+```
 
 Each concept in Strata has types at up to three layers. The naming follows a consistent pattern:
 
