@@ -80,14 +80,14 @@ void FunctionImpl::set_invoke_callback(IFunction::CallableFn *fn)
     target_fn_ = fn ? &callback_trampoline : nullptr;
 }
 
-void FunctionImpl::bind(void* context, IFunctionInternal::BoundFn* fn)
+void FunctionImpl::bind(void* context, IFunction::BoundFn* fn)
 {
     release_owned_context();
     target_context_ = context;
     target_fn_ = fn;
 }
 
-void FunctionImpl::set_owned_callback(void* context, BoundFn* fn, ContextDeleter* deleter)
+void FunctionImpl::set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter)
 {
     release_owned_context();
     owned_context_ = context;

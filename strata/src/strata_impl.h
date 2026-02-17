@@ -25,6 +25,10 @@ public:
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
     void update() const override;
     IFuture::Ptr create_future() const override;
+    IFunction::Ptr create_callback(IFunction::CallableFn* fn) const override;
+    IFunction::Ptr create_owned_callback(void* context,
+                                         IFunction::BoundFn* fn,
+                                         IFunction::ContextDeleter* deleter) const override;
 
 private:
     struct Entry {
