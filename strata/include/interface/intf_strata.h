@@ -1,9 +1,7 @@
 #ifndef INTF_STRATA_H
 #define INTF_STRATA_H
 
-#include <functional>
 #include <memory>
-#include <string_view>
 #include <vector>
 
 #include <interface/intf_future.h>
@@ -18,13 +16,17 @@ namespace strata {
  * @brief Central interface for creating and managing Strata object types.
  *
  * Types are registered via IObjectFactory instances and can be created by UID.
+ *
+ * A global IStrata& reference be retrieved through strata::instance():
+ * @code
+ * #include <api/strata.h>
+ * ...
+ * auto& s = ::strata::instance(); // strata::IStrata&
+ * @endcode
  */
 class IStrata : public Interface<IStrata>
 {
 public:
-    /** @brief Factory callable that creates an IObject instance. */
-    using TypeCreateFn = std::function<IObject::Ptr()>;
-
     /** @brief Registers an object factory for the type it describes. */
     virtual ReturnValue register_type(const IObjectFactory &factory) = 0;
     /** @brief Unregisters a previously registered object factory. */

@@ -1,7 +1,6 @@
 #ifndef PROPERTY_H
 #define PROPERTY_H
 
-#include "strata_impl.h"
 #include <common.h>
 #include <ext/event.h>
 #include <ext/core_object.h>

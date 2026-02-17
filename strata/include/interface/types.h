@@ -113,8 +113,8 @@ enum ReturnValue : int16_t {
 
 /** @brief General-purpose object flags. Checked by runtime implementations. */
 namespace ObjectFlags {
-constexpr int32_t None = 0;
-constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
+[[maybe_unused]] constexpr int32_t None = 0;
+[[maybe_unused]] constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
 } // namespace ObjectFlags
 
 /** @brief Returns true if the return value indicates success (non-negative). */

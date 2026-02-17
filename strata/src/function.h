@@ -1,7 +1,6 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
-#include "strata_impl.h"
 #include <common.h>
 #include <ext/core_object.h>
 #include <interface/intf_event.h>

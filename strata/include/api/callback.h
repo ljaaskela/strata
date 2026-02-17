@@ -13,8 +13,7 @@ namespace strata {
 
 namespace detail {
 
-// --- Typed parameter unpacking for auto-unpack Callback constructor ---
-
+/** @brief Typed parameter unpacking for auto-unpack Callback constructor */
 template<class Callable, class ArgsTuple, size_t... Is>
 decltype(auto) invoke_typed_impl(Callable& callable, FnArgs args, std::index_sequence<Is...>)
 {

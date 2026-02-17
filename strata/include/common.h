@@ -1,10 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <memory>
-#include <vector>
-
 #include <uid.h>
+#include <array>
 
 namespace strata {
 

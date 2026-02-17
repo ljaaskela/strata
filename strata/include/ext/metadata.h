@@ -5,13 +5,11 @@
 #include <interface/intf_metadata.h>
 #include <interface/types.h>
 
-#include <string_view>
 #include <type_traits>
-#include <utility>
 
 namespace strata::ext {
 
-// -- Constexpr metadata collection from interfaces --
+// Constexpr metadata collection from interfaces
 
 /** @brief Gets T::metadata if it exists, otherwise an empty array. */
 template<class T, class = void>
@@ -54,7 +52,7 @@ struct CollectedMetadata<First, Rest...> {
     );
 };
 
-// -- State struct extraction from interfaces --
+// State struct extraction from interfaces
 
 /** @brief Extracts T::State if it exists, otherwise provides an empty struct. */
 template<class T, class = void>
