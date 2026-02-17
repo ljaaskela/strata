@@ -38,6 +38,10 @@ class IFunction : public Interface<IFunction>
 public:
     /** @brief Function pointer type for invoke callbacks. */
     using CallableFn = IAny::Ptr(FnArgs);
+    /** @brief Function pointer type for bound trampoline callbacks. */
+    using BoundFn = IAny::Ptr(void* context, FnArgs);
+    /** @brief Function pointer type for deleting an owned context. */
+    using ContextDeleter = void(void*);
     /**
      * @brief Called to invoke the function.
      * @param args Call args as a non-owning view.
@@ -45,45 +49,6 @@ public:
      * @return Typed result (nullptr = void/no result).
      */
     virtual IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const = 0;
-};
-
-/**
- * @brief Internal interface for configuring an IFunction's invoke callback.
- *
- * Supports two dispatch mechanisms:
- * - @c set_invoke_callback() for explicit function pointer callbacks (highest priority).
- * - @c bind() for trampoline-based virtual dispatch, used by STRATA_INTERFACE
- *   to route @c invoke() calls to @c fn_Name() virtual methods on the interface.
- */
-class IFunctionInternal : public Interface<IFunctionInternal>
-{
-public:
-    /** @brief Function pointer type for bound trampoline callbacks. */
-    using BoundFn = IAny::Ptr(void* context, FnArgs);
-    /** @brief Function pointer type for deleting an owned context. */
-    using ContextDeleter = void(void*);
-
-    /** @brief Sets the callback that will be called when IFunction::invoke is called. */
-    virtual void set_invoke_callback(IFunction::CallableFn *fn) = 0;
-
-    /**
-     * @brief Binds a context pointer and trampoline function for virtual dispatch.
-     * @param context Pointer to the interface subobject (passed as first arg to fn).
-     * @param fn Static trampoline that casts context and calls the virtual method.
-     */
-    virtual void bind(void* context, BoundFn* fn) = 0;
-
-    /**
-     * @brief Sets an owned callback with a heap-allocated context.
-     *
-     * Takes ownership of @p context. The @p deleter is called on @p context
-     * when the function is destroyed or a new callback is set.
-     *
-     * @param context Heap-allocated callable (ownership transferred).
-     * @param fn Static trampoline that casts context and invokes it.
-     * @param deleter Static function that deletes context.
-     */
-    virtual void set_owned_callback(void* context, BoundFn* fn, ContextDeleter* deleter) = 0;
 };
 
 /**

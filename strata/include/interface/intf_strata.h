@@ -85,6 +85,12 @@ public:
     virtual void update() const = 0;
     /** @brief Creates a new future/promise pair. */
     virtual IFuture::Ptr create_future() const = 0;
+    /** @brief Creates a callback-backed IFunction from a raw function pointer. */
+    virtual IFunction::Ptr create_callback(IFunction::CallableFn* fn) const = 0;
+    /** @brief Creates an owned-callback IFunction from a context, trampoline, and deleter. */
+    virtual IFunction::Ptr create_owned_callback(void* context,
+                                                  IFunction::BoundFn* fn,
+                                                  IFunction::ContextDeleter* deleter) const = 0;
     /**
      * @brief Creates a property for type T with an optional initial value.
      * @tparam T The value type for the property.
