@@ -5,8 +5,6 @@
 #include <api/strata.h>
 #include <api/traits.h>
 #include <common.h>
-#include <interface/intf_function.h>
-#include <interface/types.h>
 
 #include <type_traits>
 #include <utility>
@@ -87,12 +85,8 @@ public:
     Callback() = delete;
     /** @brief Creates a Callback backed by the given callback. */
     Callback(CallbackFn *cb)
-    {
-        fn_ = instance().create<IFunction>(ClassId::Function);
-        if (auto internal = interface_cast<IFunctionInternal>(fn_); internal && cb) {
-            internal->set_invoke_callback(cb);
-        }
-    }
+        : fn_(instance().create_callback(cb))
+    {}
 
     /**
      * @brief Creates a Callback from a capturing callable (lambda, functor, etc.).
@@ -104,22 +98,19 @@ public:
     Callback(F&& callable)
     {
         using Callable = std::decay_t<F>;
-        fn_ = instance().create<IFunction>(ClassId::Function);
-        if (auto internal = interface_cast<IFunctionInternal>(fn_)) {
-            auto* ctx = new Callable(std::forward<F>(callable));
-            auto* trampoline = +[](void* c, FnArgs args) -> IAny::Ptr {
-                if constexpr (std::is_invocable_r_v<IAny::Ptr, Callable, FnArgs>) {
-                    return (*static_cast<Callable*>(c))(args);
-                } else {
-                    (*static_cast<Callable*>(c))(args);
-                    return nullptr;
-                }
-            };
-            auto* deleter = +[](void* c) {
-                delete static_cast<Callable*>(c);
-            };
-            internal->set_owned_callback(ctx, trampoline, deleter);
-        }
+        auto* ctx = new Callable(std::forward<F>(callable));
+        auto* trampoline = +[](void* c, FnArgs args) -> IAny::Ptr {
+            if constexpr (std::is_invocable_r_v<IAny::Ptr, Callable, FnArgs>) {
+                return (*static_cast<Callable*>(c))(args);
+            } else {
+                (*static_cast<Callable*>(c))(args);
+                return nullptr;
+            }
+        };
+        auto* deleter = +[](void* c) {
+            delete static_cast<Callable*>(c);
+        };
+        fn_ = instance().create_owned_callback(ctx, trampoline, deleter);
     }
 
     /**
@@ -135,11 +126,8 @@ public:
         using Traits = detail::callable_traits<Callable>;
         using Trampoline = detail::typed_trampoline<Callable, Traits>;
 
-        fn_ = instance().create<IFunction>(ClassId::Function);
-        if (auto internal = interface_cast<IFunctionInternal>(fn_)) {
-            auto* ctx = new Callable(std::forward<F>(callable));
-            internal->set_owned_callback(ctx, &Trampoline::invoke, &Trampoline::destroy);
-        }
+        auto* ctx = new Callable(std::forward<F>(callable));
+        fn_ = instance().create_owned_callback(ctx, &Trampoline::invoke, &Trampoline::destroy);
     }
 
     /** @brief Implicit conversion to IFunction::Ptr. */

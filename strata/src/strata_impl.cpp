@@ -149,4 +149,23 @@ IFuture::Ptr StrataImpl::create_future() const
     return interface_pointer_cast<IFuture>(create(ClassId::Future));
 }
 
+IFunction::Ptr StrataImpl::create_callback(IFunction::CallableFn* fn) const
+{
+    auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
+    if (auto* internal = interface_cast<IFunctionInternal>(func); internal && fn) {
+        internal->set_invoke_callback(fn);
+    }
+    return func;
+}
+
+IFunction::Ptr StrataImpl::create_owned_callback(void* context,
+    IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) const
+{
+    auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
+    if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+        internal->set_owned_callback(context, fn, deleter);
+    }
+    return func;
+}
+
 } // namespace strata
