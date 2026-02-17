@@ -5,8 +5,6 @@
 #include <iostream>
 #include <string_view>
 
-#include <array>
-
 namespace strata {
 
 /** @brief Returns true if @p c is a valid hexadecimal digit. */

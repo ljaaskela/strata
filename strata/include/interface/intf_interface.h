@@ -2,8 +2,7 @@
 #define INTF_INTERFACE_H
 
 #include <common.h>
-#include <type_traits>
-#include <utility>
+#include <memory>
 
 namespace strata {
 

@@ -1,7 +1,7 @@
 #ifndef REFCNT_PTR_H
 #define REFCNT_PTR_H
 
-#include <interface/intf_interface.h>
+namespace strata { class IInterface; }
 
 /**
  * @brief Intrusive reference-counting smart pointer for IInterface-derived types.
@@ -31,7 +31,8 @@ public:
     constexpr refcnt_ptr(refcnt_ptr &&o) noexcept
     {
         release();
-        ptr_ = std::exchange(o.ptr_, nullptr);
+        ptr_ = o.ptr_;
+        o.ptr_ = nullptr;
     }
     /** @brief Returns true if the pointer is non-null. */
     operator bool() const noexcept { return ptr_ != nullptr; }
