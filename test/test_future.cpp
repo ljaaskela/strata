@@ -256,6 +256,89 @@ TEST(Future, ThenChaining)
     EXPECT_EQ(future2.get_result().get_value(), 11);
 }
 
+TEST(Future, ThenReturnValueChaining)
+{
+    auto promise = make_promise();
+    auto future = promise.get_future<int>();
+
+    // .then() returns a new Future whose type matches the callable's return type
+    auto chained = future
+        .then([](int val) -> int { return val * 2; })
+        .then([](int val) -> int { return val + 1; });
+
+    promise.set_value(5);
+    EXPECT_TRUE(chained.is_ready());
+    EXPECT_EQ(chained.get_result().get_value(), 11); // (5 * 2) + 1
+}
+
+TEST(Future, ThenTypeTransform)
+{
+    auto promise = make_promise();
+    auto future = promise.get_future<int>();
+
+    // int -> float via chaining
+    auto chained = future.then([](int val) -> float { return val * 1.5f; });
+
+    promise.set_value(10);
+    EXPECT_TRUE(chained.is_ready());
+    EXPECT_FLOAT_EQ(chained.get_result().get_value(), 15.f);
+}
+
+TEST(Future, ThenVoidChaining)
+{
+    auto promise = make_promise();
+    auto future = promise.get_future<int>();
+
+    bool called = false;
+    // void return produces Future<void>
+    auto chained = future.then([&](int) { called = true; });
+
+    promise.set_value(42);
+    EXPECT_TRUE(called);
+    EXPECT_TRUE(chained.is_ready());
+}
+
+TEST(Future, ThenFnArgsChaining)
+{
+    auto promise = make_promise();
+    auto future = promise.get_future<int>();
+
+    bool called = false;
+    // FnArgs lambda produces Future<void>
+    auto chained = future.then([&](FnArgs) -> ReturnValue {
+        called = true;
+        return ReturnValue::SUCCESS;
+    });
+
+    promise.set_value(1);
+    EXPECT_TRUE(called);
+    EXPECT_TRUE(chained.is_ready());
+}
+
+TEST(Future, ThenTripleChain)
+{
+    auto promise = make_promise();
+    auto end = promise.get_future<int>()
+        .then([](int v) -> int { return v + 1; })
+        .then([](int v) -> int { return v * 10; })
+        .then([](int v) -> int { return v - 3; });
+
+    promise.set_value(2);
+    EXPECT_EQ(end.get_result().get_value(), 27); // ((2+1)*10)-3
+}
+
+TEST(Future, ThenFromVoidFuture)
+{
+    auto promise = make_promise();
+    auto future = promise.get_future<void>();
+
+    auto chained = future.then([]() -> int { return 42; });
+
+    promise.complete();
+    EXPECT_TRUE(chained.is_ready());
+    EXPECT_EQ(chained.get_result().get_value(), 42);
+}
+
 // --- Float type ---
 
 TEST(Future, FloatValue)
