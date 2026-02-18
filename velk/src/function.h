@@ -46,6 +46,8 @@ public:
 class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal, IEvent>
 {
 public:
+    VELK_CLASS_UID(ClassId::Function);
+
     FunctionImpl() = default;
     ~FunctionImpl();
 
