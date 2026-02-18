@@ -12,6 +12,8 @@ namespace velk {
 class PropertyImpl final : public ext::ObjectCore<PropertyImpl, IProperty, IPropertyInternal>
 {
 public:
+    VELK_CLASS_UID(ClassId::Property);
+
     PropertyImpl() = default;
 
 protected: // IProperty

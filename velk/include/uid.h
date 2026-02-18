@@ -2,7 +2,7 @@
 #define UID_H
 
 #include <cstdint>
-#include <iostream>
+#include <ostream>
 #include <string_view>
 
 namespace velk {
@@ -27,6 +27,11 @@ constexpr bool is_valid_uid_format(std::string_view str)
     return true;
 }
 
+/** @brief Called at runtime for malformed UID strings. Not constexpr, so bad UIDs in
+ *  constexpr context produce a compile error. */
+inline void uid_format_error() {
+}
+
 /** @brief 128-bit unique identifier used for type and interface identification. */
 struct Uid {
     uint64_t hi = 0;
@@ -35,12 +40,22 @@ struct Uid {
     constexpr Uid() = default;
     constexpr Uid(uint64_t h, uint64_t l) : hi(h), lo(l) {}
 
+    /** @brief Constructs a Uid from a string literal. Validates length at compile time. */
+    template<size_t N>
+    constexpr Uid(const char (&str)[N]) : Uid(std::string_view(str, N - 1))
+    {
+        static_assert(N == 37, "Uid string must be 36 characters (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)");
+    }
+
     /** @brief Constructs a Uid from a UUID string (e.g. "cc262192-d151-941f-d542-d4c622b50b09").
      *  In constexpr context, a malformed string produces a compile error. */
     constexpr Uid(std::string_view str) : hi(0), lo(0)
     {
         if (!is_valid_uid_format(str)) {
-            throw "Uid: invalid UUID format (expected xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)";
+            // Non-constexpr call makes the compiler reject bad UIDs in constexpr context.
+            // At runtime, produces a zero Uid.
+            uid_format_error();
+            return;
         }
         for (auto c : str) {
             if (c == '-') continue;
@@ -139,5 +154,8 @@ constexpr Uid make_hash(const std::string_view toHash)
 
 /** @brief Expands a UUID string literal into two uint64_t template arguments (hi, lo). */
 #define VELK_UID(str) ::velk::Uid(str).hi, ::velk::Uid(str).lo
+
+/** @brief Declares a static constexpr class UID from a UUID string literal. */
+#define VELK_CLASS_UID(str) static constexpr ::velk::Uid class_uid{str}
 
 #endif // UID_H
