@@ -4,6 +4,7 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 
 ## Contents
 
+- [Class UIDs](#class-uids)
 - [Virtual function dispatch](#virtual-function-dispatch)
   - [Function arguments](#function-arguments)
   - [Typed lambda parameters](#typed-lambda-parameters)
@@ -19,6 +20,38 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
   - [Then chaining](#then-chaining)
   - [Type transforms](#type-transforms)
   - [Thread safety](#thread-safety)
+
+## Class UIDs
+
+Every class that inherits from `ObjectCore` or `Object` has a class UID returned by `get_class_uid()`. By default this is auto-generated from the class name via constexpr FNV-1a hashing. You can override it with a stable, user-specified UID using the `VELK_CLASS_UID` macro:
+
+```cpp
+class MyWidget : public ext::Object<MyWidget, IMyWidget>
+{
+    VELK_CLASS_UID("a0b1c2d3-e4f5-6789-abcd-ef0123456789");
+    // or static constexpr ::velk::Uid class_uid{"a0b1c2d3-e4f5-6789-abcd-ef0123456789"}
+
+    void fn_reset() override { /* ... */ }
+};
+```
+
+The UID string is validated at compile time — a malformed or wrong-length string produces a compile error.
+
+User-specified UIDs are useful when you want to:
+
+- **Export stable UIDs** in public headers without exposing internal class names.
+- **Create instances by well-known UID** across DLL boundaries, where class names may differ.
+- **Maintain ABI stability** — auto-generated UIDs change if the class is renamed or moved to a different namespace.
+
+For example, the built-in `Property`, `Function` and `Future` objects use this mechanism. Their UIDs are defined in `ClassId` namespace in `types.h`:
+
+```cpp
+namespace ClassId {
+inline constexpr Uid Property{"a66badbf-c750-4580-b035-b5446806d67e"};
+inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
+inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
+}
+```
 
 ## Virtual function dispatch
 

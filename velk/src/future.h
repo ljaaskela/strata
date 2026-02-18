@@ -16,6 +16,8 @@ namespace velk {
 class FutureImpl final : public ext::ObjectCore<FutureImpl, IFuture, IFutureInternal>
 {
 public:
+    VELK_CLASS_UID(ClassId::Future);
+
     FutureImpl() = default;
 
 public: // IFuture

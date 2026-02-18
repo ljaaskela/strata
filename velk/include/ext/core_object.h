@@ -62,6 +62,11 @@ class DefaultFactory : public ObjectFactory<FinalClass>
 template<class FinalClass, class... Interfaces>
 class ObjectCore : public RefCountedDispatch<ISharedFromObject, Interfaces...>
 {
+    template<class T, class = void>
+    struct has_class_uid : std::false_type {};
+    template<class T>
+    struct has_class_uid<T, std::void_t<decltype(T::class_uid)>> : std::true_type {};
+
 public:
     ObjectCore() = default;
     ~ObjectCore() override = default;
@@ -69,8 +74,15 @@ public:
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr std::string_view get_class_name() noexcept { return get_name<FinalClass>(); }
-    /** @brief Returns the compile-time UID of FinalClass. */
-    static constexpr Uid get_class_uid() noexcept { return type_uid<FinalClass>(); }
+    /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
+    static constexpr Uid get_class_uid() noexcept
+    {
+        if constexpr (has_class_uid<FinalClass>::value) {
+            return FinalClass::class_uid;
+        } else {
+            return type_uid<FinalClass>();
+        }
+    }
 
     /** @brief Stores a weak self-reference (called once by the factory). */
     void set_self(const IObject::Ptr &self) override
