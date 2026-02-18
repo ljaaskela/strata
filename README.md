@@ -37,6 +37,7 @@ Velk is designed to be built as a shared library (DLL on Windows, .so on Linux).
 | **Futures** | Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution |
 | **Deferred invocation** | Queue function calls and event handlers for batch execution during `instance().update()` |
 | **Extensible** | Implement custom `IAny` types for used-defined types, external or shared data storage |
+| **No RTTI or exceptions** | Builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
 | **High performance** | Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups |
 
 ## Documentation

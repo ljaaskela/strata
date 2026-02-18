@@ -18,21 +18,16 @@ struct ClassInfo
     const array_view<MemberDesc> members; // empty when no metadata
 };
 
-// Forward declarations for built-in implementation classes.
-class PropertyImpl;
-class FunctionImpl;
-class FutureImpl;
-
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
 /** @brief Default property object implementation. */
-inline constexpr Uid Property = type_uid<PropertyImpl>();
+inline constexpr Uid Property{"a66badbf-c750-4580-b035-b5446806d67e"};
 /** @brief Default function object implementation. */
-inline constexpr Uid Function = type_uid<FunctionImpl>();
+inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
 /** @brief Default event object implementation (same as Function). */
 inline constexpr Uid Event = Function;
 /** @brief Default future object implementation. */
-inline constexpr Uid Future = type_uid<FutureImpl>();
+inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
 }
 
 /**
@@ -44,8 +39,8 @@ inline constexpr Uid Future = type_uid<FutureImpl>();
 template <class T>
 typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
 {
-    if (obj && obj->get_interface(T::UID)) {
-        return std::dynamic_pointer_cast<T>(obj);
+    if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
+        return typename T::Ptr(obj, p); // aliasing constructor: shares ownership, stores adjusted pointer
     }
     return nullptr;
 }
@@ -60,8 +55,8 @@ typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
 template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
 typename T::ConstPtr interface_pointer_cast(const std::shared_ptr<U> &obj)
 {
-    if (obj && obj->get_interface(T::UID)) {
-        return std::dynamic_pointer_cast<const T>(obj);
+    if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
+        return typename T::ConstPtr(obj, p); // aliasing constructor
     }
     return nullptr;
 }
@@ -113,8 +108,8 @@ enum ReturnValue : int16_t {
 
 /** @brief General-purpose object flags. Checked by runtime implementations. */
 namespace ObjectFlags {
-[[maybe_unused]] constexpr int32_t None = 0;
-[[maybe_unused]] constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
+inline constexpr int32_t None = 0;
+inline constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
 } // namespace ObjectFlags
 
 /** @brief Returns true if the return value indicates success (non-negative). */

@@ -25,7 +25,6 @@ const IAny::ConstPtr PropertyImpl::get_value() const
 bool PropertyImpl::set_any(const IAny::Ptr &value)
 {
     if (data_ && value) {
-        std::cerr << "Property data already set" << std::endl;
         return false;
     }
     data_ = value;
