@@ -1,6 +1,8 @@
 # Velk
 
-[![CI](https://github.com/ljaaskela/velk/actions/workflows/ci.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/ci.yml)
+[![Linux](https://github.com/ljaaskela/velk/actions/workflows/ci.yml/badge.svg?job=linux)](https://github.com/ljaaskela/velk/actions/workflows/ci.yml)
+[![Windows](https://github.com/ljaaskela/velk/actions/workflows/ci.yml/badge.svg?job=windows)](https://github.com/ljaaskela/velk/actions/workflows/ci.yml)
+[![macOS](https://github.com/ljaaskela/velk/actions/workflows/ci.yml/badge.svg?job=macos)](https://github.com/ljaaskela/velk/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml)
 
 Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
