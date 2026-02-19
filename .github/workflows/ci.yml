@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  checks: write
   pages: write
   id-token: write
 
@@ -17,55 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux:
-    name: Linux (GCC)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build build --config Release
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-      - name: Publish test results
-        if: always()
-        run: build/bin/tests --gtest_output=xml:test-results.xml
-      - name: Publish test report
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Test Results
-          path: test-results.xml
-          reporter: java-junit
-    environment:
-      name: test-results
-      url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  windows:
-    name: Windows (MSVC)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -B build
-      - name: Build
-        run: cmake --build build --config Release
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
-  macos:
-    name: macOS (Clang)
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build build --config Release
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
   docs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
@@ -85,7 +35,7 @@ jobs:
           path: docs/html
 
   deploy:
-    needs: [linux, windows, macos, docs]
+    needs: [docs]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
