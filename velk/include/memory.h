@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <utility>
-
+#include <velk_export.h>
 
 namespace velk {
 
@@ -97,65 +97,22 @@ struct external_control_block : control_block
 
 namespace detail {
 
-/// @brief Maximum number of control_blocks retained in each thread's free-list.
-inline constexpr int32_t block_pool_max_size = 256;
-
-/// @brief Thread-local free-list state for control_block recycling.
-struct block_pool
-{
-    control_block* head{nullptr};
-    int32_t size{0};
-};
-
-/// @brief Returns the thread-local free-list state.
-inline block_pool& block_free_list()
-{
-    thread_local block_pool pool;
-    return pool;
-}
-
 /**
- * @brief Allocates a control_block from a thread-local free-list, falling back to the heap.
+ * @brief Allocates a control_block, reusing a pooled block when available.
  *
- * Uses an intrusive singly-linked list threaded through the block's @c ptr field,
- * avoiding any container header dependency.
+ * Implemented in velk.cpp to keep all heap operations within the DLL,
+ * avoiding cross-module new/delete mismatches.
  *
  * @return A control_block initialized with strong=1, weak=1, ptr=nullptr.
  */
-inline control_block* alloc_control_block()
-{
-    auto& pool = block_free_list();
-    if (pool.head) {
-        auto* b = pool.head;
-        pool.head = static_cast<control_block*>(b->ptr);
-        --pool.size;
-        b->strong.store(1, std::memory_order_relaxed);
-        b->weak.store(1, std::memory_order_relaxed);
-        b->ptr = nullptr;
-        return b;
-    }
-    return new control_block{1, 1, nullptr};
-}
+VELK_EXPORT control_block* alloc_control_block();
 
 /**
- * @brief Returns a control_block to the thread-local free-list for reuse.
- *
- * Threads the block into the intrusive list via its @c ptr field.
- * If the pool is full, the block is freed to the heap instead.
+ * @brief Returns a control_block to the pool, or frees it if the pool is full.
  *
  * @param block The control block to recycle.
  */
-inline void dealloc_control_block(control_block* block)
-{
-    auto& pool = block_free_list();
-    if (pool.size >= block_pool_max_size) {
-        delete block;
-        return;
-    }
-    block->ptr = pool.head;
-    pool.head = block;
-    ++pool.size;
-}
+VELK_EXPORT void dealloc_control_block(control_block* block);
 
 /**
  * @brief Releases the "strong group" weak ref, freeing the block if no weak_ptrs remain.
