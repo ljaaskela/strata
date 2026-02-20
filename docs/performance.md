@@ -12,6 +12,7 @@ This document covers runtime performance and memory usage related topics.
   - [interface_cast](#interface_cast)
   - [Metadata lookup](#metadata-lookup)
   - [Object creation](#object-creation)
+- [Control block pooling](#control-block-pooling)
 - [Memory layout](#memory-layout)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
   - [Common base layers](#common-base-layers)
@@ -33,7 +34,7 @@ This document covers runtime performance and memory usage related topics.
 | **interface_cast** | Linear scan | ~10 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
 | **Metadata lookup (cold)** | Linear scan + alloc | ~608 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~35 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 2 heap allocations | ~114 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
+| **Object creation** | 1-2 heap allocations | ~77 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -87,6 +88,52 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
+
+### Control block pooling
+
+Every `RefCountedDispatch`-derived object needs a 16-byte `control_block` (strong count, weak count, self-pointer). Rather than calling `new`/`delete` for each block, freed blocks are recycled via a thread-local intrusive free-list that reuses the block's own `ptr` field as a next-pointer.
+
+**Free-list structure:**
+
+```
+block_free_head() -> [block A] -> [block B] -> [block C] -> nullptr
+                      ptr=B        ptr=C        ptr=nullptr
+```
+
+When a block is sitting in the free list, its `strong`, `weak`, and `ptr` fields are meaningless — nobody holds a reference to it. The `ptr` field (which normally stores the `IObject*` self-pointer) is repurposed as the "next" link in the singly-linked list.
+
+**Dealloc** pushes to the front:
+
+```
+block->ptr = head;   // new block points to current head
+head = block;        // new block becomes the head
+
+Before:  head -> [B] -> [C] -> nullptr
+After:   head -> [block] -> [B] -> [C] -> nullptr
+```
+
+**Alloc** pops from the front, reinitializing the block for use:
+
+```
+b = head;                            // grab the head
+head = static_cast<control_block*>(b->ptr);  // advance head to next
+b->strong = 1; b->weak = 1; b->ptr = nullptr;
+return b;
+
+Before:  head -> [A] -> [B] -> [C] -> nullptr
+After:   head -> [B] -> [C] -> nullptr          (A returned to caller)
+```
+
+If the free list is empty, `alloc_control_block()` falls back to `new control_block{1, 1, nullptr}`.
+
+**Performance impact** (AMD Ryzen 7 5800X, MSVC, Release):
+
+| Operation | new/delete | Pooled |
+|---|---|---|
+| Control block alloc + dealloc | ~23 ns | ~2 ns |
+| Object creation (end-to-end) | ~96 ns | ~77 ns |
+
+The free list is `thread_local`, so it requires no synchronization. Blocks freed on a different thread than they were allocated on simply join that thread's free list — no correctness issue, just suboptimal reuse in producer/consumer patterns.
 
 ## Memory layout
 
