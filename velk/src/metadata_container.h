@@ -36,6 +36,7 @@ public: // IMetadata
     IProperty::Ptr get_property(string_view name) const override;
     IEvent::Ptr get_event(string_view name) const override;
     IFunction::Ptr get_function(string_view name) const override;
+    void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override;
 
 private:
     array_view<MemberDesc> members_;    ///< Static metadata descriptors from VELK_INTERFACE.
