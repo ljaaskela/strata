@@ -109,7 +109,7 @@ public:
         if (auto internal = this->get_internal()) {
             return internal->set_data(&value, sizeof(Type), Base::TYPE_UID);
         }
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
 };
 

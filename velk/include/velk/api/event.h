@@ -32,7 +32,7 @@ public:
     /** @brief Adds a handler function for the event (null-safe). */
     ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const
     {
-        return event_ ? event_->add_handler(fn, type) : ReturnValue::INVALID_ARGUMENT;
+        return event_ ? event_->add_handler(fn, type) : ReturnValue::InvalidArgument;
     }
 
     /**
@@ -49,7 +49,7 @@ public:
      * @par Example
      * @code
      * Event evt = widget->on_clicked();
-     * evt.add_handler([](FnArgs args) { std::cout << "clicked!\n"; return SUCCESS; });
+     * evt.add_handler([](FnArgs args) { std::cout << "clicked!\n"; return Success; });
      * evt.add_handler([](int x, float y) { std::cout << x + y << std::endl; });
      * @endcode
      */
@@ -63,7 +63,7 @@ public:
     /** @brief Removes an event handler function (null-safe). */
     ReturnValue remove_handler(const IFunction::ConstPtr& fn) const
     {
-        return event_ ? event_->remove_handler(fn) : ReturnValue::INVALID_ARGUMENT;
+        return event_ ? event_->remove_handler(fn) : ReturnValue::InvalidArgument;
     }
 
     /** @brief Returns true if the event has any handlers (null-safe). */
@@ -75,17 +75,17 @@ public:
     /** @brief Invokes the event with no arguments (null-safe). */
     ReturnValue invoke(InvokeType type = Immediate) const
     {
-        if (!event_) return ReturnValue::INVALID_ARGUMENT;
+        if (!event_) return ReturnValue::InvalidArgument;
         event_->invoke({}, type);
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
 
     /** @brief Invokes the event with the given @p args (null-safe). */
     ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const
     {
-        if (!event_) return ReturnValue::INVALID_ARGUMENT;
+        if (!event_) return ReturnValue::InvalidArgument;
         event_->invoke(args, type);
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
 
 private:

@@ -78,7 +78,7 @@ private:
 
     /** @brief Finds the factory for the given class UID, or nullptr if not registered. */
     const IObjectFactory* find(Uid uid) const;
-    /** @brief Checks that all dependencies declared in info are loaded. Logs and returns FAIL if not. */
+    /** @brief Checks that all dependencies declared in info are loaded. Logs and returns Fail if not. */
     ReturnValue check_dependencies(const PluginInfo& info);
     std::vector<Entry> types_;                      ///< Sorted registry of class factories.
     std::vector<PluginEntry> plugins_;              ///< Sorted registry of loaded plugins.

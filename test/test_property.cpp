@@ -53,7 +53,7 @@ TEST(Property, OnChangedEventFires)
         if (auto v = Any<const float>(args[0])) {
             receivedValue = v.get_value();
         }
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     p.add_on_changed(handler);
@@ -72,7 +72,7 @@ TEST(Property, SetSameValueReturnsNothingToDo)
 
     Any<int> val(5);
     auto result = iprop->set_value(val);
-    EXPECT_EQ(result, ReturnValue::NOTHING_TO_DO);
+    EXPECT_EQ(result, ReturnValue::NothingToDo);
 }
 
 TEST(Property, SetDifferentValueReturnsSuccess)
@@ -81,7 +81,7 @@ TEST(Property, SetDifferentValueReturnsSuccess)
     ASSERT_TRUE(p);
 
     auto result = p.set_value(10);
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, ReturnValue::Success);
     EXPECT_EQ(p.get_value(), 10);
 }
 
@@ -93,11 +93,11 @@ TEST(Property, OnChangedDoesNotFireOnSameValue)
 
     Callback handler([&](FnArgs) -> ReturnValue {
         callCount++;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     p.add_on_changed(handler);
-    EXPECT_EQ(p.set_value(5), ReturnValue::NOTHING_TO_DO); // same value
+    EXPECT_EQ(p.set_value(5), ReturnValue::NothingToDo); // same value
     EXPECT_EQ(callCount, 0);
 }
 
@@ -129,5 +129,5 @@ TEST(Property, ConstructReadOnlySetFails)
     // Can still create a "ReadWrite" Property<T> using the interface, but writes should still fail.
     Property<int> pp(p.get_property_interface());
     EXPECT_TRUE(pp);
-    EXPECT_EQ(pp.set_value(1), ReturnValue::READ_ONLY);
+    EXPECT_EQ(pp.set_value(1), ReturnValue::ReadOnly);
 }

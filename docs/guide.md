@@ -148,7 +148,7 @@ invoke_function(widget.get(), "process", 1.f, 2u);             // multi-value (a
 ```cpp
 Callback fn([&](const float& a, const int& b) -> ReturnValue {
     // a and b are extracted from FnArgs automatically
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 });
 
 Any<float> x(3.14f);
@@ -171,7 +171,7 @@ Zero-arity lambdas work too:
 Callback fn([&]() {
     std::cout << "called!" << std::endl;
 });
-fn.invoke();  // SUCCESS
+fn.invoke();  // Success
 ```
 
 The three constructor forms are mutually exclusive via SFINAE:
@@ -194,7 +194,7 @@ Callback onChange([](FnArgs args) -> ReturnValue {
     if (auto v = Any<const float>(args[0])) {
         std::cout << "new value: " << v.get_value() << std::endl;
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 });
 prop.add_on_changed(onChange);
 
@@ -213,7 +213,7 @@ public:
     ReturnValue set_value(const Data& value) override {
         globalData_ = value;
         invoke_event(on_data_changed(), this);
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
     IEvent::Ptr on_data_changed() const override { return onChanged_; }
 };
@@ -267,15 +267,15 @@ sequenceDiagram
 
     Caller->>Event: invoke(args)
     Event->>Immediate: invoke(args)
-    Immediate-->>Event: SUCCESS
+    Immediate-->>Event: Success
     Note over Event: Deferred handler queued<br>(args cloned)
-    Event-->>Caller: SUCCESS
+    Event-->>Caller: Success
 
     Note over Caller: ... later ...
 
     Caller->>IVelk: update()
     IVelk->>Deferred: invoke(cloned args)
-    Deferred-->>IVelk: SUCCESS
+    Deferred-->>IVelk: Success
     IVelk-->>Caller: done
 ```
 
@@ -348,11 +348,11 @@ auto future = promise.get_future<void>();
 promise.complete();                     // resolves without a value
 ```
 
-Resolving twice returns `NOTHING_TO_DO` and the first value persists:
+Resolving twice returns `NothingToDo` and the first value persists:
 
 ```cpp
-promise.set_value(1);                   // SUCCESS
-promise.set_value(2);                   // NOTHING_TO_DO, first value wins
+promise.set_value(1);                   // Success
+promise.set_value(2);                   // NothingToDo, first value wins
 ```
 
 ### Continuations
@@ -368,7 +368,7 @@ future.then([](FnArgs args) -> ReturnValue {
     if (auto ctx = FunctionContext(args, 1)) {
         std::cout << "got: " << ctx.arg<int>(0).get_value() << std::endl;
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 });
 
 // Typed continuation, arguments are auto-extracted

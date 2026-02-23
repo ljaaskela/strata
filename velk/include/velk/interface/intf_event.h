@@ -41,18 +41,18 @@ public:
  */
 inline ReturnValue invoke_event(const IEvent::ConstPtr &event, FnArgs args)
 {
-    if (!event) return ReturnValue::INVALID_ARGUMENT;
+    if (!event) return ReturnValue::InvalidArgument;
     event->invoke(args);
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 /** @brief Invokes an event with a single IAny argument. */
 inline ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *arg)
 {
     FnArgs args{&arg, 1};
-    if (!event) return ReturnValue::INVALID_ARGUMENT;
+    if (!event) return ReturnValue::InvalidArgument;
     event->invoke(args);
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 } // namespace velk

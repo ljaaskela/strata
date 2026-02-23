@@ -62,7 +62,7 @@ class AnyCore : public AnyBase<FinalClass, Interfaces...>
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
-    /** @brief Sets the stored value. Returns SUCCESS if changed, NOTHING_TO_DO if identical. */
+    /** @brief Sets the stored value. Returns Success if changed, NothingToDo if identical. */
     virtual ReturnValue set_value(const T &value) = 0;
     /** @brief Returns a const reference to the stored value. */
     virtual const T &get_value() const = 0;
@@ -84,16 +84,16 @@ public:
     {
         if (is_valid_args(to, toSize, type)) {
             *reinterpret_cast<T *>(to) = get_value();
-            return ReturnValue::SUCCESS;
+            return ReturnValue::Success;
         }
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
     ReturnValue set_data(void const *from, size_t fromSize, Uid type) override
     {
         if (is_valid_args(from, fromSize, type)) {
             return set_value(*reinterpret_cast<const T *>(from));
         }
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
     ReturnValue copy_from(const IAny &other) override
     {
@@ -103,7 +103,7 @@ public:
                 return set_value(value);
             }
         }
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
 
 private:
@@ -130,15 +130,15 @@ public:
         if constexpr (std::is_trivially_copyable_v<T>) {
             if (std::memcmp(&data_, &value, sizeof(T)) != 0) {
                 std::memcpy(&data_, &value, sizeof(T));
-                return ReturnValue::SUCCESS;
+                return ReturnValue::Success;
             }
         } else {
             if (data_ != value) {
                 data_ = value;
-                return ReturnValue::SUCCESS;
+                return ReturnValue::Success;
             }
         }
-        return ReturnValue::NOTHING_TO_DO;
+        return ReturnValue::NothingToDo;
     }
 
     const T& get_value() const override { return data_; }
@@ -151,36 +151,36 @@ public:
     ReturnValue get_data(void *to, size_t toSize, Uid type) const override
     {
         if (!valid_args(to, toSize, type)) {
-            return ReturnValue::FAIL;
+            return ReturnValue::Fail;
         }
         if constexpr (std::is_trivially_copyable_v<T>) {
             std::memcpy(to, &data_, sizeof(T));
         } else {
             *reinterpret_cast<T *>(to) = data_;
         }
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
 
     ReturnValue set_data(const void *from, size_t fromSize, Uid type) override
     {
         return valid_args(from, fromSize, type)
             ? set_value(*reinterpret_cast<const T *>(from))
-            : ReturnValue::FAIL;
+            : ReturnValue::Fail;
     }
 
     ReturnValue copy_from(const IAny &other) override
     {
         if (!is_compatible(other, Base::TYPE_UID)) {
-            return ReturnValue::FAIL;
+            return ReturnValue::Fail;
         }
         if constexpr (std::is_trivially_copyable_v<T>) {
             char buf[sizeof(T)];
             return succeeded(other.get_data(buf, sizeof(T), Base::TYPE_UID))
-                ? set_value(*reinterpret_cast<const T *>(buf)) : ReturnValue::FAIL;
+                ? set_value(*reinterpret_cast<const T *>(buf)) : ReturnValue::Fail;
         } else {
             T value{};
             return succeeded(other.get_data(&value, sizeof(T), Base::TYPE_UID))
-                ? set_value(value) : ReturnValue::FAIL;
+                ? set_value(value) : ReturnValue::Fail;
         }
     }
 
@@ -214,15 +214,15 @@ public:
         if constexpr (std::is_trivially_copyable_v<T>) {
             if (std::memcmp(ptr_, &value, sizeof(T)) != 0) {
                 std::memcpy(ptr_, &value, sizeof(T));
-                return ReturnValue::SUCCESS;
+                return ReturnValue::Success;
             }
         } else {
             if (*ptr_ != value) {
                 *ptr_ = value;
-                return ReturnValue::SUCCESS;
+                return ReturnValue::Success;
             }
         }
-        return ReturnValue::NOTHING_TO_DO;
+        return ReturnValue::NothingToDo;
     }
 
     const T& get_value() const override { return *ptr_; }

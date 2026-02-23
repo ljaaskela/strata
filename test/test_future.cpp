@@ -36,7 +36,7 @@ TEST(Future, SetValueMakesReady)
     auto future = promise.get_future<int>();
 
     auto ret = promise.set_value(42);
-    EXPECT_EQ(ret, ReturnValue::SUCCESS);
+    EXPECT_EQ(ret, ReturnValue::Success);
     EXPECT_TRUE(future.is_ready());
 }
 
@@ -71,10 +71,10 @@ TEST(Future, DoubleSetReturnsNothingToDo)
     auto promise = make_promise();
 
     auto ret1 = promise.set_value(1);
-    EXPECT_EQ(ret1, ReturnValue::SUCCESS);
+    EXPECT_EQ(ret1, ReturnValue::Success);
 
     auto ret2 = promise.set_value(2);
-    EXPECT_EQ(ret2, ReturnValue::NOTHING_TO_DO);
+    EXPECT_EQ(ret2, ReturnValue::NothingToDo);
 
     // First value persists
     auto future = promise.get_future<int>();
@@ -91,7 +91,7 @@ TEST(Future, ImmediateContinuationFiresOnSet)
     bool called = false;
     future.then([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     EXPECT_FALSE(called);
@@ -109,7 +109,7 @@ TEST(Future, ImmediateContinuationFiresWhenAlreadyReady)
     bool called = false;
     future.then([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     EXPECT_TRUE(called);
@@ -123,7 +123,7 @@ TEST(Future, DeferredContinuationQueuesAndFiresOnUpdate)
     bool called = false;
     future.then([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }, Deferred);
 
     promise.set_value(42);
@@ -143,7 +143,7 @@ TEST(Future, ContinuationReceivesValue)
         if (auto v = Any<const int>(args[0])) {
             received = v.get_value();
         }
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     promise.set_value(42);
@@ -174,7 +174,7 @@ TEST(Future, VoidFuture)
     EXPECT_FALSE(future.is_ready());
 
     auto ret = promise.complete();
-    EXPECT_EQ(ret, ReturnValue::SUCCESS);
+    EXPECT_EQ(ret, ReturnValue::Success);
     EXPECT_TRUE(future.is_ready());
 }
 
@@ -186,7 +186,7 @@ TEST(Future, VoidFutureContinuation)
     bool called = false;
     future.then([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     promise.complete();
@@ -201,9 +201,9 @@ TEST(Future, MultipleContinuations)
     auto future = promise.get_future<int>();
 
     int count = 0;
-    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::SUCCESS; });
-    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::SUCCESS; });
-    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::SUCCESS; });
+    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::Success; });
+    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::Success; });
+    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::Success; });
 
     promise.set_value(1);
     EXPECT_EQ(count, 3);
@@ -307,7 +307,7 @@ TEST(Future, ThenFnArgsChaining)
     // FnArgs lambda produces Future<void>
     auto chained = future.then([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     promise.set_value(1);
