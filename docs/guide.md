@@ -11,6 +11,8 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 - [Properties with change notifications](#properties-with-change-notifications)
 - [Custom Any types](#custom-any-types)
 - [Direct state access](#direct-state-access)
+  - [read_state / write_state](#read_state--write_state)
+  - [Raw state pointer](#raw-state-pointer)
 - [Deferred invocation](#deferred-invocation)
   - [Defer at the call site](#defer-at-the-call-site)
   - [Deferred event handlers](#deferred-event-handlers)
@@ -221,36 +223,73 @@ public:
 
 ## Direct state access
 
-Each interface that declares `PROP` members gets a `State` struct with one field per property, initialized with its declared default. `ext::Object` stores these structs inline, and properties read/write directly into them via `ext::AnyRef<T>`. You can also access the state struct directly through `IPropertyState`, bypassing the property layer entirely.
+Each interface that declares `PROP` members gets a `State` struct with one field per property, initialized with its declared default. `ext::Object` stores these structs inline, and properties read/write directly into them via `ext::AnyRef<T>`.
+
+### read_state / write_state
+
+`read_state<T>` and `write_state<T>` provide RAII accessors to the state struct. `read_state` returns a read-only view. `write_state` returns a writable view that automatically fires `on_changed` on all instantiated properties of that interface when it goes out of scope. Both return a null-safe handle that converts to `false` if the interface is not implemented by the object or the object pointer is null.
 
 ```cpp
 auto widget = instance().create<IObject>(MyWidget::class_id());
 auto* iw = interface_cast<IMyWidget>(widget);
+
+// Read current state (const access)
+if (auto reader = read_state<IMyWidget>(iw)) {
+    float w = reader->width;    // 100.f (default)
+    float h = reader->height;   // 50.f
+}
+
+// Write state with automatic change notification
+if (auto writer = write_state<IMyWidget>(iw)) {
+    writer->width = 200.f;
+    writer->height = 100.f;
+}  // ~StateWriter fires on_changed for all instantiated IMyWidget properties
+```
+
+The accessors are also available directly on `IMetadata`:
+
+```cpp
+auto* meta = interface_cast<IMetadata>(widget);
+if (auto reader = meta->read<IMyWidget>()) {
+    // ...
+}
+if (auto writer = meta->write<IMyWidget>()) {
+    // ...
+}
+```
+
+Only properties that have been accessed (instantiated) receive notifications. If no properties have been looked up yet, `write_state` writes the state but skips notification since there are no listeners.
+
+Each interface's state is independent, `write_state<IMyWidget>` only notifies `IMyWidget` properties, not properties from other interfaces on the same object:
+
+```cpp
+if (auto writer = write_state<IMyWidget>(iw)) {
+    writer->width = 300.f;
+}  // fires on_changed for IMyWidget properties only, not ISerializable
+
+if (auto writer = write_state<ISerializable>(iw)) {
+    writer->version = 2;
+}  // fires on_changed for ISerializable properties only
+```
+
+### Raw state pointer
+
+For bulk operations like serialization or snapshotting (`memcpy` for trivially-copyable state), you can also access the raw state pointer directly through `IPropertyState`. Note that writes through the raw pointer bypass change notifications entirely.
+
+```cpp
 auto* ps = interface_cast<IPropertyState>(widget);
+auto* state = ps->get_property_state<IMyWidget>();  // IMyWidget::State*
 
-// Typed access: returns IMyWidget::State*
-auto* state = ps->get_property_state<IMyWidget>();
-
-// State fields are initialized with VELK_INTERFACE defaults
-state->width;   // 100.f
+state->width;   // 100.f (default)
 state->height;  // 50.f
 
 // Write through property API, state reflects it
 iw->width().set_value(200.f);
 state->width;   // 200.f
 
-// Write to state directly, property reads it back
+// Write to state directly — property reads it back, but on_changed does NOT fire
 state->height = 75.f;
 iw->height().get_value();  // 75.f
-```
-
-This is useful for bulk operations like serialization, snapshotting (via `memcpy` for trivially-copyable state), or cases where you want to process raw data without going through the property layer.
-
-Each interface's state is independent:
-
-```cpp
-auto* ws = ps->get_property_state<IMyWidget>();       // IMyWidget::State*
-auto* ss = ps->get_property_state<ISerializable>();   // ISerializable::State*
 ```
 
 ## Deferred invocation
