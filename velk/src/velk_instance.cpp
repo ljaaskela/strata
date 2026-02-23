@@ -46,6 +46,8 @@ VelkInstance::VelkInstance()
 
 VelkInstance::~VelkInstance()
 {
+    update_plugins_.clear();
+
     // Unload plugins in reverse order so that dependents shut down before
     // their dependencies.
     while (!plugins_.empty()) {
@@ -194,30 +196,29 @@ void VelkInstance::update(Duration time) const
         }
     }
 
-    // Resolve current time: use caller-supplied value or fall back to system clock.
-    bool is_explicit = time.us != 0;
-    int64_t current_us = is_explicit ? time.us : now_us();
-
-    // Reset tracking when switching between explicit and auto time domains.
-    if (is_explicit != last_update_was_explicit_) {
-        first_update_us_ = 0;
-        last_update_us_ = 0;
-    }
-    last_update_was_explicit_ = is_explicit;
-
-    if (!first_update_us_) {
-        first_update_us_ = current_us;
-    }
-
-    UpdateInfo info;
-    info.timeSinceInit = {current_us - first_update_us_};
-    info.timeSinceLastUpdate = {last_update_us_ ? current_us - last_update_us_ : 0};
-    last_update_us_ = current_us;
-
     // Notify plugins that opted into update notifications.
-    for (auto& entry : plugins_) {
-        if (entry.config.enableUpdate) {
-            entry.plugin->update(info);
+    if (!update_plugins_.empty()) {
+        bool is_explicit = time.us != 0;
+        int64_t current_us = is_explicit ? time.us : now_us();
+
+        // Reset tracking when switching between explicit and auto time domains.
+        if (is_explicit != last_update_was_explicit_) {
+            first_update_us_ = 0;
+            last_update_us_ = 0;
+        }
+        last_update_was_explicit_ = is_explicit;
+
+        if (!first_update_us_) {
+            first_update_us_ = current_us;
+        }
+
+        UpdateInfo info;
+        info.timeSinceInit = {current_us - first_update_us_};
+        info.timeSinceLastUpdate = {last_update_us_ ? current_us - last_update_us_ : 0};
+        last_update_us_ = current_us;
+
+        for (auto* plugin : update_plugins_) {
+            plugin->update(info);
         }
     }
 }
@@ -376,6 +377,10 @@ ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
         plugins_.erase(it);
         return rv;
     }
+
+    if (config.enableUpdate) {
+        update_plugins_.push_back(plugin.get());
+    }
     return ReturnValue::Success;
 }
 
@@ -408,7 +413,14 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
         }
     }
 
+    IPlugin* raw = it->plugin.get();
     it->plugin->shutdown(*this);
+
+    // Remove from update cache.
+    auto uit = std::find(update_plugins_.begin(), update_plugins_.end(), raw);
+    if (uit != update_plugins_.end()) {
+        update_plugins_.erase(uit);
+    }
 
     // Sweep types owned by this plugin unless it opted to retain them.
     if (!it->config.retainTypesOnUnload) {
