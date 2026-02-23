@@ -91,8 +91,8 @@ TEST(AnyValue, SetSameValueReturnsNothingToDo)
 {
     ext::AnyValue<int> a;
     a.set_value(5);
-    EXPECT_EQ(a.set_value(5), ReturnValue::NOTHING_TO_DO);
-    EXPECT_EQ(a.set_value(6), ReturnValue::SUCCESS);
+    EXPECT_EQ(a.set_value(5), ReturnValue::NothingToDo);
+    EXPECT_EQ(a.set_value(6), ReturnValue::Success);
 }
 
 TEST(Any, TypeMismatchProducesInvalidWrapper)
@@ -109,7 +109,7 @@ TEST(AnyValue, CopyFromCompatible)
     ext::AnyValue<int> a;
     a.set_value(42);
     ext::AnyValue<int> b;
-    EXPECT_EQ(b.copy_from(a), ReturnValue::SUCCESS);
+    EXPECT_EQ(b.copy_from(a), ReturnValue::Success);
     EXPECT_EQ(b.get_value(), 42);
 }
 
@@ -118,5 +118,5 @@ TEST(AnyValue, CopyFromIncompatibleFails)
     ext::AnyValue<int> a;
     a.set_value(42);
     ext::AnyValue<float> b;
-    EXPECT_EQ(b.copy_from(a), ReturnValue::FAIL);
+    EXPECT_EQ(b.copy_from(a), ReturnValue::Fail);
 }

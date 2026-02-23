@@ -30,7 +30,7 @@ public:
 
     ReturnValue shutdown(IVelk&) override
     {
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
 };
 
@@ -54,7 +54,7 @@ public:
     ReturnValue shutdown(IVelk& velk) override
     {
         velk.plugin_registry().unload_plugin(DllSubPlugin::class_id());
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
 };
 

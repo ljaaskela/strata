@@ -482,9 +482,9 @@ TEST_F(ObjectTest, RPropSetValueReturnsReadOnly)
     auto prop = meta->get_property("id");
     ASSERT_TRUE(prop);
 
-    // set_value on a read-only property should return READ_ONLY
+    // set_value on a read-only property should return ReadOnly
     Any<int> newVal(100);
-    EXPECT_EQ(prop->set_value(*static_cast<const IAny*>(newVal)), ReturnValue::READ_ONLY);
+    EXPECT_EQ(prop->set_value(*static_cast<const IAny*>(newVal)), ReturnValue::ReadOnly);
 
     // Value should be unchanged
     auto* iw = interface_cast<ITestWidget>(obj);
@@ -504,9 +504,9 @@ TEST_F(ObjectTest, RPropSetDataReturnsReadOnly)
     auto* pi = interface_cast<IPropertyInternal>(prop);
     ASSERT_NE(pi, nullptr);
 
-    // set_data on a read-only property should return READ_ONLY
+    // set_data on a read-only property should return ReadOnly
     int newVal = 100;
-    EXPECT_EQ(pi->set_data(&newVal, sizeof(int), type_uid<int>()), ReturnValue::READ_ONLY);
+    EXPECT_EQ(pi->set_data(&newVal, sizeof(int), type_uid<int>()), ReturnValue::ReadOnly);
 
     // Value should be unchanged
     auto* iw = interface_cast<ITestWidget>(obj);

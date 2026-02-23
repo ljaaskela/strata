@@ -33,7 +33,7 @@ public:
      * @param to The buffer to store the data to.
      * @param toSize Size of the buffer.
      * @param type Type which should be stored. Must be one of the values returned by get_compatible_types.
-     * @return SUCCESS if data was successfully stored, FAIL otherwise.
+     * @return Success if data was successfully stored, Fail otherwise.
      */
     virtual ReturnValue get_data(void *to, size_t toSize, Uid type) const = 0;
     /**
@@ -41,15 +41,15 @@ public:
      * @param from The buffer to read data from.
      * @param fromSize Size of the buffer.
      * @param type Type of the data. Must be one of the values returned by get_compatible_types.
-     * @return SUCCESS if the value was set successfully and changed as a result of the operation
-     *         NOTHING_TO_DO if the operation was successful but did not result to the contained value changing.
-     *         FAIL otherwise.
+     * @return Success if the value was set successfully and changed as a result of the operation
+     *         NothingToDo if the operation was successful but did not result to the contained value changing.
+     *         Fail otherwise.
      */
     virtual ReturnValue set_data(void const *from, size_t fromSize, Uid type) = 0;
     /**
      * @brief Copies the content of this IAny from another IAny.
      * @param other The IAny to copy from. Must be compatible with this IAny.
-     * @return SUCCESS if copy operation completed successfully, FAIL otherwise.
+     * @return Success if copy operation completed successfully, Fail otherwise.
      */
     virtual ReturnValue copy_from(const IAny &other) = 0;
     /**

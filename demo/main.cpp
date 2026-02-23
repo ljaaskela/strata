@@ -46,9 +46,9 @@ public:
             globalData_.value = value.value;
             globalData_.name = value.name;
             invoke_event(on_data_changed(), this);
-            return ReturnValue::SUCCESS;
+            return ReturnValue::Success;
         }
-        return ReturnValue::NOTHING_TO_DO;
+        return ReturnValue::NothingToDo;
     }
 
     IEvent::Ptr on_data_changed() const override
@@ -149,7 +149,7 @@ void demo_change_notifications()
     Callback valueChanged([](FnArgs args) -> ReturnValue {
         cout << "Property value changed, ";
         if (!args[0]) {
-            return ReturnValue::INVALID_ARGUMENT;
+            return ReturnValue::InvalidArgument;
         }
         if (auto v = Any<const float>(*args[0])) {
             cout << "new value: " << v.get_value();
@@ -160,7 +160,7 @@ void demo_change_notifications()
             cout << "property not convertible to float or Data";
         }
         cout << endl;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
     prop.add_on_changed(valueChanged);
     myprop.add_on_changed(valueChanged);
@@ -447,7 +447,7 @@ void demo_function_context(IObject::Ptr& widget)
             auto ctx = FunctionContext(args, 2);
             if (!ctx) {
                 cout << "  add: expected 2 args" << endl;
-                return ReturnValue::INVALID_ARGUMENT;
+                return ReturnValue::InvalidArgument;
             }
             auto a = ctx.arg<float>(0);
             auto b = Any<const int>(ctx.arg(1));
@@ -455,7 +455,7 @@ void demo_function_context(IObject::Ptr& widget)
                 cout << "  add(" << a.get_value() << ", " << b.get_value()
                           << ") = " << (a.get_value() + b.get_value()) << endl;
             }
-            return ReturnValue::SUCCESS;
+            return ReturnValue::Success;
         });
 
         // Variadic invoke with raw values — auto-wraps in Any<T> + FunctionContext

@@ -99,10 +99,10 @@ void FunctionImpl::set_owned_callback(void* context, IFunction::BoundFn* fn, IFu
 ReturnValue FunctionImpl::add_handler(const IFunction::ConstPtr &fn, InvokeType type) const
 {
     if (!fn) {
-        return ReturnValue::INVALID_ARGUMENT;
+        return ReturnValue::InvalidArgument;
     }
     for (const auto &h : handlers_) {
-        if (h == fn) return ReturnValue::NOTHING_TO_DO;
+        if (h == fn) return ReturnValue::NothingToDo;
     }
     if (type == Immediate) {
         handlers_.insert(handlers_.begin() + deferred_begin_, fn);
@@ -110,7 +110,7 @@ ReturnValue FunctionImpl::add_handler(const IFunction::ConstPtr &fn, InvokeType 
     } else {
         handlers_.push_back(fn);
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 ReturnValue FunctionImpl::remove_handler(const IFunction::ConstPtr &fn) const
@@ -119,10 +119,10 @@ ReturnValue FunctionImpl::remove_handler(const IFunction::ConstPtr &fn) const
         if (handlers_[i] == fn) {
             if (i < deferred_begin_) --deferred_begin_;
             handlers_.erase(handlers_.begin() + i);
-            return ReturnValue::SUCCESS;
+            return ReturnValue::Success;
         }
     }
-    return ReturnValue::NOTHING_TO_DO;
+    return ReturnValue::NothingToDo;
 }
 
 bool FunctionImpl::has_handlers() const

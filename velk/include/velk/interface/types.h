@@ -100,11 +100,11 @@ const T *interface_cast(const shared_ptr<U> &obj)
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t {
-    SUCCESS = 0,           ///< Operation succeeded.
-    NOTHING_TO_DO = 1,     ///< Operation succeeded but had no effect (e.g. value unchanged).
-    FAIL = -1,             ///< Operation failed.
-    INVALID_ARGUMENT = -2, ///< One or more arguments were invalid.
-    READ_ONLY = -3,        ///< Write rejected: target is read-only.
+    Success = 0,           ///< Operation succeeded.
+    NothingToDo = 1,       ///< Operation succeeded but had no effect (e.g. value unchanged).
+    Fail = -1,             ///< Operation failed.
+    InvalidArgument = -2,  ///< One or more arguments were invalid.
+    ReadOnly = -3,         ///< Write rejected: target is read-only.
 };
 
 /** @brief General-purpose object flags. Checked by runtime implementations. */

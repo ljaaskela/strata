@@ -90,7 +90,7 @@ ReturnValue VelkInstance::register_type(const IObjectFactory &factory)
     } else {
         types_.insert(it, entry);
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 ReturnValue VelkInstance::unregister_type(const IObjectFactory &factory)
@@ -100,7 +100,7 @@ ReturnValue VelkInstance::unregister_type(const IObjectFactory &factory)
     if (it != types_.end() && it->uid == key.uid) {
         types_.erase(it);
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 IInterface::Ptr VelkInstance::create(Uid uid) const
@@ -215,7 +215,7 @@ ReturnValue VelkInstance::check_dependencies(const PluginInfo& info)
                              info.name.data(),
                              static_cast<unsigned long long>(dep.uid.hi),
                              static_cast<unsigned long long>(dep.uid.lo));
-            return ReturnValue::FAIL;
+            return ReturnValue::Fail;
         }
         if (dep.min_version && plugin->get_version() < dep.min_version) {
             detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
@@ -228,23 +228,23 @@ ReturnValue VelkInstance::check_dependencies(const PluginInfo& info)
                              version_major(plugin->get_version()),
                              version_minor(plugin->get_version()),
                              version_patch(plugin->get_version()));
-            return ReturnValue::FAIL;
+            return ReturnValue::Fail;
         }
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 ReturnValue VelkInstance::load_plugin_from_path(const char* path)
 {
     if (!path || !*path) {
-        return ReturnValue::INVALID_ARGUMENT;
+        return ReturnValue::InvalidArgument;
     }
 
     auto lib = LibraryHandle::open(path);
     if (!lib) {
         detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
                          "Failed to load library: %s", path);
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
 
     auto* get_info = reinterpret_cast<detail::PluginInfoFn*>(lib.symbol("velk_plugin_info"));
@@ -252,7 +252,7 @@ ReturnValue VelkInstance::load_plugin_from_path(const char* path)
         detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
                          "Library missing velk_plugin_info entry point: %s", path);
         lib.close();
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
 
     auto& info = *get_info();
@@ -263,7 +263,7 @@ ReturnValue VelkInstance::load_plugin_from_path(const char* path)
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == id) {
         lib.close();
-        return ReturnValue::NOTHING_TO_DO;
+        return ReturnValue::NothingToDo;
     }
     if (auto rv = check_dependencies(info); failed(rv)) {
         lib.close();
@@ -276,7 +276,7 @@ ReturnValue VelkInstance::load_plugin_from_path(const char* path)
         detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
                          "Factory failed to create plugin: %s", path);
         lib.close();
-        return ReturnValue::FAIL;
+        return ReturnValue::Fail;
     }
 
     ReturnValue rv = load_plugin(plugin);
@@ -292,13 +292,13 @@ ReturnValue VelkInstance::load_plugin_from_path(const char* path)
 ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
 {
     if (!plugin) {
-        return ReturnValue::INVALID_ARGUMENT;
+        return ReturnValue::InvalidArgument;
     }
     Uid id = plugin->get_class_uid();
     PluginEntry key{id, {}};
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == id) {
-        return ReturnValue::NOTHING_TO_DO; // Already there
+        return ReturnValue::NothingToDo; // Already there
     }
     if (auto rv = check_dependencies(plugin->get_plugin_info()); failed(rv)) {
         return rv;
@@ -313,7 +313,7 @@ ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
         plugins_.erase(it);
         return rv;
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 ReturnValue VelkInstance::unload_plugin(Uid pluginId)
@@ -321,7 +321,7 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
     PluginEntry key{pluginId, {}};
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it == plugins_.end() || it->uid != pluginId) {
-        return ReturnValue::INVALID_ARGUMENT;
+        return ReturnValue::InvalidArgument;
     }
 
     // Reject if any other loaded plugin depends on this one.
@@ -335,7 +335,7 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
                                  it->plugin->get_name().data(),
                                  static_cast<int>(pe.plugin->get_name().size()),
                                  pe.plugin->get_name().data());
-                return ReturnValue::FAIL;
+                return ReturnValue::Fail;
             }
         }
     }
@@ -352,7 +352,7 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
     auto handle = std::move(it->library);
     plugins_.erase(it);
     handle.close();
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 IPlugin* VelkInstance::find_plugin(Uid pluginId) const

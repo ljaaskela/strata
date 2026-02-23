@@ -7,16 +7,16 @@ namespace velk {
 ReturnValue PropertyImpl::set_value(const IAny &from)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
-        return ReturnValue::READ_ONLY;
+        return ReturnValue::ReadOnly;
     }
     if (data_) {
         auto ret = data_->copy_from(from);
-        if (ret == ReturnValue::SUCCESS && !external_) {
+        if (ret == ReturnValue::Success && !external_) {
             invoke_event(on_changed(), data_.get());
         }
         return ret;
     }
-    return ReturnValue::FAIL;
+    return ReturnValue::Fail;
 }
 const IAny::ConstPtr PropertyImpl::get_value() const
 {
@@ -49,12 +49,12 @@ void PropertyImpl::set_flags(int32_t flags)
 ReturnValue PropertyImpl::set_data(const void *data, size_t size, Uid type)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
-        return ReturnValue::READ_ONLY;
+        return ReturnValue::ReadOnly;
     }
-    auto ret = ReturnValue::FAIL;
+    auto ret = ReturnValue::Fail;
     if (data_) {
         ret = data_->set_data(data, size, type);
-        if (ret == ReturnValue::SUCCESS && !external_) {
+        if (ret == ReturnValue::Success && !external_) {
             // Ignore return value since data was successfully set
             invoke_event(on_changed(), data_.get());
         }

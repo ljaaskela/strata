@@ -253,7 +253,7 @@ inline ReturnValue invoke_event(const IInterface *o,
                                 FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
+    return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::InvalidArgument;
 }
 
 /**
@@ -360,7 +360,7 @@ IAny::Ptr interface_trampoline_impl(void* self, FnArgs args,
  * @param self Pointer to the interface instance.
  * @param args Runtime function arguments.
  * @param fn Pointer-to-member for the virtual method to call.
- * @return The virtual method's return value, or INVALID_ARGUMENT if too few args.
+ * @return The virtual method's return value, or InvalidArgument if too few args.
  */
 template<class Intf, class R, class... Args>
 IAny::Ptr interface_trampoline(void* self, FnArgs args,
@@ -786,7 +786,7 @@ struct FnRawBind
  * {
  *     ReturnValue fn_reset(const IAny* args) override {
  *         // implementation with access to 'this'
- *         return ReturnValue::SUCCESS;
+ *         return ReturnValue::Success;
  *     }
  * };
  * @endcode
@@ -823,7 +823,7 @@ struct FnRawBind
  * When @c IFunction::invoke() is called, the runtime checks in order:
  * -# An explicit callback set via @c set_invoke_callback() (highest priority).
  * -# A bound trampoline from a @c fn_Name override (automatic wiring).
- * -# Returns @c NOTHING_TO_DO if neither is set.
+ * -# Returns @c NothingToDo if neither is set.
  *
  * @note Up to 32 members are supported per interface.
  *

@@ -33,7 +33,7 @@ public:
 
     velk::ReturnValue shutdown(velk::IVelk& velk) override
     {
-        return velk::ReturnValue::SUCCESS;
+        return velk::ReturnValue::Success;
     }
 };
 ```
@@ -105,7 +105,7 @@ public:
 };
 ```
 
-Dependencies are validated at load time. If any dependency is not already loaded, `load_plugin` returns `FAIL` and the plugin is not registered.
+Dependencies are validated at load time. If any dependency is not already loaded, `load_plugin` returns `Fail` and the plugin is not registered.
 
 ### Versioned dependencies
 
@@ -162,7 +162,7 @@ public:
     velk::ReturnValue shutdown(velk::IVelk& velk) override
     {
         // Velk keeps track of types registered in initialize() and automatically unregisters them.
-        return velk::ReturnValue::SUCCESS;
+        return velk::ReturnValue::Success;
     }
 };
 
@@ -211,7 +211,7 @@ public:
     VELK_PLUGIN_UID("...");
 
     velk::ReturnValue initialize(velk::IVelk& velk) override { /* ... */ }
-    velk::ReturnValue shutdown(velk::IVelk& velk) override { return velk::ReturnValue::SUCCESS; }
+    velk::ReturnValue shutdown(velk::IVelk& velk) override { return velk::ReturnValue::Success; }
 };
 
 class HostPlugin : public velk::ext::Plugin<HostPlugin>
@@ -235,7 +235,7 @@ public:
     velk::ReturnValue shutdown(velk::IVelk& velk) override
     {
         velk.plugin_registry().unload_plugin(SubPlugin::class_id());
-        return velk::ReturnValue::SUCCESS;
+        return velk::ReturnValue::Success;
     }
 };
 

@@ -135,23 +135,23 @@ public:
      * @brief Resolves the future with a typed value.
      * @tparam T The value type.
      * @param value The value to resolve with (cloned internally).
-     * @return SUCCESS on first call, NOTHING_TO_DO if already resolved.
+     * @return Success on first call, NothingToDo if already resolved.
      */
     template<class T>
     ReturnValue set_value(const T& value)
     {
         auto* internal = interface_cast<IFutureInternal>(future_);
-        return internal ? internal->set_result(Any<const T>(value)) : ReturnValue::FAIL;
+        return internal ? internal->set_result(Any<const T>(value)) : ReturnValue::Fail;
     }
 
     /**
      * @brief Resolves a void future (no value).
-     * @return SUCCESS on first call, NOTHING_TO_DO if already resolved.
+     * @return Success on first call, NothingToDo if already resolved.
      */
     ReturnValue complete()
     {
         auto* internal = interface_cast<IFutureInternal>(future_);
-        return internal ? internal->set_result(nullptr) : ReturnValue::FAIL;
+        return internal ? internal->set_result(nullptr) : ReturnValue::Fail;
     }
 
     /**

@@ -61,7 +61,7 @@ TEST(Callback,LambdaCallbackInvoked)
 
     Callback fn([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     auto result = fn.invoke();
@@ -77,7 +77,7 @@ TEST(Callback,InvokeWithArgs)
         if (auto v = Any<const float>(args[0])) {
             received = v.get_value();
         }
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     Any<float> arg(3.14f);
@@ -96,7 +96,7 @@ TEST(InvokeFunction, VariadicWithValues)
     Callback fn([&](FnArgs args) -> ReturnValue {
         if (auto a = Any<const float>(args[0])) varA = a.get_value();
         if (auto b = Any<const int>(args[1])) varB = b.get_value();
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     invoke_function(IFunction::Ptr(fn), 10.f, 20);
@@ -114,7 +114,7 @@ TEST(InvokeFunction, VariadicWithAnyPointers)
     Callback fn([&](FnArgs args) -> ReturnValue {
         if (auto a = Any<const float>(args[0])) ptrA = a.get_value();
         if (auto b = Any<const int>(args[1])) ptrB = b.get_value();
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     Any<float> arg0(5.f);
@@ -195,7 +195,7 @@ TEST(Callback,TypedLambdaTwoParams)
     Callback fn([&](const float& a, const int& b) -> ReturnValue {
         received_a = a;
         received_b = b;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     Any<float> a(3.14f);
@@ -225,7 +225,7 @@ TEST(Callback,TypedLambdaVoidReturn)
 TEST(Callback,TypedLambdaInsufficientArgs)
 {
     Callback fn([](const float&, const int&) -> ReturnValue {
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     Any<float> a(1.f);
@@ -286,7 +286,7 @@ TEST(Callback,TypedLambdaWithInvokeFunction)
     Callback fn([&](const float& a, const int& b) -> ReturnValue {
         received_a = a;
         received_b = b;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     invoke_function(IFunction::Ptr(fn), 10.f, 20);
@@ -312,7 +312,7 @@ TEST(Callback,FnArgsLambdaStillWorks)
 
     Callback fn([&](FnArgs) -> ReturnValue {
         called = true;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     auto result = fn.invoke();
@@ -331,7 +331,7 @@ TEST(Event, HandlerAddRemove)
 
     Callback handler([&](FnArgs) -> ReturnValue {
         callCount++;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     event->add_handler(handler);
@@ -357,7 +357,7 @@ TEST(Event, AddHandlerWithLambdaHelper)
     // Lambda automatically wrapped in Callback
     event.add_handler([&](FnArgs) -> ReturnValue {
         callCount++;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     EXPECT_TRUE(event.has_handlers());
@@ -377,7 +377,7 @@ TEST(Event, AddHandlerWithTypedLambdaHelper)
     event.add_handler([&](const float& a, const int& b) -> ReturnValue {
         received_a = a;
         received_b = b;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     Any<float> a(3.14f);
@@ -413,7 +413,7 @@ TEST(Callback,DeferredInvocationQueuesAndExecutesOnUpdate)
 
     Callback fn([&](FnArgs) -> ReturnValue {
         callCount++;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     });
 
     fn.invoke({}, Deferred);

@@ -161,7 +161,7 @@ static void BM_EventDispatchImmediate(benchmark::State& state)
     auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     Event evt = iw->on_changed();
-    evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::SUCCESS; }, Immediate);
+    evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::Success; }, Immediate);
     for (auto _ : state) {
         evt.invoke(Immediate);
     }
@@ -174,7 +174,7 @@ static void BM_EventDispatchDeferred(benchmark::State& state)
     auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     Event evt = iw->on_changed();
-    evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::SUCCESS; }, Deferred);
+    evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::Success; }, Deferred);
     for (auto _ : state) {
         evt.invoke(Deferred);
     }

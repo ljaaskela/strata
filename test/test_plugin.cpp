@@ -37,7 +37,7 @@ public:
     ReturnValue shutdown(IVelk& velk) override
     {
         shutdownCount++;
-        return ReturnValue::SUCCESS;
+        return ReturnValue::Success;
     }
 
     int initCount = 0;
@@ -50,8 +50,8 @@ class FailingPlugin : public ext::Plugin<FailingPlugin>
 public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000002");
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::FAIL; }
-    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue initialize(IVelk&) override { return ReturnValue::Fail; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
 // A plugin that depends on TestPlugin
@@ -61,8 +61,8 @@ public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000003");
     VELK_PLUGIN_DEPS(TestPlugin::class_uid);
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::SUCCESS; }
-    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue initialize(IVelk&) override { return ReturnValue::Success; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
 // A plugin that depends on TestPlugin >= 2.1.0 (should succeed)
@@ -72,8 +72,8 @@ public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000004");
     VELK_PLUGIN_DEPS({TestPlugin::class_uid, make_version(2, 1, 0)});
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::SUCCESS; }
-    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue initialize(IVelk&) override { return ReturnValue::Success; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
 // A plugin that depends on TestPlugin >= 3.0.0 (should fail, TestPlugin is 2.1.0)
@@ -83,8 +83,8 @@ public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000005");
     VELK_PLUGIN_DEPS({TestPlugin::class_uid, make_version(3, 0, 0)});
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::SUCCESS; }
-    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue initialize(IVelk&) override { return ReturnValue::Success; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
 // UIDs for DLL test plugins (must match test_plugin_dll.cpp)
@@ -130,7 +130,7 @@ TEST_F(PluginTest, LoadPlugin)
 {
     auto& reg = velk_.plugin_registry();
 
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
     EXPECT_EQ(1, tp_->initCount);
     EXPECT_EQ(0, tp_->shutdownCount);
 }
@@ -168,7 +168,7 @@ TEST_F(PluginTest, UnloadPlugin)
     auto& reg = velk_.plugin_registry();
 
     reg.load_plugin(plugin_);
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin<TestPlugin>());
+    ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<TestPlugin>());
     EXPECT_EQ(1, tp_->shutdownCount);
     EXPECT_EQ(nullptr, reg.find_plugin<TestPlugin>());
     EXPECT_EQ(0u, reg.plugin_count());
@@ -191,8 +191,8 @@ TEST_F(PluginTest, DoubleLoadReturnsNothingToDo)
 {
     auto& reg = velk_.plugin_registry();
 
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
-    EXPECT_EQ(ReturnValue::NOTHING_TO_DO, reg.load_plugin(plugin_));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
+    EXPECT_EQ(ReturnValue::NothingToDo, reg.load_plugin(plugin_));
     EXPECT_EQ(1, tp_->initCount);
 }
 
@@ -201,14 +201,14 @@ TEST_F(PluginTest, InvalidReturnsError)
 {
     auto& reg = velk_.plugin_registry();
 
-    ASSERT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin({}));
+    ASSERT_EQ(ReturnValue::InvalidArgument, reg.load_plugin({}));
     EXPECT_EQ(0, tp_->initCount);
 }
 
 TEST_F(PluginTest, UnloadUnknownReturnsError)
 {
     auto& reg = velk_.plugin_registry();
-    EXPECT_EQ(ReturnValue::INVALID_ARGUMENT, reg.unload_plugin(Uid{"ffffffff-ffff-ffff-ffff-ffffffffffff"}));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.unload_plugin(Uid{"ffffffff-ffff-ffff-ffff-ffffffffffff"}));
 }
 
 TEST_F(PluginTest, BuiltinTypesSurvivePluginUnload)
@@ -227,7 +227,7 @@ TEST_F(PluginTest, FailedInitializeDoesNotLoad)
     auto& reg = velk_.plugin_registry();
     auto fp = ext::make_object<FailingPlugin, IPlugin>();
 
-    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin(fp));
+    EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(fp));
     EXPECT_EQ(nullptr, reg.find_plugin<FailingPlugin>());
     EXPECT_EQ(0u, reg.plugin_count());
 }
@@ -235,15 +235,15 @@ TEST_F(PluginTest, FailedInitializeDoesNotLoad)
 TEST_F(PluginTest, LoadFromPathNonExistentFails)
 {
     auto& reg = velk_.plugin_registry();
-    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin_from_path("nonexistent_plugin.dll"));
+    EXPECT_EQ(ReturnValue::Fail, reg.load_plugin_from_path("nonexistent_plugin.dll"));
     EXPECT_EQ(0u, reg.plugin_count());
 }
 
 TEST_F(PluginTest, LoadFromPathNullFails)
 {
     auto& reg = velk_.plugin_registry();
-    EXPECT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin_from_path(nullptr));
-    EXPECT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin_from_path(""));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin_from_path(nullptr));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin_from_path(""));
 }
 
 TEST_F(PluginTest, LoadFromPathInvalidDllFails)
@@ -251,7 +251,7 @@ TEST_F(PluginTest, LoadFromPathInvalidDllFails)
     // Use the test executable itself as a "DLL" with no velk_create_plugin symbol.
     // On Windows LoadLibrary will fail on an .exe, which is fine (tests FAIL path).
     auto& reg = velk_.plugin_registry();
-    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin_from_path("tests.exe"));
+    EXPECT_EQ(ReturnValue::Fail, reg.load_plugin_from_path("tests.exe"));
     EXPECT_EQ(0u, reg.plugin_count());
 }
 
@@ -303,19 +303,19 @@ TEST_F(PluginTest, PluginVersionDefault)
 TEST_F(PluginTest, VersionedDependencySatisfied)
 {
     auto& reg = velk_.plugin_registry();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
 
     auto vp = ext::make_object<VersionOkPlugin, IPlugin>();
-    EXPECT_EQ(ReturnValue::SUCCESS, reg.load_plugin(vp));
+    EXPECT_EQ(ReturnValue::Success, reg.load_plugin(vp));
 }
 
 TEST_F(PluginTest, VersionedDependencyTooNew)
 {
     auto& reg = velk_.plugin_registry();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
 
     auto vp = ext::make_object<VersionTooNewPlugin, IPlugin>();
-    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin(vp));
+    EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(vp));
     EXPECT_EQ(nullptr, reg.find_plugin<VersionTooNewPlugin>());
 }
 
@@ -324,7 +324,7 @@ TEST_F(PluginTest, DependencyNotLoadedFails)
     auto& reg = velk_.plugin_registry();
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
 
-    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin(dp));
+    EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(dp));
     EXPECT_EQ(nullptr, reg.find_plugin<DependentPlugin>());
 }
 
@@ -332,10 +332,10 @@ TEST_F(PluginTest, DependencyLoadedSucceeds)
 {
     auto& reg = velk_.plugin_registry();
 
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
 
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
-    EXPECT_EQ(ReturnValue::SUCCESS, reg.load_plugin(dp));
+    EXPECT_EQ(ReturnValue::Success, reg.load_plugin(dp));
     EXPECT_NE(nullptr, reg.find_plugin<DependentPlugin>());
 }
 
@@ -343,24 +343,24 @@ TEST_F(PluginTest, UnloadRejectsWhenDependentsLoaded)
 {
     auto& reg = velk_.plugin_registry();
 
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(dp));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(dp));
 
     // TestPlugin cannot be unloaded while DependentPlugin depends on it
-    EXPECT_EQ(ReturnValue::FAIL, reg.unload_plugin<TestPlugin>());
+    EXPECT_EQ(ReturnValue::Fail, reg.unload_plugin<TestPlugin>());
     EXPECT_NE(nullptr, reg.find_plugin<TestPlugin>());
 
     // Unload the dependent first, then the dependency succeeds
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin<DependentPlugin>());
-    EXPECT_EQ(ReturnValue::SUCCESS, reg.unload_plugin<TestPlugin>());
+    ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<DependentPlugin>());
+    EXPECT_EQ(ReturnValue::Success, reg.unload_plugin<TestPlugin>());
 }
 
 #ifdef TEST_PLUGIN_DLL_PATH
 TEST_F(PluginTest, LoadFromPathSuccess)
 {
     auto& reg = velk_.plugin_registry();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
     EXPECT_EQ(2u, reg.plugin_count()); // host + sub-plugin
 
     auto* plugin = reg.find_plugin(DllTestPluginUid);
@@ -371,16 +371,16 @@ TEST_F(PluginTest, LoadFromPathSuccess)
 TEST_F(PluginTest, LoadFromPathDoubleLoadReturnsNothingToDo)
 {
     auto& reg = velk_.plugin_registry();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
-    EXPECT_EQ(ReturnValue::NOTHING_TO_DO, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    EXPECT_EQ(ReturnValue::NothingToDo, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
     EXPECT_EQ(2u, reg.plugin_count()); // host + sub-plugin
 }
 
 TEST_F(PluginTest, LoadFromPathThenUnload)
 {
     auto& reg = velk_.plugin_registry();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin(DllTestPluginUid));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
     EXPECT_EQ(0u, reg.plugin_count());
     EXPECT_EQ(nullptr, reg.find_plugin(DllTestPluginUid));
 }
@@ -388,7 +388,7 @@ TEST_F(PluginTest, LoadFromPathThenUnload)
 TEST_F(PluginTest, LoadFromPathMultiPlugin)
 {
     auto& reg = velk_.plugin_registry();
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
 
     // Host plugin and sub-plugin should both be loaded
     EXPECT_EQ(2u, reg.plugin_count());
@@ -397,7 +397,7 @@ TEST_F(PluginTest, LoadFromPathMultiPlugin)
     EXPECT_EQ(string_view("DllSubPlugin"), reg.find_plugin(DllSubPluginUid)->get_name());
 
     // Unloading the host should also unload the sub-plugin (via shutdown)
-    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin(DllTestPluginUid));
+    ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
     EXPECT_EQ(0u, reg.plugin_count());
     EXPECT_EQ(nullptr, reg.find_plugin(DllSubPluginUid));
 }

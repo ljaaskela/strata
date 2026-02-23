@@ -55,10 +55,10 @@ public:
      * @brief Resolves the future with the given result.
      *
      * The value is cloned internally. Pass nullptr for void futures.
-     * Can only be called once; subsequent calls return NOTHING_TO_DO.
+     * Can only be called once; subsequent calls return NothingToDo.
      *
      * @param result The value to resolve with (cloned), or nullptr for void.
-     * @return SUCCESS on first call, NOTHING_TO_DO if already resolved.
+     * @return Success on first call, NothingToDo if already resolved.
      */
     virtual ReturnValue set_result(const IAny* result) = 0;
 };
