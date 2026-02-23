@@ -101,14 +101,12 @@ protected:
     void TearDown() override
     {
         auto& reg = velk_.plugin_registry();
-        if (reg.find_plugin<TestPlugin>()) {
-            reg.unload_plugin<TestPlugin>();
+        // Unload dependents before their dependencies.
+        if (reg.find_plugin(DllTestPluginUid)) {
+            reg.unload_plugin(DllTestPluginUid);
         }
-        if (reg.find_plugin<DependentPlugin>()) {
-            reg.unload_plugin<DependentPlugin>();
-        }
-        if (reg.find_plugin<FailingPlugin>()) {
-            reg.unload_plugin<FailingPlugin>();
+        if (reg.find_plugin(DllSubPluginUid)) {
+            reg.unload_plugin(DllSubPluginUid);
         }
         if (reg.find_plugin<VersionOkPlugin>()) {
             reg.unload_plugin<VersionOkPlugin>();
@@ -116,11 +114,14 @@ protected:
         if (reg.find_plugin<VersionTooNewPlugin>()) {
             reg.unload_plugin<VersionTooNewPlugin>();
         }
-        if (reg.find_plugin(DllTestPluginUid)) {
-            reg.unload_plugin(DllTestPluginUid);
+        if (reg.find_plugin<DependentPlugin>()) {
+            reg.unload_plugin<DependentPlugin>();
         }
-        if (reg.find_plugin(DllSubPluginUid)) {
-            reg.unload_plugin(DllSubPluginUid);
+        if (reg.find_plugin<FailingPlugin>()) {
+            reg.unload_plugin<FailingPlugin>();
+        }
+        if (reg.find_plugin<TestPlugin>()) {
+            reg.unload_plugin<TestPlugin>();
         }
     }
 };
@@ -336,6 +337,23 @@ TEST_F(PluginTest, DependencyLoadedSucceeds)
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
     EXPECT_EQ(ReturnValue::SUCCESS, reg.load_plugin(dp));
     EXPECT_NE(nullptr, reg.find_plugin<DependentPlugin>());
+}
+
+TEST_F(PluginTest, UnloadRejectsWhenDependentsLoaded)
+{
+    auto& reg = velk_.plugin_registry();
+
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+    auto dp = ext::make_object<DependentPlugin, IPlugin>();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(dp));
+
+    // TestPlugin cannot be unloaded while DependentPlugin depends on it
+    EXPECT_EQ(ReturnValue::FAIL, reg.unload_plugin<TestPlugin>());
+    EXPECT_NE(nullptr, reg.find_plugin<TestPlugin>());
+
+    // Unload the dependent first, then the dependency succeeds
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin<DependentPlugin>());
+    EXPECT_EQ(ReturnValue::SUCCESS, reg.unload_plugin<TestPlugin>());
 }
 
 #ifdef TEST_PLUGIN_DLL_PATH

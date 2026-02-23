@@ -34,6 +34,28 @@ VelkInstance::VelkInstance()
     RegisterTypes(*this);
 }
 
+VelkInstance::~VelkInstance()
+{
+    // Unload plugins in reverse order so that dependents shut down before
+    // their dependencies.
+    while (!plugins_.empty()) {
+        auto& entry = plugins_.back();
+        entry.plugin->shutdown(*this);
+
+        // Sweep types owned by this plugin.
+        Uid owner = entry.uid;
+        types_.erase(
+            std::remove_if(types_.begin(), types_.end(),
+                [&](const Entry& e) { return e.owner == owner; }),
+            types_.end());
+
+        // Move library handle out before erasing so it outlives the plugin pointer.
+        auto handle = std::move(entry.library);
+        plugins_.pop_back();
+        handle.close();
+    }
+}
+
 const IObjectFactory* VelkInstance::find(Uid uid) const
 {
     Entry key{uid, nullptr};
@@ -300,6 +322,22 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it == plugins_.end() || it->uid != pluginId) {
         return ReturnValue::INVALID_ARGUMENT;
+    }
+
+    // Reject if any other loaded plugin depends on this one.
+    for (auto& pe : plugins_) {
+        if (pe.uid == pluginId) continue;
+        for (auto& dep : pe.plugin->get_dependencies()) {
+            if (dep.uid == pluginId) {
+                detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                                 "Cannot unload plugin '%.*s': plugin '%.*s' depends on it",
+                                 static_cast<int>(it->plugin->get_name().size()),
+                                 it->plugin->get_name().data(),
+                                 static_cast<int>(pe.plugin->get_name().size()),
+                                 pe.plugin->get_name().data());
+                return ReturnValue::FAIL;
+            }
+        }
     }
 
     it->plugin->shutdown(*this);
