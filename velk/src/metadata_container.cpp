@@ -124,4 +124,24 @@ IFunction::Ptr MetadataContainer::get_function(string_view name) const
     return interface_pointer_cast<IFunction>(find_or_create(name, MemberKind::Function));
 }
 
+void MetadataContainer::notify(MemberKind kind, Uid interfaceUid, Notification notification) const
+{
+    for (auto &[idx, ptr] : instances_) {
+        auto &m = members_[idx];
+        if (m.kind != kind || !m.interfaceInfo || m.interfaceInfo->uid != interfaceUid)
+            continue;
+
+        switch (notification) {
+        case Notification::Changed:
+            if (kind == MemberKind::Property) {
+                if (auto *prop = interface_cast<IProperty>(ptr))
+                    invoke_event(prop->on_changed(), prop->get_value().get());
+            }
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 } // namespace velk

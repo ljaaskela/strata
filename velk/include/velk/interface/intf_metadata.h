@@ -22,6 +22,9 @@ namespace velk {
 /** @brief Discriminator for the kind of member described by a MemberDesc. */
 enum class MemberKind : uint8_t { Property, Event, Function };
 
+/** @brief Discriminator for the kind of notification to broadcast. */
+enum class Notification : uint8_t { Changed, Invoked, Reset };
+
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
 using FnTrampoline = IAny::Ptr(*)(void* self, FnArgs args);
 
@@ -154,6 +157,47 @@ typename T::State *get_property_state(U *object)
     return state ? state->template get_property_state<T>() : nullptr;
 }
 
+namespace detail {
+
+/** @brief RAII read-only accessor to an interface's State struct. Null-safe. */
+template<class T>
+class StateReader
+{
+public:
+    StateReader() = default;
+    explicit StateReader(const typename T::State* state) : state_(state) {}
+    explicit operator bool() const { return state_ != nullptr; }
+    const typename T::State* operator->() const { return state_; }
+    const typename T::State& operator*() const { return *state_; }
+    StateReader(const StateReader&) = default;
+    StateReader& operator=(const StateReader&) = default;
+private:
+    const typename T::State* state_{};
+};
+
+/** @brief RAII write accessor; fires notify on destruction. Null-safe. */
+template<class T>
+class StateWriter
+{
+public:
+    StateWriter() = default;
+    StateWriter(typename T::State* state, const IInterface* meta) : state_(state), meta_(meta) {}
+    ~StateWriter(); // defined after IMetadata
+    StateWriter(const StateWriter&) = delete;
+    StateWriter& operator=(const StateWriter&) = delete;
+    StateWriter(StateWriter&& o) noexcept : state_(o.state_), meta_(o.meta_) { o.state_ = nullptr; o.meta_ = nullptr; }
+    StateWriter& operator=(StateWriter&&) = delete;
+
+    explicit operator bool() const { return state_ != nullptr; }
+    typename T::State* operator->() { return state_; }
+    typename T::State& operator*() { return *state_; }
+private:
+    typename T::State* state_{};
+    const IInterface* meta_{};
+};
+
+} // namespace detail
+
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
 class IMetadata : public Interface<IMetadata, IPropertyState>
 {
@@ -167,7 +211,57 @@ public:
     virtual IEvent::Ptr get_event(string_view name) const = 0;
     /** @brief Returns the runtime function instance for the named member, or nullptr. */
     virtual IFunction::Ptr get_function(string_view name) const = 0;
+
+    /** @brief Broadcasts a notification to all instantiated members of the given kind and interface. */
+    virtual void notify(MemberKind kind, Uid interfaceUid, Notification notification) const = 0;
+
+    /** @brief Returns a read-only accessor to the State struct of interface @p T. */
+    template<class T>
+    detail::StateReader<T> read() const;
+
+    /** @brief Returns a write accessor that fires on_changed for @p T properties on destruction. */
+    template<class T>
+    detail::StateWriter<T> write();
 };
+
+template<class T>
+detail::StateReader<T> IMetadata::read() const
+{
+    auto* state = const_cast<IMetadata*>(this)->template get_property_state<T>();
+    return detail::StateReader<T>(state);
+}
+
+template<class T>
+detail::StateWriter<T> IMetadata::write()
+{
+    auto* state = this->template get_property_state<T>();
+    return detail::StateWriter<T>(state, state ? this : nullptr);
+}
+
+template<class T>
+detail::StateWriter<T>::~StateWriter()
+{
+    if (state_ && meta_) {
+        if (auto* m = interface_cast<IMetadata>(meta_))
+            m->notify(MemberKind::Property, T::UID, Notification::Changed);
+    }
+}
+
+/** @brief Convenience free function: read-only access to T::State via IMetadata. */
+template<class T, class U>
+detail::StateReader<T> read_state(U* object)
+{
+    auto* meta = interface_cast<IMetadata>(object);
+    return meta ? meta->template read<T>() : detail::StateReader<T>();
+}
+
+/** @brief Convenience free function: write access to T::State via IMetadata. */
+template<class T, class U>
+detail::StateWriter<T> write_state(U* object)
+{
+    auto* meta = interface_cast<IMetadata>(object);
+    return meta ? meta->template write<T>() : detail::StateWriter<T>();
+}
 
 /**
  * @brief Null-safe property lookup on an IMetadata pointer.
