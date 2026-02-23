@@ -182,13 +182,7 @@ class StateWriter
 public:
     StateWriter() = default;
     StateWriter(typename T::State* state, const IInterface* meta) : state_(state), meta_(meta) {}
-    ~StateWriter()
-    {
-        if (state_ && meta_) {
-            if (auto* m = interface_cast<IMetadata>(meta_))
-                m->notify(MemberKind::Property, T::UID, Notification::Changed);
-        }
-    }
+    ~StateWriter(); // defined after IMetadata
     StateWriter(const StateWriter&) = delete;
     StateWriter& operator=(const StateWriter&) = delete;
     StateWriter(StateWriter&& o) noexcept : state_(o.state_), meta_(o.meta_) { o.state_ = nullptr; o.meta_ = nullptr; }
@@ -242,6 +236,15 @@ detail::StateWriter<T> IMetadata::write()
 {
     auto* state = this->template get_property_state<T>();
     return detail::StateWriter<T>(state, state ? this : nullptr);
+}
+
+template<class T>
+detail::StateWriter<T>::~StateWriter()
+{
+    if (state_ && meta_) {
+        if (auto* m = interface_cast<IMetadata>(meta_))
+            m->notify(MemberKind::Property, T::UID, Notification::Changed);
+    }
 }
 
 /** @brief Convenience free function: read-only access to T::State via IMetadata. */
