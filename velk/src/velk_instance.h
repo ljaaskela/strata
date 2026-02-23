@@ -21,6 +21,7 @@ class VelkInstance final : public ext::ObjectCore<VelkInstance, IVelk, ITypeRegi
 {
 public:
     VelkInstance();
+    ~VelkInstance();
 
     ITypeRegistry& type_registry() override { return *this; }
     const ITypeRegistry& type_registry() const override { return *this; }
