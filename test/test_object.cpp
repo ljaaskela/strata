@@ -583,3 +583,164 @@ TEST_F(ClassUidTest, CreateByUserSpecifiedUid)
     auto* tagged = interface_cast<ITagged>(obj);
     ASSERT_NE(tagged, nullptr);
 }
+
+// --- read_state / write_state tests ---
+
+TEST_F(ObjectTest, ReadStateReturnsCurrentValues)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    iw->width().set_value(200.f);
+
+    auto reader = read_state<ITestWidget>(iw);
+    EXPECT_FLOAT_EQ(reader->width, 200.f);
+    EXPECT_FLOAT_EQ(reader->height, 50.f);  // default
+}
+
+TEST_F(ObjectTest, ReadStateViaIMetadata)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto reader = meta->read<ITestWidget>();
+    EXPECT_FLOAT_EQ(reader->width, 100.f);
+    EXPECT_FLOAT_EQ(reader->height, 50.f);
+}
+
+TEST_F(ObjectTest, WriteStateFiresOnChanged)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    // Instantiate properties by accessing them, then subscribe
+    int widthNotified = 0;
+    int heightNotified = 0;
+    Callback onWidth([&]() { widthNotified++; });
+    Callback onHeight([&]() { heightNotified++; });
+    iw->width().add_on_changed(onWidth);
+    iw->height().add_on_changed(onHeight);
+
+    // Reset counters (add_on_changed fires once during property init)
+    widthNotified = 0;
+    heightNotified = 0;
+
+    {
+        auto writer = write_state<ITestWidget>(iw);
+        writer->width = 300.f;
+        writer->height = 150.f;
+        // Not fired yet
+        EXPECT_EQ(widthNotified, 0);
+        EXPECT_EQ(heightNotified, 0);
+    }
+    // ~StateWriter fires on_changed
+    EXPECT_EQ(widthNotified, 1);
+    EXPECT_EQ(heightNotified, 1);
+
+    // Verify the values actually changed
+    EXPECT_FLOAT_EQ(iw->width().get_value(), 300.f);
+    EXPECT_FLOAT_EQ(iw->height().get_value(), 150.f);
+}
+
+TEST_F(ObjectTest, WriteStateNoCrashWithNoInstantiatedProperties)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    // No properties have been accessed yet — should not crash
+    {
+        auto writer = meta->write<ITestWidget>();
+        writer->width = 999.f;
+    }
+
+    // Verify the state was written
+    auto reader = meta->read<ITestWidget>();
+    EXPECT_FLOAT_EQ(reader->width, 999.f);
+}
+
+TEST_F(ObjectTest, WriteStateOnlyFiresForTargetInterface)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    auto* is = interface_cast<ITestSerializable>(obj);
+    ASSERT_NE(iw, nullptr);
+    ASSERT_NE(is, nullptr);
+
+    int widthNotified = 0;
+    int versionNotified = 0;
+    Callback onWidth([&]() { widthNotified++; });
+    Callback onVersion([&]() { versionNotified++; });
+    iw->width().add_on_changed(onWidth);
+    is->version().add_on_changed(onVersion);
+
+    widthNotified = 0;
+    versionNotified = 0;
+
+    {
+        auto writer = write_state<ITestSerializable>(is);
+        writer->version = 42;
+    }
+
+    // Only ITestSerializable property should fire, not ITestWidget
+    EXPECT_EQ(versionNotified, 1);
+    EXPECT_EQ(widthNotified, 0);
+}
+
+TEST_F(ObjectTest, ReadStateInvalidInterfaceReturnsFalse)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    // ITagged is not implemented by TestWidget — read should return false
+    auto reader = meta->read<ITagged>();
+    EXPECT_FALSE(reader);
+}
+
+TEST_F(ObjectTest, WriteStateInvalidInterfaceReturnsFalse)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    // ITagged is not implemented by TestWidget — write should return false, no crash on destruction
+    {
+        auto writer = meta->write<ITagged>();
+        EXPECT_FALSE(writer);
+    }
+}
+
+TEST_F(ObjectTest, ReadStateFreeNullObject)
+{
+    // Null object pointer — should return false
+    IInterface* null = nullptr;
+    auto reader = read_state<ITestWidget>(null);
+    EXPECT_FALSE(reader);
+}
+
+TEST_F(ObjectTest, WriteStateFreeNullObject)
+{
+    // Null object pointer — should return false, no crash on destruction
+    IInterface* null = nullptr;
+    {
+        auto writer = write_state<ITestWidget>(null);
+        EXPECT_FALSE(writer);
+    }
+}
+
+TEST_F(ObjectTest, ValidReadWriteStateReturnTrue)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    auto reader = read_state<ITestWidget>(iw);
+    EXPECT_TRUE(reader);
+
+    auto writer = write_state<ITestWidget>(iw);
+    EXPECT_TRUE(writer);
+}

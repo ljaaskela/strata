@@ -50,6 +50,11 @@ public: // IMetadata overrides
     {
         return meta_ ? meta_->get_function(name) : nullptr;
     }
+    /** @brief Broadcasts a notification to matching instantiated members. */
+    void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
+    {
+        if (meta_) meta_->notify(kind, interfaceUid, notification);
+    }
 
 public: // IMetadataContainer override
     /** @brief Accepts the runtime metadata container (called once by Velk at construction). */
