@@ -30,7 +30,7 @@ ReturnValue FutureImpl::set_result(const IAny* result)
     {
         std::lock_guard lock(mutex_);
         if (ready_.load(std::memory_order_relaxed)) {
-            return ReturnValue::NOTHING_TO_DO;
+            return ReturnValue::NothingToDo;
         }
         result_ = result ? result->clone() : nullptr;
         ready_.store(true, std::memory_order_release);
@@ -41,7 +41,7 @@ ReturnValue FutureImpl::set_result(const IAny* result)
     for (auto& cont : continuations) {
         fire_continuation(cont, result_.get());
     }
-    return ReturnValue::SUCCESS;
+    return ReturnValue::Success;
 }
 
 void FutureImpl::add_continuation(const IFunction::ConstPtr& fn, InvokeType type)

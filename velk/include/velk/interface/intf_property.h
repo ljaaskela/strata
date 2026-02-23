@@ -13,9 +13,9 @@ public:
     /**
      * @brief Sets the property to a given value
      * @param from The value to set from.
-     * @return ReturnValue::SUCCESS if value changed
-     *         ReturnValue::NOTHING_TO_DO if the same value was set
-     *         ReturnValue::FAIL otherwise
+     * @return ReturnValue::Success if value changed
+     *         ReturnValue::NothingToDo if the same value was set
+     *         ReturnValue::Fail otherwise
      */
     virtual ReturnValue set_value(const IAny &from) = 0;
     /**
