@@ -3,6 +3,7 @@
 
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_event.h>
+#include <velk/interface/intf_function.h>
 
 namespace velk {
 
@@ -17,7 +18,7 @@ public:
      *         ReturnValue::NothingToDo if the same value was set
      *         ReturnValue::Fail otherwise
      */
-    virtual ReturnValue set_value(const IAny& from) = 0;
+    virtual ReturnValue set_value(const IAny& from, InvokeType type = Immediate) = 0;
     /**
      * @brief Returns the property's current value.
      */
@@ -52,7 +53,14 @@ public:
      * @param size Size of the source data in bytes.
      * @param type Type UID of the data.
      */
-    virtual ReturnValue set_data(const void* data, size_t size, Uid type) = 0;
+    virtual ReturnValue set_data(const void* data, size_t size, Uid type,
+                                 InvokeType invokeType = Immediate) = 0;
+    /**
+     * @brief Copies @p from into the backing value without firing on_changed.
+     * @return ReturnValue::Success if the value changed and the caller should fire on_changed.
+     *         ReturnValue::NothingToDo if unchanged or if the property is externally notified.
+     */
+    virtual ReturnValue set_value_silent(const IAny& from) = 0;
     /**
      * @brief Sets object flags (e.g. ObjectFlags::ReadOnly) on the property.
      * @param flags Bitwise combination of ObjectFlags constants.
