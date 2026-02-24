@@ -5,9 +5,19 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 ## Contents
 
 - [Class UIDs](#class-uids)
-- [Virtual function dispatch](#virtual-function-dispatch)
+- [Functions and events](#functions-and-events)
+  - [Virtual function dispatch](#virtual-function-dispatch)
   - [Function arguments](#function-arguments)
   - [Typed lambda parameters](#typed-lambda-parameters)
+  - [Deferred invocation](#deferred-invocation)
+    - [Defer at the call site](#defer-at-the-call-site)
+    - [Deferred event handlers](#deferred-event-handlers)
+  - [Futures and promises](#futures-and-promises)
+    - [Basic usage](#basic-usage)
+    - [Continuations](#continuations)
+    - [Then chaining](#then-chaining)
+    - [Type transforms](#type-transforms)
+    - [Thread safety](#thread-safety)
 - [Properties](#properties)
   - [Change notifications](#change-notifications)
   - [Custom Any types](#custom-any-types)
@@ -15,15 +25,7 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
     - [read_state / write_state](#read_state--write_state)
     - [Raw state pointer](#raw-state-pointer)
   - [Deferred property assignment](#deferred-property-assignment)
-- [Deferred invocation](#deferred-invocation)
-  - [Defer at the call site](#defer-at-the-call-site)
-  - [Deferred event handlers](#deferred-event-handlers)
-- [Futures and promises](#futures-and-promises)
-  - [Basic usage](#basic-usage)
-  - [Continuations](#continuations)
-  - [Then chaining](#then-chaining)
-  - [Type transforms](#type-transforms)
-  - [Thread safety](#thread-safety)
+    - [Deferred write_state](#deferred-write_state)
 
 ## Class UIDs
 
@@ -57,7 +59,11 @@ inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
 }
 ```
 
-## Virtual function dispatch
+## Functions and events
+
+Functions are type-erased callables declared in interfaces via `FN` or `FN_RAW`. Events are multicast delegates declared via `EVT`. Both support immediate and deferred invocation.
+
+### Virtual function dispatch
 
 `VELK_INTERFACE` supports three function forms. `(FN, RetType, Name)` generates a zero-arg virtual `RetType fn_Name()`. `(FN, RetType, Name, (T1, a1), ...)` generates a typed virtual `RetType fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs` and return value wrapping. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
 
@@ -119,7 +125,7 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 
 Each `fn_Name` is pure virtual, so implementing classes must override it. An explicit `set_invoke_callback()` takes priority over the virtual.
 
-### Function arguments
+#### Function arguments
 
 For **typed-arg** functions (`(FN, RetType, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically, the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `nullptr`.
 
@@ -145,7 +151,7 @@ invoke_function(iw->process(), Any<int>(42));                   // single IAny a
 invoke_function(widget.get(), "process", 1.f, 2u);             // multi-value (auto-wrapped)
 ```
 
-### Typed lambda parameters
+#### Typed lambda parameters
 
 `Callback` also accepts lambdas with typed parameters. Arguments are automatically extracted from `FnArgs` using `Any<const T>`, so there's no manual unpacking:
 
@@ -187,6 +193,211 @@ The three constructor forms are mutually exclusive via SFINAE:
 | Callable with typed params (any return) | Typed lambda ctor |
 
 `invoke()` returns `IAny::Ptr`, `nullptr` for void results, or a typed result. Typed-return lambdas have their result automatically wrapped via `Any<R>`. When fewer arguments are provided than the lambda expects, `invoke()` returns `nullptr`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
+
+### Deferred invocation
+
+Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::velk::instance().update()` is called.
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Event
+    participant IVelk
+    participant Immediate as Immediate Handler
+    participant Deferred as Deferred Handler
+
+    Caller->>Event: invoke(args)
+    Event->>Immediate: invoke(args)
+    Immediate-->>Event: Success
+    Note over Event: Deferred handler queued<br>(args cloned)
+    Event-->>Caller: Success
+
+    Note over Caller: ... later ...
+
+    Caller->>IVelk: update()
+    IVelk->>Deferred: invoke(cloned args)
+    Deferred-->>IVelk: Success
+    IVelk-->>Caller: done
+```
+
+#### Defer at the call site
+
+Pass `Deferred` to `invoke()` to queue the entire invocation:
+
+```cpp
+auto fn = iw->reset();
+invoke_function(fn, args);                                // executes now (default)
+invoke_function(fn, args, InvokeType::Deferred);          // queued for update()
+```
+
+#### Deferred event handlers
+
+Register a handler as deferred so it is queued each time the event fires, while immediate handlers on the same event still execute synchronously:
+
+```cpp
+auto event = iw->on_clicked();
+event->add_handler(immediateHandler);                        // fires synchronously
+event->add_handler(deferredHandler, InvokeType::Deferred);   // queued for update()
+
+invoke_event(event, args);  // immediateHandler runs now, deferredHandler is queued
+instance().update();        // deferredHandler runs here
+```
+
+Arguments are cloned when a task is queued, so the original `IAny` does not need to outlive the call. Deferred tasks that themselves produce deferred work will re-queue, and will be handled when `update()` is called the next time.
+
+### Futures and promises
+
+Velk provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side, it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
+
+```mermaid
+sequenceDiagram
+    participant Producer
+    participant Promise
+    participant Future
+    participant Continuation
+
+    Producer->>Promise: set_value(42)
+    Promise->>Future: result ready
+    Future->>Continuation: invoke(result)
+    Continuation-->>Future: IAny::Ptr
+```
+
+#### Basic usage
+
+Create a promise, hand out its future, and resolve it later:
+
+```cpp
+#include <api/future.h>
+
+auto promise = make_promise();
+auto future = promise.get_future<int>();
+
+// Consumer side
+future.wait();                          // blocks until ready
+int value = future.get_result().get_value();
+
+// Producer side (possibly from another thread)
+promise.set_value(42);                  // resolves the future
+```
+
+For void futures (signaling completion without a value):
+
+```cpp
+auto promise = make_promise();
+auto future = promise.get_future<void>();
+
+promise.complete();                     // resolves without a value
+```
+
+Resolving twice returns `NothingToDo` and the first value persists:
+
+```cpp
+promise.set_value(1);                   // Success
+promise.set_value(2);                   // NothingToDo, first value wins
+```
+
+#### Continuations
+
+Attach a callback that fires when the future resolves. If the future is already ready, the continuation fires immediately:
+
+```cpp
+auto promise = make_promise();
+auto future = promise.get_future<int>();
+
+// FnArgs continuation, receives the result as args[0]
+future.then([](FnArgs args) -> ReturnValue {
+    if (auto ctx = FunctionContext(args, 1)) {
+        std::cout << "got: " << ctx.arg<int>(0).get_value() << std::endl;
+    }
+    return ReturnValue::Success;
+});
+
+// Typed continuation, arguments are auto-extracted
+future.then([](int value) {
+    std::cout << "got: " << value << std::endl;
+});
+
+promise.set_value(42);                  // fires both continuations
+```
+
+Deferred continuations are queued for `instance().update()`:
+
+```cpp
+future.then([](int value) {
+    std::cout << value << std::endl;
+}, Deferred);
+
+promise.set_value(42);                  // continuation is queued, not fired
+instance().update();                    // continuation fires here
+```
+
+#### Then chaining
+
+`.then()` returns a new `Future` that resolves with the continuation's return value. This enables fluent chaining:
+
+```cpp
+auto promise = make_promise();
+
+auto result = promise.get_future<int>()
+    .then([](int v) -> int { return v * 2; })
+    .then([](int v) -> int { return v + 1; });
+
+promise.set_value(5);
+// result is Future<int>, resolves to 11: (5 * 2) + 1
+```
+
+Void-returning continuations produce `Future<void>`:
+
+```cpp
+auto done = promise.get_future<int>()
+    .then([](int v) { std::cout << v << std::endl; });
+// done is Future<void>
+```
+
+#### Type transforms
+
+Continuations can change the value type between chain steps:
+
+```cpp
+auto promise = make_promise();
+
+// int -> float
+auto result = promise.get_future<int>()
+    .then([](int v) -> float { return v * 1.5f; });
+
+promise.set_value(10);
+// result is Future<float>, resolves to 15.f
+```
+
+Chaining from a void future is also supported:
+
+```cpp
+auto promise = make_promise();
+auto result = promise.get_future<void>()
+    .then([]() -> int { return 42; });
+
+promise.complete();
+// result is Future<int>, resolves to 42
+```
+
+#### Thread safety
+
+`Promise` and `Future` are safe to use across threads. `wait()` blocks until the result is available, and multiple threads can wait on the same future:
+
+```cpp
+auto promise = make_promise();
+auto future = promise.get_future<int>();
+
+std::thread consumer([&] {
+    future.wait();                      // blocks until ready
+    int v = future.get_result().get_value();
+});
+
+promise.set_value(42);                  // unblocks the consumer
+consumer.join();
+```
+
+Resolution, waiting, and continuation dispatch are all mutex-protected internally. Continuations added after resolution fire immediately (for `Immediate` type) or are queued (for `Deferred` type).
 
 ## Properties
 
@@ -365,208 +576,3 @@ write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
 ```
 
 If the object is destroyed before `update()`, the queued callback is silently skipped.
-
-## Deferred invocation
-
-Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::velk::instance().update()` is called.
-
-```mermaid
-sequenceDiagram
-    participant Caller
-    participant Event
-    participant IVelk
-    participant Immediate as Immediate Handler
-    participant Deferred as Deferred Handler
-
-    Caller->>Event: invoke(args)
-    Event->>Immediate: invoke(args)
-    Immediate-->>Event: Success
-    Note over Event: Deferred handler queued<br>(args cloned)
-    Event-->>Caller: Success
-
-    Note over Caller: ... later ...
-
-    Caller->>IVelk: update()
-    IVelk->>Deferred: invoke(cloned args)
-    Deferred-->>IVelk: Success
-    IVelk-->>Caller: done
-```
-
-### Defer at the call site
-
-Pass `Deferred` to `invoke()` to queue the entire invocation:
-
-```cpp
-auto fn = iw->reset();
-invoke_function(fn, args);                                // executes now (default)
-invoke_function(fn, args, InvokeType::Deferred);          // queued for update()
-```
-
-### Deferred event handlers
-
-Register a handler as deferred so it is queued each time the event fires, while immediate handlers on the same event still execute synchronously:
-
-```cpp
-auto event = iw->on_clicked();
-event->add_handler(immediateHandler);                        // fires synchronously
-event->add_handler(deferredHandler, InvokeType::Deferred);   // queued for update()
-
-invoke_event(event, args);  // immediateHandler runs now, deferredHandler is queued
-instance().update();        // deferredHandler runs here
-```
-
-Arguments are cloned when a task is queued, so the original `IAny` does not need to outlive the call. Deferred tasks that themselves produce deferred work will re-queue, and will be handled when `update()` is called the next time.
-
-## Futures and promises
-
-Velk provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side, it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
-
-```mermaid
-sequenceDiagram
-    participant Producer
-    participant Promise
-    participant Future
-    participant Continuation
-
-    Producer->>Promise: set_value(42)
-    Promise->>Future: result ready
-    Future->>Continuation: invoke(result)
-    Continuation-->>Future: IAny::Ptr
-```
-
-### Basic usage
-
-Create a promise, hand out its future, and resolve it later:
-
-```cpp
-#include <api/future.h>
-
-auto promise = make_promise();
-auto future = promise.get_future<int>();
-
-// Consumer side
-future.wait();                          // blocks until ready
-int value = future.get_result().get_value();
-
-// Producer side (possibly from another thread)
-promise.set_value(42);                  // resolves the future
-```
-
-For void futures (signaling completion without a value):
-
-```cpp
-auto promise = make_promise();
-auto future = promise.get_future<void>();
-
-promise.complete();                     // resolves without a value
-```
-
-Resolving twice returns `NothingToDo` and the first value persists:
-
-```cpp
-promise.set_value(1);                   // Success
-promise.set_value(2);                   // NothingToDo, first value wins
-```
-
-### Continuations
-
-Attach a callback that fires when the future resolves. If the future is already ready, the continuation fires immediately:
-
-```cpp
-auto promise = make_promise();
-auto future = promise.get_future<int>();
-
-// FnArgs continuation, receives the result as args[0]
-future.then([](FnArgs args) -> ReturnValue {
-    if (auto ctx = FunctionContext(args, 1)) {
-        std::cout << "got: " << ctx.arg<int>(0).get_value() << std::endl;
-    }
-    return ReturnValue::Success;
-});
-
-// Typed continuation, arguments are auto-extracted
-future.then([](int value) {
-    std::cout << "got: " << value << std::endl;
-});
-
-promise.set_value(42);                  // fires both continuations
-```
-
-Deferred continuations are queued for `instance().update()`:
-
-```cpp
-future.then([](int value) {
-    std::cout << value << std::endl;
-}, Deferred);
-
-promise.set_value(42);                  // continuation is queued, not fired
-instance().update();                    // continuation fires here
-```
-
-### Then chaining
-
-`.then()` returns a new `Future` that resolves with the continuation's return value. This enables fluent chaining:
-
-```cpp
-auto promise = make_promise();
-
-auto result = promise.get_future<int>()
-    .then([](int v) -> int { return v * 2; })
-    .then([](int v) -> int { return v + 1; });
-
-promise.set_value(5);
-// result is Future<int>, resolves to 11: (5 * 2) + 1
-```
-
-Void-returning continuations produce `Future<void>`:
-
-```cpp
-auto done = promise.get_future<int>()
-    .then([](int v) { std::cout << v << std::endl; });
-// done is Future<void>
-```
-
-### Type transforms
-
-Continuations can change the value type between chain steps:
-
-```cpp
-auto promise = make_promise();
-
-// int -> float
-auto result = promise.get_future<int>()
-    .then([](int v) -> float { return v * 1.5f; });
-
-promise.set_value(10);
-// result is Future<float>, resolves to 15.f
-```
-
-Chaining from a void future is also supported:
-
-```cpp
-auto promise = make_promise();
-auto result = promise.get_future<void>()
-    .then([]() -> int { return 42; });
-
-promise.complete();
-// result is Future<int>, resolves to 42
-```
-
-### Thread safety
-
-`Promise` and `Future` are safe to use across threads. `wait()` blocks until the result is available, and multiple threads can wait on the same future:
-
-```cpp
-auto promise = make_promise();
-auto future = promise.get_future<int>();
-
-std::thread consumer([&] {
-    future.wait();                      // blocks until ready
-    int v = future.get_result().get_value();
-});
-
-promise.set_value(42);                  // unblocks the consumer
-consumer.join();
-```
-
-Resolution, waiting, and continuation dispatch are all mutex-protected internally. Continuations added after resolution fire immediately (for `Immediate` type) or are queued (for `Deferred` type).
