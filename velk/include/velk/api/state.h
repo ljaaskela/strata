@@ -62,7 +62,7 @@ typename T::Ptr get_self(U* object)
 template <class T, class U, class Fn>
 void write_state(U* object, Fn&& fn, InvokeType type = Immediate)
 {
-    auto meta = interface_cast<IMetadata>(object);
+    auto* meta = interface_cast<IMetadata>(object);
     auto* state = get_property_state<T>(meta);
     if (!state) {
         return;
