@@ -8,11 +8,13 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 - [Virtual function dispatch](#virtual-function-dispatch)
   - [Function arguments](#function-arguments)
   - [Typed lambda parameters](#typed-lambda-parameters)
-- [Properties with change notifications](#properties-with-change-notifications)
-- [Custom Any types](#custom-any-types)
-- [Direct state access](#direct-state-access)
-  - [read_state / write_state](#read_state--write_state)
-  - [Raw state pointer](#raw-state-pointer)
+- [Properties](#properties)
+  - [Change notifications](#change-notifications)
+  - [Custom Any types](#custom-any-types)
+  - [Direct state access](#direct-state-access)
+    - [read_state / write_state](#read_state--write_state)
+    - [Raw state pointer](#raw-state-pointer)
+  - [Deferred property assignment](#deferred-property-assignment)
 - [Deferred invocation](#deferred-invocation)
   - [Defer at the call site](#defer-at-the-call-site)
   - [Deferred event handlers](#deferred-event-handlers)
@@ -186,10 +188,14 @@ The three constructor forms are mutually exclusive via SFINAE:
 
 `invoke()` returns `IAny::Ptr`, `nullptr` for void results, or a typed result. Typed-return lambdas have their result automatically wrapped via `Any<R>`. When fewer arguments are provided than the lambda expects, `invoke()` returns `nullptr`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
 
-## Properties with change notifications
+## Properties
+
+Properties are type-erased values with built-in change notification. They are declared in interfaces via `PROP` and created standalone via `create_property<T>`.
+
+### Change notifications
 
 ```cpp
-auto prop = Property<float>();
+auto prop = create_property<float>();
 prop.set_value(5.f);
 
 Callback onChange([](FnArgs args) -> ReturnValue {
@@ -203,7 +209,7 @@ prop.add_on_changed(onChange);
 prop.set_value(10.f);  // triggers onChange
 ```
 
-## Custom Any types
+### Custom Any types
 
 Implement `ext::AnyCore` to back a property with external or shared data:
 
@@ -221,11 +227,11 @@ public:
 };
 ```
 
-## Direct state access
+### Direct state access
 
 Each interface that declares `PROP` members gets a `State` struct with one field per property, initialized with its declared default. `ext::Object` stores these structs inline, and properties read/write directly into them via `ext::AnyRef<T>`.
 
-### read_state / write_state
+#### read_state / write_state
 
 `read_state<T>` and `write_state<T>` provide RAII accessors to the state struct. `read_state` returns a read-only view. `write_state` returns a writable view that automatically fires `on_changed` on all instantiated properties of that interface when it goes out of scope. Both return a null-safe handle that converts to `false` if the interface is not implemented by the object or the object pointer is null.
 
@@ -272,13 +278,14 @@ if (auto writer = write_state<ISerializable>(iw)) {
 }  // fires on_changed for ISerializable properties only
 ```
 
-### get_property_state (raw pointer)
+#### get_property_state (raw pointer)
 
 For performance-critical code paths like serialization, snapshotting (`memcpy` for trivially-copyable state), or tight loops, `get_property_state<T>` returns the raw `T::State*` with zero overhead. Writes through the raw pointer bypass change notifications entirely. This is the opt-in escape hatch when you know no listeners need notifying.
 
 | API | Notifications | Use case |
 |---|---|---|
-| `write_state<T>` | Automatic on scope exit | General use, correctness by default |
+| `write_state<T>(obj)` | Automatic on scope exit | General use, correctness by default |
+| `write_state<T>(obj, fn, type)` | After callback returns | Callback form, supports `Deferred` |
 | `get_property_state<T>` | None | Performance-critical bulk operations |
 
 ```cpp
@@ -291,6 +298,73 @@ state->height;  // 50.f
 state->width = 200.f;
 iw->width().get_value();  // 200.f
 ```
+
+### Deferred property assignment
+
+Property values can be set from any thread by passing `Deferred` to `set_value`. The write is queued and applied on the next `instance().update()` call. The value is cloned at the call site, so the original does not need to outlive the call.
+
+```cpp
+auto prop = create_property<int>(0);
+prop.set_value(42, Deferred);       // queued, not applied yet
+prop.get_value();                    // still 0
+
+instance().update();                 // applies the write, fires on_changed
+prop.get_value();                    // 42
+```
+
+Multiple writes to the same property before `update()` coalesce. Only the last value is applied and `on_changed` fires once:
+
+```cpp
+prop.set_value(1, Deferred);
+prop.set_value(2, Deferred);
+prop.set_value(3, Deferred);
+
+instance().update();                 // applies 3, on_changed fires once
+```
+
+When multiple properties are set in the same batch, all values are applied before any `on_changed` fires. This means a notification handler for one property can read the already-updated value of another:
+
+```cpp
+auto width  = create_property<float>(0.f);
+auto height = create_property<float>(0.f);
+
+Callback onWidthChanged([&](FnArgs) -> ReturnValue {
+    // height is already updated when this fires
+    float h = height.get_value();
+    return ReturnValue::Success;
+});
+width.add_on_changed(onWidthChanged);
+
+width.set_value(100.f, Deferred);
+height.set_value(50.f, Deferred);
+instance().update();                 // both applied, then both notified
+```
+
+If the property is destroyed before `update()` is called, the queued write is silently skipped.
+
+#### Deferred write_state
+
+The callback form of `write_state` also accepts an `InvokeType`. When `Deferred`, the callback is queued and executed on the next `update()` call, with `on_changed` firing after the callback returns:
+
+```cpp
+write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
+    s.width = 200.f;
+    s.height = 100.f;
+}, Deferred);
+
+// State unchanged here
+instance().update();    // callback runs, then on_changed fires
+```
+
+The immediate callback form is equivalent to the RAII writer but in a single expression:
+
+```cpp
+write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
+    s.width = 200.f;
+});  // applied and notified synchronously
+```
+
+If the object is destroyed before `update()`, the queued callback is silently skipped.
 
 ## Deferred invocation
 

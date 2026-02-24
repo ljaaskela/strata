@@ -1,23 +1,32 @@
 #include "property.h"
 
+#include <velk/api/velk.h>
 #include <velk/interface/intf_external_any.h>
 #include <velk/interface/types.h>
 
 namespace velk {
 
-ReturnValue PropertyImpl::set_value(const IAny& from)
+ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
-    if (data_) {
-        auto ret = data_->copy_from(from);
-        if (ret == ReturnValue::Success && !external_) {
-            invoke_event(on_changed(), data_.get());
-        }
-        return ret;
+    if (!data_) {
+        return ReturnValue::Fail;
     }
-    return ReturnValue::Fail;
+    if (type == Deferred) {
+        auto clone = data_->clone();
+        if (clone && clone->copy_from(from) == ReturnValue::Success) {
+            instance().queue_deferred_property({get_self<IPropertyInternal>(), std::move(clone)});
+            return ReturnValue::Success;
+        }
+        return ReturnValue::Fail;
+    }
+    auto ret = data_->copy_from(from);
+    if (ret == ReturnValue::Success && !external_) {
+        invoke_event(on_changed(), data_.get());
+    }
+    return ret;
 }
 const IAny::ConstPtr PropertyImpl::get_value() const
 {
@@ -42,23 +51,46 @@ IAny::ConstPtr PropertyImpl::get_any() const
 {
     return data_;
 }
+ReturnValue PropertyImpl::set_value_silent(const IAny& from)
+{
+    if (get_object_data().flags & ObjectFlags::ReadOnly) {
+        return ReturnValue::ReadOnly;
+    }
+    if (!data_) {
+        return ReturnValue::Fail;
+    }
+    auto ret = data_->copy_from(from);
+    // External anys fire on_data_changed -> on_changed automatically during copy_from,
+    // so return NothingToDo to prevent the caller from firing on_changed again.
+    if (ret == ReturnValue::Success && external_) {
+        return ReturnValue::NothingToDo;
+    }
+    return ret;
+}
 void PropertyImpl::set_flags(int32_t flags)
 {
     get_object_data().flags = flags;
 }
 
-ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type)
+ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
-    auto ret = ReturnValue::Fail;
-    if (data_) {
-        ret = data_->set_data(data, size, type);
-        if (ret == ReturnValue::Success && !external_) {
-            // Ignore return value since data was successfully set
-            invoke_event(on_changed(), data_.get());
+    if (!data_) {
+        return ReturnValue::Fail;
+    }
+    if (invokeType == Deferred) {
+        auto clone = data_->clone();
+        if (clone && clone->set_data(data, size, type) == ReturnValue::Success) {
+            instance().queue_deferred_property({get_self<IPropertyInternal>(), std::move(clone)});
+            return ReturnValue::Success;
         }
+        return ReturnValue::Fail;
+    }
+    auto ret = data_->set_data(data, size, type);
+    if (ret == ReturnValue::Success && !external_) {
+        invoke_event(on_changed(), data_.get());
     }
     return ret;
 }

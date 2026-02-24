@@ -180,47 +180,105 @@ void VelkInstance::queue_deferred_tasks(array_view<DeferredTask> tasks) const
     deferred_queue_.insert(deferred_queue_.end(), tasks.begin(), tasks.end());
 }
 
+void VelkInstance::queue_deferred_property(DeferredPropertySet task) const
+{
+    std::lock_guard lock(deferred_mutex_);
+    deferred_property_queue_.push_back(std::move(task));
+}
+
+void VelkInstance::flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const
+{
+    // Coalesce property sets: walk backwards, lock each weak_ptr once, keep last-write-wins.
+    struct CoalescedEntry
+    {
+        IPropertyInternal::Ptr property;
+        IAny* value;
+    };
+    std::vector<CoalescedEntry> unique;
+    for (auto it = propSets.rbegin(); it != propSets.rend(); ++it) {
+        auto locked = it->property.lock();
+        if (!locked) {
+            continue;
+        }
+        bool found = false;
+        for (auto& u : unique) {
+            if (u.property == locked) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            unique.push_back({std::move(locked), it->value.get()});
+        }
+    }
+    // First pass: apply all values silently in original queue order, collect those needing notification.
+    std::vector<IPropertyInternal*> notify;
+    for (auto it = unique.rbegin(); it != unique.rend(); ++it) {
+        if (it->property->set_value_silent(*it->value) == ReturnValue::Success) {
+            notify.push_back(it->property.get());
+        }
+    }
+    // Second pass: fire on_changed for all properties that changed.
+    for (auto* prop : notify) {
+        invoke_event(prop->on_changed(), prop->get_any().get());
+    }
+}
+
+void VelkInstance::notify_plugins(Duration time) const
+{
+    bool is_explicit = time.us != 0;
+    int64_t current_us = is_explicit ? time.us : now_us();
+    auto& t = update_timestamps_;
+
+    // Reset tracking when switching between explicit and auto time domains.
+    if (is_explicit != last_update_was_explicit_) {
+        t.timeSinceFirstUpdate = {};
+        t.timeSinceLastUpdate = {};
+    }
+    last_update_was_explicit_ = is_explicit;
+
+    if (!t.timeSinceFirstUpdate.us) {
+        t.timeSinceFirstUpdate.us = current_us;
+    }
+
+    UpdateInfo info;
+    info.timeSinceInit = {current_us - t.timeSinceInit.us};
+    info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
+    info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
+    t.timeSinceLastUpdate.us = current_us;
+
+    for (auto* plugin : update_plugins_) {
+        plugin->update(info);
+    }
+}
+
 void VelkInstance::update(Duration time) const
 {
-    // Swap the queue under lock, then invoke outside the lock.
+    // Swap the queues under lock, then invoke outside the lock.
     // Tasks queued during invocation (by deferred handlers) will be picked up at the next update().
     std::vector<DeferredTask> tasks;
+    std::vector<DeferredPropertySet> propSets;
     {
         std::lock_guard lock(deferred_mutex_);
         tasks.swap(deferred_queue_);
+        propSets.swap(deferred_property_queue_);
     }
+
+    // Run deferred tasks
     for (auto& task : tasks) {
         if (task.fn) {
             task.fn->invoke(task.args ? task.args->view() : FnArgs{});
         }
     }
 
-    // Notify plugins that opted into update notifications.
+    // Set deferred properties
+    if (!propSets.empty()) {
+        flush_deferred_properties(propSets);
+    }
+
+    // Update plugins that have asked for updates
     if (!update_plugins_.empty()) {
-        bool is_explicit = time.us != 0;
-        int64_t current_us = is_explicit ? time.us : now_us();
-        auto& t = update_timestamps_;
-
-        // Reset tracking when switching between explicit and auto time domains.
-        if (is_explicit != last_update_was_explicit_) {
-            t.timeSinceFirstUpdate = {};
-            t.timeSinceLastUpdate = {};
-        }
-        last_update_was_explicit_ = is_explicit;
-
-        if (!t.timeSinceFirstUpdate.us) {
-            t.timeSinceFirstUpdate.us = current_us;
-        }
-
-        UpdateInfo info;
-        info.timeSinceInit = {current_us - t.timeSinceInit.us};
-        info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
-        info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
-        t.timeSinceLastUpdate.us = current_us;
-
-        for (auto* plugin : update_plugins_) {
-            plugin->update(info);
-        }
+        notify_plugins(time);
     }
 }
 

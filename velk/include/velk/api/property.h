@@ -105,10 +105,10 @@ public:
     explicit Property(IProperty::Ptr existing) : Base(std::move(existing)) {}
 
     /** @brief Sets the property to @p value. */
-    ReturnValue set_value(const Type& value)
+    ReturnValue set_value(const Type& value, InvokeType type = Immediate)
     {
         if (auto internal = this->get_internal()) {
-            return internal->set_data(&value, sizeof(Type), Base::TYPE_UID);
+            return internal->set_data(&value, sizeof(Type), Base::TYPE_UID, type);
         }
         return ReturnValue::Fail;
     }
