@@ -131,3 +131,92 @@ TEST(Property, ConstructReadOnlySetFails)
     EXPECT_TRUE(pp);
     EXPECT_EQ(pp.set_value(1), ReturnValue::ReadOnly);
 }
+
+// Deferred property updates
+
+TEST(Property, DeferredSetValue)
+{
+    auto p = create_property<int>(0);
+    EXPECT_EQ(p.set_value(42, Deferred), ReturnValue::Success);
+    // Value should not be applied yet.
+    EXPECT_EQ(p.get_value(), 0);
+
+    instance().update();
+    EXPECT_EQ(p.get_value(), 42);
+}
+
+TEST(Property, DeferredCoalescing)
+{
+    auto p = create_property<int>(0);
+    int callCount = 0;
+
+    Callback handler([&](FnArgs) -> ReturnValue {
+        callCount++;
+        return ReturnValue::Success;
+    });
+
+    p.add_on_changed(handler);
+
+    p.set_value(1, Deferred);
+    p.set_value(2, Deferred);
+    p.set_value(3, Deferred);
+
+    EXPECT_EQ(p.get_value(), 0);
+
+    instance().update();
+
+    // Only last value should be applied, on_changed fires once.
+    EXPECT_EQ(p.get_value(), 3);
+    EXPECT_EQ(callCount, 1);
+}
+
+TEST(Property, DeferredMultipleProperties)
+{
+    auto p1 = create_property<int>(0);
+    auto p2 = create_property<float>(0.f);
+
+    p1.set_value(10, Deferred);
+    p2.set_value(3.14f, Deferred);
+
+    EXPECT_EQ(p1.get_value(), 0);
+    EXPECT_FLOAT_EQ(p2.get_value(), 0.f);
+
+    instance().update();
+
+    EXPECT_EQ(p1.get_value(), 10);
+    EXPECT_FLOAT_EQ(p2.get_value(), 3.14f);
+}
+
+TEST(Property, DeferredBatchedNotifications)
+{
+    auto p1 = create_property<int>(0);
+    auto p2 = create_property<int>(0);
+
+    // When p1's on_changed fires, p2 should already have its new value.
+    int p2ValueSeenByP1Handler = -1;
+    Callback handler([&](FnArgs) -> ReturnValue {
+        p2ValueSeenByP1Handler = p2.get_value();
+        return ReturnValue::Success;
+    });
+    p1.add_on_changed(handler);
+
+    p1.set_value(1, Deferred);
+    p2.set_value(2, Deferred);
+
+    instance().update();
+
+    EXPECT_EQ(p1.get_value(), 1);
+    EXPECT_EQ(p2.get_value(), 2);
+    EXPECT_EQ(p2ValueSeenByP1Handler, 2);
+}
+
+TEST(Property, DeferredPropertyDestroyedBeforeUpdate)
+{
+    {
+        auto p = create_property<int>(0);
+        p.set_value(42, Deferred);
+        // p goes out of scope here, destroying the property.
+    }
+    // update() should not crash when the weak_ptr is expired.
+    instance().update();
+}

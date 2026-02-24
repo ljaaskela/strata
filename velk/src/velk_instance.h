@@ -42,6 +42,7 @@ public:
     IAny::Ptr create_any(Uid type) const override;
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, int32_t flags) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
+    void queue_deferred_property(DeferredPropertySet task) const override;
     void update(Duration time) const override;
     IFuture::Ptr create_future() const override;
     IFunction::Ptr create_callback(IFunction::CallableFn* fn) const override;
@@ -83,16 +84,22 @@ private:
     const IObjectFactory* find(Uid uid) const;
     /** @brief Checks that all dependencies declared in info are loaded. Logs and returns Fail if not. */
     ReturnValue check_dependencies(const PluginInfo& info);
+    /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
+    void flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const;
+    /** @brief Notifies opted-in plugins with timing information. */
+    void notify_plugins(Duration time) const;
     std::vector<Entry> types_;                         ///< Sorted registry of class factories.
     std::vector<PluginEntry> plugins_;                 ///< Sorted registry of loaded plugins.
     Uid current_owner_;                                ///< Owner context for type registration.
     mutable std::mutex deferred_mutex_;                ///< Guards @c deferred_queue_.
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
-    ILogSink::Ptr sink_;                               ///< Custom log sink (empty = default stderr).
-    LogLevel level_{LogLevel::Info};                   ///< Minimum log level.
-    std::vector<IPlugin*> update_plugins_;             ///< Plugins that opted into update notifications.
-    mutable UpdateInfo update_timestamps_;              ///< Absolute timestamps for init, first update, last update.
-    mutable bool last_update_was_explicit_{};          ///< Whether previous update used explicit time.
+    mutable std::vector<DeferredPropertySet>
+        deferred_property_queue_;             ///< Property sets queued for the next update() call.
+    ILogSink::Ptr sink_;                      ///< Custom log sink (empty = default stderr).
+    LogLevel level_{LogLevel::Info};          ///< Minimum log level.
+    std::vector<IPlugin*> update_plugins_;    ///< Plugins that opted into update notifications.
+    mutable UpdateInfo update_timestamps_;    ///< Absolute timestamps for init, first update, last update.
+    mutable bool last_update_was_explicit_{}; ///< Whether previous update used explicit time.
 };
 
 } // namespace velk

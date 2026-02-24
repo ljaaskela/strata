@@ -53,6 +53,13 @@ struct DeferredTask
     shared_ptr<DeferredArgs> args;
 };
 
+/** @brief Deferred property write queued for the next update() call. */
+struct DeferredPropertySet
+{
+    IPropertyInternal::WeakPtr property;  ///< Weak ref to the property. Skipped if expired before flush.
+    IAny::Ptr value;                      ///< Cloned value to apply.
+};
+
 /** @brief Information passed to each update cycle. */
 struct UpdateInfo
 {
@@ -96,6 +103,11 @@ public:
      * @param tasks The tasks to invoke.
      */
     virtual void queue_deferred_tasks(array_view<DeferredTask> tasks) const = 0;
+    /**
+     * @brief Enqueues a deferred property write for the next update() call.
+     * @param task The deferred property set to queue.
+     */
+    virtual void queue_deferred_property(DeferredPropertySet task) const = 0;
     /**
      * @brief Executes all queued deferred tasks and notifies opted-in plugins.
      * @param time Current time in microseconds. If zero, the system clock is used.
