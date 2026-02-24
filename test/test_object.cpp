@@ -2,6 +2,7 @@
 #include <velk/api/callback.h>
 #include <velk/api/function_context.h>
 #include <velk/api/property.h>
+#include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/interface/intf_event.h>
@@ -743,4 +744,82 @@ TEST_F(ObjectTest, ValidReadWriteStateReturnTrue)
 
     auto writer = write_state<ITestWidget>(iw);
     EXPECT_TRUE(writer);
+}
+
+// --- Deferred write_state ---
+
+TEST_F(ObjectTest, DeferredWriteState)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    write_state<ITestWidget>(
+        iw,
+        [](ITestWidget::State& s) {
+            s.width = 400.f;
+            s.height = 200.f;
+        },
+        Deferred);
+
+    // Not applied yet
+    EXPECT_FLOAT_EQ(iw->width().get_value(), 100.f);
+    EXPECT_FLOAT_EQ(iw->height().get_value(), 50.f);
+
+    instance().update();
+
+    EXPECT_FLOAT_EQ(iw->width().get_value(), 400.f);
+    EXPECT_FLOAT_EQ(iw->height().get_value(), 200.f);
+}
+
+TEST_F(ObjectTest, DeferredWriteStateFiresOnChanged)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    int widthNotified = 0;
+    Callback onWidth([&]() { widthNotified++; });
+    iw->width().add_on_changed(onWidth);
+    widthNotified = 0;
+
+    write_state<ITestWidget>(iw, [](ITestWidget::State& s) { s.width = 500.f; }, Deferred);
+
+    EXPECT_EQ(widthNotified, 0);
+
+    instance().update();
+
+    EXPECT_EQ(widthNotified, 1);
+    EXPECT_FLOAT_EQ(iw->width().get_value(), 500.f);
+}
+
+TEST_F(ObjectTest, DeferredWriteStateDestroyedBeforeUpdate)
+{
+    {
+        auto obj = instance().create<IObject>(TestWidget::class_id());
+        auto* iw = interface_cast<ITestWidget>(obj);
+        ASSERT_NE(iw, nullptr);
+
+        write_state<ITestWidget>(iw, [](ITestWidget::State& s) { s.width = 999.f; }, Deferred);
+    }
+    // Object destroyed, update should not crash
+    instance().update();
+}
+
+TEST_F(ObjectTest, ImmediateWriteStateCallback)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    int widthNotified = 0;
+    Callback onWidth([&]() { widthNotified++; });
+    iw->width().add_on_changed(onWidth);
+    widthNotified = 0;
+
+    write_state<ITestWidget>(iw, [](ITestWidget::State& s) { s.width = 600.f; });
+
+    // Immediate: applied and notified synchronously
+    EXPECT_EQ(widthNotified, 1);
+    EXPECT_FLOAT_EQ(iw->width().get_value(), 600.f);
 }

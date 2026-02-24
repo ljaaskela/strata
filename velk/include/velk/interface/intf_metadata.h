@@ -43,18 +43,6 @@ public:
     }
 };
 
-/**
- * @brief Type-safe property state access. Returns a typed pointer to T::State.
- * @tparam T The interface type whose State struct to retrieve.
- * @param object The object whose property state to return.
- */
-template <class T, class U>
-typename T::State* get_property_state(U* object)
-{
-    auto state = interface_cast<IPropertyState>(object);
-    return state ? state->template get_property_state<T>() : nullptr;
-}
-
 namespace detail {
 
 /** @brief RAII read-only accessor to an interface's State struct. Null-safe. */
@@ -150,22 +138,6 @@ detail::StateWriter<T>::~StateWriter()
             m->notify(MemberKind::Property, T::UID, Notification::Changed);
         }
     }
-}
-
-/** @brief Convenience free function: read-only access to T::State via IMetadata. */
-template <class T, class U>
-detail::StateReader<T> read_state(U* object)
-{
-    auto* meta = interface_cast<IMetadata>(object);
-    return meta ? meta->template read<T>() : detail::StateReader<T>();
-}
-
-/** @brief Convenience free function: write access to T::State via IMetadata. */
-template <class T, class U>
-detail::StateWriter<T> write_state(U* object)
-{
-    auto* meta = interface_cast<IMetadata>(object);
-    return meta ? meta->template write<T>() : detail::StateWriter<T>();
 }
 
 /**
