@@ -2,7 +2,9 @@
 
 A hive is a dense, typed container that stores objects of a single class contiguously in memory. Instead of allocating each object individually on the heap, a hive groups objects into cache-friendly pages and constructs them in place. This is useful for systems that manage large numbers of homogeneous objects (entities, particles, nodes) where iteration performance matters.
 
-Objects in a hive are full Velk objects with reference counting, metadata, and interface support. They can be passed around as `IObject::Ptr` just like any other object. The only difference is where they live in memory.
+The design shares core ideas with C++26's `std::hive` (P0447): paged allocation, O(1) erase via a per-page freelist, stable references across insertion and removal, and no element shifting. Where `std::hive` is a general-purpose standard container, Velk's hive is specialized for Velk objects, providing reference counting, interface dispatch, metadata, and zombie/orphan lifetime management on top of the same underlying storage model.
+
+Objects in a hive are full Velk objects with reference counting, metadata, and interface support. They can be passed around as `IObject::Ptr` just like any other object. The only difference is where they live in memory, and that removed objects can [outlive the hive itself](#lifetime-and-zombies) if external references still hold them.
 
 ## Contents
 
