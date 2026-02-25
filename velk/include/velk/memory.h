@@ -4,6 +4,7 @@
 #include <velk/velk_export.h>
 
 #include <atomic>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -31,7 +32,6 @@ struct control_block
 {
     std::atomic<int32_t> strong{0};
     std::atomic<int32_t> weak{1}; ///< 1 = "strong group exists"
-    void* ptr{nullptr};           ///< IObject* (IInterface) or destroy target (non-IInterface)
 
     /** @brief Increments the strong count (relaxed). */
     void add_ref() { strong.fetch_add(1, std::memory_order_relaxed); }
@@ -68,6 +68,25 @@ struct control_block
         return false;
     }
 
+    /** @brief Sets the stored pointer. Asserts that the value is aligned (low bit clear). */
+    void set_ptr(void* p)
+    {
+        assert((reinterpret_cast<uintptr_t>(p) & 1) == 0 && "control_block::set_ptr: unaligned pointer");
+        ptr_ = p;
+    }
+
+    /** @brief Returns the stored pointer with the external tag bit masked off. */
+    void* get_ptr() const
+    {
+        return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) & ~uintptr_t(1));
+    }
+
+    /** @brief Tags the ptr low bit to mark this as an external control block. */
+    void set_external_tag() { ptr_ = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) | 1); }
+
+    /** @brief Returns true if the ptr low bit is set (external block). */
+    bool is_external() const { return reinterpret_cast<uintptr_t>(ptr_) & 1; }
+
     /** @brief Increments the weak count (relaxed). */
     void add_weak() { weak.fetch_add(1, std::memory_order_relaxed); }
 
@@ -76,6 +95,9 @@ struct control_block
      * @return true if this was the last weak ref (caller must deallocate the block).
      */
     bool release_weak() { return weak.fetch_sub(1, std::memory_order_acq_rel) == 1; }
+
+private:
+    void* ptr_{nullptr}; ///< Tagged pointer: low bit = external flag, remaining bits = object address.
 };
 
 /**
@@ -86,7 +108,7 @@ struct control_block
  */
 struct external_control_block : control_block
 {
-    void (*destroy)(void*){nullptr}; ///< Type-erased destructor for the owned object
+    void (*destroy)(external_control_block*){nullptr}; ///< Type-erased destructor; receives the ecb itself.
 };
 
 namespace detail {
@@ -120,29 +142,30 @@ VELK_EXPORT void dealloc_control_block(control_block* block, bool external = fal
  *
  * Called from ~RefCountedDispatch(). The block is heap-allocated (not embedded
  * in the object), so it safely outlives the destroyed object when weak_ptrs
- * still hold references.
+ * still hold references. Uses the tagged pointer to determine block type.
  *
  * @param block The control block.
  */
 inline void release_control_block(control_block& block)
 {
     if (block.release_weak()) {
-        dealloc_control_block(&block);
+        dealloc_control_block(&block, block.is_external());
     }
 }
 
 /**
- * @brief Releases one weak ref on a pooled control_block (IInterface types).
+ * @brief Releases one weak ref on a control_block for IInterface types.
  *
  * Used for both shared and weak pointer release on intrusive types, since
  * strong count management is handled by ref()/unref() on the object itself.
+ * Uses the tagged pointer to determine block type for deallocation.
  *
  * @param block The control block, or nullptr.
  */
 inline void weak_release_intrusive(control_block* block)
 {
     if (block && block->release_weak()) {
-        dealloc_control_block(block);
+        dealloc_control_block(block, block->is_external());
     }
 }
 
@@ -171,7 +194,7 @@ inline void shared_release_external(control_block* block)
     if (block) {
         auto* ecb = static_cast<external_control_block*>(block);
         if (block->release_ref()) {
-            ecb->destroy(block->ptr);
+            ecb->destroy(ecb);
         }
         if (block->release_weak()) {
             dealloc_control_block(block, true);
@@ -328,8 +351,8 @@ public:
         ptr_ = p;
         if constexpr (!is_interface) {
             auto* ecb = static_cast<external_control_block*>(detail::alloc_control_block(true));
-            ecb->ptr = p;
-            ecb->destroy = [](void* obj) { delete static_cast<T*>(obj); };
+            ecb->set_ptr(p);
+            ecb->destroy = [](external_control_block* b) { delete static_cast<T*>(b->get_ptr()); };
             block_ = ecb;
         }
     }

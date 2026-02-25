@@ -256,7 +256,8 @@ BENCHMARK(BM_ControlBlockPooled);
 static void BM_ControlBlockNewDelete(benchmark::State& state)
 {
     for (auto _ : state) {
-        auto* b = new control_block{1, 1, nullptr};
+        auto* b = new control_block;
+        b->strong.store(1, std::memory_order_relaxed);
         benchmark::DoNotOptimize(b);
         delete b;
     }

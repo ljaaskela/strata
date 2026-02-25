@@ -22,9 +22,9 @@ ILog& get_logger(const VelkInstance& instance)
     return static_cast<ILog&>(*const_cast<VelkInstance*>(&instance));
 }
 
-IInterface::Ptr VelkInstance::create(Uid uid) const
+IInterface::Ptr VelkInstance::create(Uid uid, uint32_t flags) const
 {
-    return type_registry_.create(uid);
+    return type_registry_.create(uid, flags);
 }
 
 IAny::Ptr VelkInstance::create_any(Uid type) const
@@ -32,11 +32,10 @@ IAny::Ptr VelkInstance::create_any(Uid type) const
     return interface_pointer_cast<IAny>(create(type));
 }
 
-IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, int32_t flags) const
+IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
 {
-    auto property = interface_pointer_cast<IProperty>(create(ClassId::Property));
+    auto property = interface_pointer_cast<IProperty>(create(ClassId::Property, flags));
     if (auto pi = interface_cast<IPropertyInternal>(property)) {
-        pi->set_flags(flags);
         if (value && is_compatible(value, type)) {
             if (pi->set_any(value)) {
                 return property;

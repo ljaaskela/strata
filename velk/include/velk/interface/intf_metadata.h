@@ -376,7 +376,7 @@ State& default_state()
  * static constexpr PropertyKind pk = detail::PropBind<State, &State::width>::kind;
  * @endcode
  */
-template <class State, auto Mem, int32_t Flags = 0>
+template <class State, auto Mem, uint32_t Flags = 0>
 struct PropBind
 {
     using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.

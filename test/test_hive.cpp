@@ -1,8 +1,10 @@
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/interface/hive/intf_hive_registry.h>
+#include <velk/interface/intf_metadata.h>
 
 #include <gtest/gtest.h>
+#include <vector>
 
 using namespace velk;
 
@@ -319,4 +321,102 @@ TEST_F(HiveTest, CreateHiveRegistryViaClassId)
 
     // The two registries are independent instances.
     EXPECT_NE(registry_.get(), reg2.get());
+}
+
+// --- Placement storage tests ---
+
+TEST_F(HiveTest, PageGrowth)
+{
+    // Add enough objects to trigger multiple pages (first page = 16 slots).
+    auto hive = fresh_hive();
+    std::vector<IObject::Ptr> objs;
+    for (int i = 0; i < 100; ++i) {
+        auto obj = hive->add();
+        ASSERT_TRUE(obj);
+        objs.push_back(obj);
+    }
+    EXPECT_EQ(100u, hive->size());
+
+    // All objects should be accessible via for_each.
+    int count = 0;
+    hive->for_each(&count, [](void* ctx, IObject&) -> bool {
+        ++(*static_cast<int*>(ctx));
+        return true;
+    });
+    EXPECT_EQ(100, count);
+}
+
+TEST_F(HiveTest, ZombieToFreeTransition)
+{
+    // Remove an object while an external ref exists. Verify the slot is
+    // reused after the external ref drops.
+    auto hive = fresh_hive();
+    auto obj = hive->add();
+    auto held = obj; // external ref
+
+    hive->remove(*obj);
+    obj.reset(); // drop our copy, held still alive
+    EXPECT_EQ(0u, hive->size());
+
+    // Object still alive via held.
+    EXPECT_NE(nullptr, held.get());
+
+    // Drop the last external ref. The destroy callback should free the slot.
+    held.reset();
+
+    // Add a new object. The freed slot should be reused.
+    auto obj2 = hive->add();
+    ASSERT_TRUE(obj2);
+    EXPECT_EQ(1u, hive->size());
+}
+
+TEST_F(HiveTest, FillAndEmptyPage)
+{
+    // Fill the first page (16 slots), then remove all objects.
+    auto hive = fresh_hive();
+    std::vector<IObject::Ptr> objs;
+    for (int i = 0; i < 16; ++i) {
+        objs.push_back(hive->add());
+    }
+    EXPECT_EQ(16u, hive->size());
+
+    // Remove all.
+    for (auto& o : objs) {
+        hive->remove(*o);
+    }
+    EXPECT_EQ(0u, hive->size());
+
+    // Drop all external refs.
+    objs.clear();
+
+    // Verify the hive is empty and functional.
+    EXPECT_TRUE(hive->empty());
+    auto fresh = hive->add();
+    ASSERT_TRUE(fresh);
+    EXPECT_EQ(1u, hive->size());
+}
+
+TEST_F(HiveTest, GetSelfWorksForHiveObjects)
+{
+    auto hive = fresh_hive();
+    auto obj = hive->add();
+
+    auto self = obj->get_self();
+    ASSERT_TRUE(self);
+    EXPECT_EQ(obj.get(), self.get());
+}
+
+TEST_F(HiveTest, MetadataAvailableOnHiveObjects)
+{
+    auto hive = registry_->get_hive(HiveWidget::class_id());
+    auto obj = hive->add();
+
+    auto* widget = interface_cast<IHiveWidget>(obj);
+    ASSERT_NE(nullptr, widget);
+
+    // Properties should be accessible via metadata.
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(nullptr, meta);
+    auto prop = meta->get_property("x");
+    EXPECT_TRUE(prop);
 }
