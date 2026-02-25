@@ -60,11 +60,11 @@ add_library(velk SHARED
     include/velk/ext/interface_dispatch.h
     include/velk/ext/refcounted_dispatch.h
     include/velk/interface/hive/intf_hive.h
-    include/velk/interface/hive/intf_hive_registry.h
+    include/velk/interface/hive/intf_hive_store.h
     src/plugins/hive/hive.cpp
     src/plugins/hive/hive.h
-    src/plugins/hive/hive_registry.cpp
-    src/plugins/hive/hive_registry.h
+    src/plugins/hive/hive_store.cpp
+    src/plugins/hive/hive_store.h
     src/plugins/hive/hive_plugin.h
     src/plugins/hive/hive_plugin.cpp
     )

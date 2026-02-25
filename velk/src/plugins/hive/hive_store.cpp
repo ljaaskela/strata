@@ -1,4 +1,4 @@
-#include "hive_registry.h"
+#include "hive_store.h"
 
 #include "hive.h"
 
@@ -8,7 +8,7 @@
 
 namespace velk {
 
-IHive::Ptr HiveRegistry::get_hive(Uid classUid)
+IHive::Ptr HiveStore::get_hive(Uid classUid)
 {
     HiveEntry key{classUid, {}};
     auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
@@ -33,7 +33,7 @@ IHive::Ptr HiveRegistry::get_hive(Uid classUid)
     return hive_ptr;
 }
 
-IHive::Ptr HiveRegistry::find_hive(Uid classUid) const
+IHive::Ptr HiveStore::find_hive(Uid classUid) const
 {
     HiveEntry key{classUid, {}};
     auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
@@ -43,12 +43,12 @@ IHive::Ptr HiveRegistry::find_hive(Uid classUid) const
     return {};
 }
 
-size_t HiveRegistry::hive_count() const
+size_t HiveStore::hive_count() const
 {
     return hives_.size();
 }
 
-void HiveRegistry::for_each_hive(void* context, HiveVisitorFn visitor) const
+void HiveStore::for_each_hive(void* context, HiveVisitorFn visitor) const
 {
     for (auto& entry : hives_) {
         if (!visitor(context, *entry.hive)) {

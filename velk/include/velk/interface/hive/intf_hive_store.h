@@ -1,15 +1,15 @@
-#ifndef VELK_INTF_HIVE_REGISTRY_H
-#define VELK_INTF_HIVE_REGISTRY_H
+#ifndef VELK_INTF_HIVE_STORE_H
+#define VELK_INTF_HIVE_STORE_H
 
 #include <velk/interface/hive/intf_hive.h>
 
 namespace velk {
 
 namespace ClassId {
-/** @brief Built-in plugin that provides IHiveRegistry. */
+/** @brief Built-in plugin that provides IHiveStore. */
 inline constexpr Uid HivePlugin{"c32cf115-ddb4-48c2-b683-46a02d148ec4"};
-/** @brief Registry managing hives, one per class ID. */
-inline constexpr Uid HiveRegistry{"7a383dd3-a3cf-48f2-a8ac-4da38df5bb13"};
+/** @brief Store managing hives, one per class ID. */
+inline constexpr Uid HiveStore{"7a383dd3-a3cf-48f2-a8ac-4da38df5bb13"};
 } // namespace ClassId
 
 /**
@@ -18,7 +18,7 @@ inline constexpr Uid HiveRegistry{"7a383dd3-a3cf-48f2-a8ac-4da38df5bb13"};
  * Provides lazy creation of hives (via get_hive) and lookup of existing
  * hives (via find_hive). Typically owned by HivePlugin.
  */
-class IHiveRegistry : public Interface<IHiveRegistry>
+class IHiveStore : public Interface<IHiveStore>
 {
 public:
     /** @brief Returns the hive for the given class UID, creating it if it does not exist. */
@@ -55,4 +55,4 @@ public:
 
 } // namespace velk
 
-#endif // VELK_INTF_HIVE_REGISTRY_H
+#endif // VELK_INTF_HIVE_STORE_H

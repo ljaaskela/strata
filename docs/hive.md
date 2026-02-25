@@ -24,10 +24,10 @@ Objects in a hive are full Velk objects with reference counting, metadata, and i
 The hive system is built into Velk as an internal plugin. No setup is required. Create a hive registry and start adding objects:
 
 ```cpp
-#include <velk/interface/hive/intf_hive_registry.h>
+#include <velk/interface/hive/intf_hive_store.h>
 
 auto& velk = instance();
-auto registry = velk.create<IHiveRegistry>(ClassId::HiveRegistry);
+auto registry = velk.create<IHiveStore>(ClassId::HiveStore);
 
 // Get (or create) a hive for MyWidget objects
 auto hive = registry->get_hive<MyWidget>();
@@ -38,10 +38,10 @@ auto obj = hive->add();
 
 ## Hive registry
 
-`IHiveRegistry` manages hives, one per class UID. It provides lazy creation and lookup:
+The hive registry manages hives, one per class UID. Create one via `ClassId::HiveStore` and use the `IHiveStore` interface for lazy creation and lookup:
 
 ```cpp
-auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
 
 // get_hive: returns the hive for the class, creating it if needed
 auto hive = registry->get_hive(MyWidget::class_id());

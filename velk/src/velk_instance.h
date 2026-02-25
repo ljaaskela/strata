@@ -56,14 +56,14 @@ private:
     /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
     void flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const;
 
-    TypeRegistry type_registry_;                       ///< Registry of class factories.
-    PluginRegistry plugin_registry_;                   ///< Registry of loaded plugins.
-    mutable std::mutex deferred_mutex_;                ///< Guards @c deferred_queue_.
+    LogLevel level_{LogLevel::Info};    ///< Minimum log level (before type_registry_ for init order).
+    ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
+    TypeRegistry type_registry_;        ///< Registry of class factories.
+    PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
+    mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
     mutable std::vector<DeferredPropertySet>
-        deferred_property_queue_;    ///< Property sets queued for the next update() call.
-    ILogSink::Ptr sink_;             ///< Custom log sink (empty = default stderr).
-    LogLevel level_{LogLevel::Info}; ///< Minimum log level.
+        deferred_property_queue_; ///< Property sets queued for the next update() call.
 };
 
 } // namespace velk

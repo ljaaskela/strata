@@ -33,10 +33,7 @@ protected:
     {
         return meta_ ? meta_->get_property(name) : nullptr;
     }
-    IEvent::Ptr meta_get_event(string_view name) const
-    {
-        return meta_ ? meta_->get_event(name) : nullptr;
-    }
+    IEvent::Ptr meta_get_event(string_view name) const { return meta_ ? meta_->get_event(name) : nullptr; }
     IFunction::Ptr meta_get_function(string_view name) const
     {
         return meta_ ? meta_->get_function(name) : nullptr;

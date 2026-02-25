@@ -2,15 +2,15 @@
 #define VELK_PLUGINS_HIVE_PLUGIN_H
 
 #include <velk/ext/plugin.h>
-#include <velk/interface/hive/intf_hive_registry.h>
+#include <velk/interface/hive/intf_hive_store.h>
 
 namespace velk {
 
 /**
- * @brief Built-in plugin that registers hive types (HiveRegistry, Hive).
+ * @brief Built-in plugin that registers hive types (HiveStore, Hive).
  *
- * After loading this plugin, applications can create HiveRegistry instances
- * via velk.create(ClassId::HiveRegistry).
+ * After loading this plugin, applications can create HiveStore instances
+ * via velk.create(ClassId::HiveStore).
  */
 class HivePlugin : public ext::Plugin<HivePlugin>
 {

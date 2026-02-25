@@ -6,11 +6,10 @@
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
-#include <velk/interface/hive/intf_hive_registry.h>
+#include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
 #include <benchmark/benchmark.h>
-
 #include <vector>
 
 using namespace velk;
@@ -329,7 +328,7 @@ static void BM_MemoryHive(benchmark::State& state)
     ensureRegistered();
     ensureHiveRegistered();
     instance().plugin_registry().load_plugin(ClassId::HivePlugin);
-    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
 
     for (auto _ : state) {
         auto hive = registry->get_hive<HiveData>();
@@ -368,7 +367,7 @@ static void BM_CreateHive(benchmark::State& state)
     ensureRegistered();
     ensureHiveRegistered();
     instance().plugin_registry().load_plugin(ClassId::HivePlugin);
-    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
     for (auto _ : state) {
@@ -416,7 +415,7 @@ static void BM_IterateHive(benchmark::State& state)
     ensureRegistered();
     ensureHiveRegistered();
     instance().plugin_registry().load_plugin(ClassId::HivePlugin);
-    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
     std::vector<IObject::Ptr> refs;
@@ -481,7 +480,7 @@ static void BM_IterateWriteHive(benchmark::State& state)
     ensureRegistered();
     ensureHiveRegistered();
     instance().plugin_registry().load_plugin(ClassId::HivePlugin);
-    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
     std::vector<IObject::Ptr> refs;
@@ -548,7 +547,7 @@ static void BM_ChurnHive(benchmark::State& state)
     ensureRegistered();
     ensureHiveRegistered();
     instance().plugin_registry().load_plugin(ClassId::HivePlugin);
-    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
     // Pre-populate.

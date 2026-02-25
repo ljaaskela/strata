@@ -1,6 +1,6 @@
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
-#include <velk/interface/hive/intf_hive_registry.h>
+#include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
 #include <gtest/gtest.h>
@@ -46,7 +46,7 @@ protected:
         register_type<HiveWidget>(velk_);
         register_type<HiveGadget>(velk_);
         velk_.plugin_registry().load_plugin(ClassId::HivePlugin);
-        registry_ = velk_.create<IHiveRegistry>(ClassId::HiveRegistry);
+        registry_ = velk_.create<IHiveStore>(ClassId::HiveStore);
         ASSERT_TRUE(registry_);
     }
 
@@ -61,10 +61,10 @@ protected:
     /** @brief Returns a fresh hive for HiveGadget (never used by other tests). */
     IHive::Ptr fresh_hive() { return registry_->get_hive(HiveGadget::class_id()); }
 
-    IHiveRegistry::Ptr registry_;
+    IHiveStore::Ptr registry_;
 };
 
-// --- IHiveRegistry tests ---
+// --- IHiveStore tests ---
 
 TEST_F(HiveTest, GetHiveCreatesHive)
 {
@@ -310,10 +310,10 @@ TEST_F(HiveTest, HiveIsVelkObject)
     EXPECT_FALSE(obj->get_class_name().empty());
 }
 
-TEST_F(HiveTest, CreateHiveRegistryViaClassId)
+TEST_F(HiveTest, CreateHiveStoreViaClassId)
 {
-    // Verify that a second HiveRegistry can be created independently.
-    auto reg2 = velk_.create<IHiveRegistry>(ClassId::HiveRegistry);
+    // Verify that a second HiveStore can be created independently.
+    auto reg2 = velk_.create<IHiveStore>(ClassId::HiveStore);
     ASSERT_TRUE(reg2);
 
     auto hive = reg2->get_hive(HiveWidget::class_id());
