@@ -7,7 +7,7 @@
 
 #include <tuple>
 
-namespace velk::ext {
+namespace velk::detail {
 
 /**
  * @brief Non-template base holding IMetadata pointer and delegation helpers.
@@ -48,6 +48,10 @@ protected:
     IMetadata* meta_{};
 };
 
+} // namespace velk::detail
+
+namespace velk::ext {
+
 /**
  * @brief CRTP base for Velk objects with metadata.
  *
@@ -58,7 +62,8 @@ protected:
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template <class FinalClass, class... Interfaces>
-class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>, protected ObjectMetadataBase
+class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>,
+               protected detail::ObjectMetadataBase
 {
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
