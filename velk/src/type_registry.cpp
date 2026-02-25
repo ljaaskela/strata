@@ -2,7 +2,6 @@
 
 #include "function.h"
 #include "future.h"
-#include "metadata_container.h"
 #include "property.h"
 
 #include <velk/ext/any.h>
@@ -75,13 +74,7 @@ ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
 IInterface::Ptr TypeRegistry::create(Uid uid, uint32_t flags) const
 {
     if (auto* factory = find(uid)) {
-        if (auto object = factory->create_instance(flags)) {
-            if (auto* meta = interface_cast<IMetadataContainer>(object)) {
-                auto& info = factory->get_class_info();
-                meta->set_metadata_container(new MetadataContainer(info.members, object.get()));
-            }
-            return object;
-        }
+        return factory->create_instance(flags);
     }
     return {};
 }

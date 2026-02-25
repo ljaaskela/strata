@@ -35,6 +35,7 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
+    IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
     IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const override;
     IAny::Ptr create_any(Uid type) const override;
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const override;

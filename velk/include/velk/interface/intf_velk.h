@@ -15,6 +15,8 @@
 
 namespace velk {
 
+class IMetadata;
+
 /** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
 struct DeferredArgs : public ::velk::NoCopyMove
 {
@@ -113,6 +115,9 @@ public:
      * @param time Current time in microseconds. If zero, the system clock is used.
      */
     virtual void update(Duration time = {}) const = 0;
+
+    /** @brief Creates a MetadataContainer for the given class info and owner. */
+    virtual IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const = 0;
 
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const = 0;

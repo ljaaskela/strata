@@ -1,6 +1,7 @@
 #include "velk_instance.h"
 
 #include "function.h"
+#include "metadata_container.h"
 #include "plugins/hive/hive_plugin.h"
 
 #include <velk/interface/types.h>
@@ -20,6 +21,11 @@ VelkInstance::~VelkInstance()
 ILog& get_logger(const VelkInstance& instance)
 {
     return static_cast<ILog&>(*const_cast<VelkInstance*>(&instance));
+}
+
+IMetadata* VelkInstance::create_metadata_container(const ClassInfo& info, IInterface* owner) const
+{
+    return new MetadataContainer(info.members, owner);
 }
 
 IInterface::Ptr VelkInstance::create(Uid uid, uint32_t flags) const

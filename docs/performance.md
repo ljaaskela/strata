@@ -193,10 +193,10 @@ An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The
 
 ### Example: Minimal object with 1 member
 
-A minimal object implements a single interface with one property. `ext::Object` adds `IMetadataContainer`, giving 3 interfaces in the dispatch pack (IObject, IMetadataContainer, IToggle).
+A minimal object implements a single interface with one property. `ext::Object` adds `IMetadata`, giving 3 interfaces in the dispatch pack (IObject, IMetadata, IToggle). The MetadataContainer is allocated lazily on first runtime metadata access.
 
 ```
-Toggle (96 bytes)                           MetadataContainer (72 bytes, heap)
+Toggle (96 bytes)                           MetadataContainer (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               64  │      │ base (InterfaceDispatch)   16  │
 │   (3 vptrs + MI padding)         │      │ members_ (array_view)      16  │
@@ -208,14 +208,14 @@ Toggle (96 bytes)                           MetadataContainer (72 bytes, heap)
 └──────────────────────────────────┘
 ```
 
-With no members accessed, the total footprint is **168 bytes** (96 object + 72 MetadataContainer). Accessing the one property adds 24 bytes to the `instances_` vector, bringing the total to **192 bytes**.
+With no members accessed, the MetadataContainer is not allocated. The total footprint is **96 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **192 bytes**.
 
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (IObject, IMetadataContainer, IMyWidget, ISerializable).
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata, totaling 4 interfaces in the dispatch pack (IObject, IMetadata, IMyWidget, ISerializable). The MetadataContainer is allocated lazily on first runtime metadata access.
 
 ```
-MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
+MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               88  │      │ base (InterfaceDispatch)   16  │
 │   (4 vptrs + MI padding)         │      │ members_ (array_view)      16  │
@@ -237,9 +237,9 @@ Member instances are created lazily, only when first accessed via `get_property(
 
 | Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| Toggle, no members accessed | 96 | 72 | 0 | **168 bytes** |
+| Toggle, no members accessed | 96 | 0 (lazy) | 0 | **96 bytes** |
 | Toggle, 1 member accessed | 96 | 72 | 1 × 24 = 24 | **192 bytes** |
-| MyWidget, no members accessed | 152 | 72 | 0 | **224 bytes** |
+| MyWidget, no members accessed | 152 | 0 (lazy) | 0 | **152 bytes** |
 | MyWidget, 3 members accessed | 152 | 72 | 3 × 24 = 72 | **296 bytes** |
 | MyWidget, all 6 members accessed | 152 | 72 | 6 × 24 = 144 | **368 bytes** |
 
@@ -262,7 +262,7 @@ Measured ObjectCore sizes (MSVC x64):
 | Configuration | Interfaces | Size |
 |---|---|---|
 | `ext::ObjectCore<X, I>` (1 extra interface) | 2 (IObject + I) | **56 bytes** |
-| `ext::ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>` | 4 | **104 bytes** |
+| `ext::ObjectCore<X, IMetadata, IMyWidget, ISerializable>` | 4 | **104 bytes** |
 
 ### Base types
 

@@ -1,7 +1,5 @@
 #include "hive.h"
 
-#include "../../metadata_container.h"
-
 #include <velk/api/velk.h>
 #include <velk/interface/intf_metadata.h>
 
@@ -324,12 +322,6 @@ IObject::Ptr Hive::add()
 
     // Store the HCB pointer in the page's per-slot array.
     target->blocks[slot_idx] = hcb;
-
-    // Set up metadata (mirrors TypeRegistry::create).
-    if (auto* meta = interface_cast<IMetadataContainer>(obj)) {
-        auto& info = factory_->get_class_info();
-        meta->set_metadata_container(new MetadataContainer(info.members, obj));
-    }
 
     // The hive owns one strong ref (keeps the object alive while in the hive).
     // The returned shared_ptr will acquire a second strong ref via adopt_ref + ref().
