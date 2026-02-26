@@ -8,6 +8,7 @@
 #include <new>
 
 #ifdef _WIN32
+#include <intrin.h>
 #include <malloc.h>
 #endif
 
@@ -38,6 +39,23 @@ size_t align_up(size_t size, size_t alignment)
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
+/** @brief Returns the index of the lowest set bit, or 64 if none. */
+inline unsigned bitscan_forward64(uint64_t mask)
+{
+#ifdef _WIN32
+    unsigned long idx;
+    if (_BitScanForward64(&idx, mask)) {
+        return static_cast<unsigned>(idx);
+    }
+    return 64;
+#else
+    if (mask == 0) {
+        return 64;
+    }
+    return static_cast<unsigned>(__builtin_ctzll(mask));
+#endif
+}
+
 } // anonymous namespace
 
 /**
@@ -45,7 +63,8 @@ size_t align_up(size_t size, size_t alignment)
  *
  * Stores only the ECB and a back-pointer to the page. The slot index
  * is recovered from the object address; factory and slot_size live on
- * the page.
+ * the page. These are embedded in the page allocation (not individually
+ * heap-allocated).
  */
 struct HiveControlBlock
 {
@@ -79,31 +98,58 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
     // -> release_weak(). Our bump keeps the block alive through the destructor.
     hcb->ecb.add_weak();
 
-    // Clear the external tag so that if outstanding weak_ptrs eventually release
-    // this block, dealloc_control_block uses the regular (non-external) path.
-    // This is safe: HiveControlBlock's trivial destructor means delete via
-    // control_block* works correctly (the heap tracks the actual allocation size).
-    hcb->ecb.set_ptr(hcb->ecb.get_ptr());
-
     factory->destroy_in_place(slot);
 
     // The destructor decremented weak by 1. Our bump kept the block alive.
-    // Now release our extra weak. If it's the last, we own the block and delete it.
-    if (hcb->ecb.release_weak()) {
-        delete hcb;
-    }
-    // else: outstanding weak_ptrs will dealloc via the regular path.
+    // Now release our extra weak. For embedded blocks, dealloc_control_block
+    // will see the embedded tag and skip deletion. If external+embedded,
+    // it calls ecb->destroy as a weak dealloc notification.
+    bool last_weak = hcb->ecb.release_weak();
 
-    // Transition slot to Free.
-    page->state[slot_index] = SlotState::Free;
-    page->blocks[slot_index] = nullptr;
     if (!orphan) {
+        // Normal mode: block stays embedded in the page. If outstanding
+        // weak_ptrs exist, set the destroy callback to hive_weak_release
+        // so the page can track when they all drop.
+        if (!last_weak) {
+            // Outstanding weak_ptrs. Set destroy to the weak release callback
+            // so dealloc_control_block (called when last weak_ptr drops) will
+            // notify the page. The external+embedded tags are already set.
+            // No weak_hcb_count tracking needed in normal mode because the
+            // page is still owned by the Hive.
+            hcb->ecb.destroy = nullptr;
+        }
+        // else: no outstanding weak_ptrs, block is fully dead. It sits inert
+        // in the page allocation, ready for reuse.
+
+        // Clear active bit and transition slot to Free.
+        size_t word = slot_index / 64;
+        size_t bit = slot_index % 64;
+        page->active_bits[word] &= ~(uint64_t(1) << bit);
+
+        page->state[slot_index] = SlotState::Free;
         std::memcpy(slot, &page->free_head, sizeof(size_t));
         page->free_head = slot_index;
+    } else {
+        // Orphan mode: page was detached from the Hive.
+        if (!last_weak) {
+            // Outstanding weak_ptrs. We need to track this so the page can
+            // be freed when all weak_ptrs drop.
+            hcb->ecb.destroy = [](external_control_block* ecb) {
+                auto* h = reinterpret_cast<HiveControlBlock*>(ecb);
+                HivePage* p = h->page;
+                if (p->weak_hcb_count.fetch_sub(1, std::memory_order_acq_rel) == 1 && p->live_count == 0) {
+                    aligned_free_impl(p->allocation);
+                    delete p;
+                }
+            };
+            page->weak_hcb_count.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        page->state[slot_index] = SlotState::Free;
     }
     --page->live_count;
 
-    if (orphan && page->live_count == 0) {
+    if (orphan && page->live_count == 0 && page->weak_hcb_count.load(std::memory_order_acquire) == 0) {
         aligned_free_impl(page->allocation);
         delete page;
     }
@@ -111,12 +157,12 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
 
 static void hive_destroy(external_control_block* ecb)
 {
-    hive_destroy_impl(static_cast<HiveControlBlock*>(static_cast<void*>(ecb)), false);
+    hive_destroy_impl(reinterpret_cast<HiveControlBlock*>(ecb), false);
 }
 
 static void hive_destroy_orphan(external_control_block* ecb)
 {
-    hive_destroy_impl(static_cast<HiveControlBlock*>(static_cast<void*>(ecb)), true);
+    hive_destroy_impl(reinterpret_cast<HiveControlBlock*>(ecb), true);
 }
 
 // --- Hive implementation ---
@@ -125,16 +171,26 @@ Hive::~Hive()
 {
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
+        size_t num_words = bitmask_words(page.capacity);
+
         // First pass: release the hive's strong ref on all Active objects.
-        for (size_t i = 0; i < page.capacity; ++i) {
-            if (page.state[i] == SlotState::Active) {
+        // Use the bitmask for fast scanning.
+        for (size_t w = 0; w < num_words; ++w) {
+            uint64_t bits = page.active_bits[w];
+            while (bits) {
+                unsigned bit = bitscan_forward64(bits);
+                size_t i = w * 64 + bit;
+                bits &= bits - 1; // clear lowest set bit
+
+                // Clear active bit
+                page.active_bits[w] &= ~(uint64_t(1) << bit);
                 page.state[i] = SlotState::Zombie;
                 auto* obj = static_cast<IObject*>(slot_ptr(page, i));
                 obj->unref(); // Release hive's strong ref
             }
         }
 
-        // Second pass: check if any zombies remain (external refs still alive).
+        // Second pass: check if any zombies or outstanding weak HCBs remain.
         bool has_zombies = false;
         for (size_t i = 0; i < page.capacity; ++i) {
             if (page.state[i] == SlotState::Zombie) {
@@ -143,16 +199,17 @@ Hive::~Hive()
             }
         }
 
-        if (has_zombies) {
-            // Transfer page ownership to an orphan. The orphan destroy callback
-            // will free the page when the last zombie is destroyed.
+        bool has_weak_hcbs = page.weak_hcb_count.load(std::memory_order_acquire) > 0;
+
+        if (has_zombies || has_weak_hcbs) {
+            // Transfer page ownership to an orphan.
+            page.orphaned = true;
             for (size_t i = 0; i < page.capacity; ++i) {
                 if (page.state[i] == SlotState::Zombie) {
-                    page.blocks[i]->ecb.destroy = hive_destroy_orphan;
+                    page.hcbs[i].ecb.destroy = hive_destroy_orphan;
                 }
             }
-            // Release unique_ptr ownership — the page now lives until the
-            // last orphan destroy callback frees it.
+            // Release unique_ptr ownership.
             page_ptr.release();
         } else {
             free_page(page);
@@ -202,24 +259,30 @@ void Hive::alloc_page(size_t capacity)
     page->slot_size = slot_size_;
     page->factory = factory_;
 
-    // Compute layout: [ SlotState[capacity] | padding | HCB*[capacity] | padding | slots ]
+    size_t num_words = bitmask_words(capacity);
+
+    // Compute layout:
+    // [ SlotState[capacity] | pad | uint64_t[bitmask] | pad | HiveControlBlock[capacity] | pad | slots ]
     size_t state_bytes = capacity * sizeof(SlotState);
-    size_t blocks_offset = align_up(state_bytes, alignof(HiveControlBlock*));
-    size_t blocks_bytes = capacity * sizeof(HiveControlBlock*);
-    size_t slots_offset = align_up(blocks_offset + blocks_bytes, slot_alignment_);
+    size_t bits_offset = align_up(state_bytes, alignof(uint64_t));
+    size_t bits_bytes = num_words * sizeof(uint64_t);
+    size_t hcbs_offset = align_up(bits_offset + bits_bytes, alignof(HiveControlBlock));
+    size_t hcbs_bytes = capacity * sizeof(HiveControlBlock);
+    size_t slots_offset = align_up(hcbs_offset + hcbs_bytes, slot_alignment_);
     size_t slots_bytes = capacity * slot_size_;
     size_t total = slots_offset + slots_bytes;
 
     auto* mem = static_cast<char*>(aligned_alloc_impl(slot_alignment_, total));
     page->allocation = mem;
     page->state = reinterpret_cast<SlotState*>(mem);
-    page->blocks = reinterpret_cast<HiveControlBlock**>(mem + blocks_offset);
+    page->active_bits = reinterpret_cast<uint64_t*>(mem + bits_offset);
+    page->hcbs = reinterpret_cast<HiveControlBlock*>(mem + hcbs_offset);
     page->slots = mem + slots_offset;
 
     for (size_t i = 0; i < capacity; ++i) {
         page->state[i] = SlotState::Free;
     }
-    std::memset(page->blocks, 0, blocks_bytes);
+    std::memset(page->active_bits, 0, bits_bytes);
 
     // Build intrusive freelist through slot memory.
     for (size_t i = 0; i < capacity - 1; ++i) {
@@ -240,7 +303,8 @@ void Hive::free_page(HivePage& page)
     aligned_free_impl(page.allocation);
     page.allocation = nullptr;
     page.state = nullptr;
-    page.blocks = nullptr;
+    page.active_bits = nullptr;
+    page.hcbs = nullptr;
     page.slots = nullptr;
 }
 
@@ -320,12 +384,17 @@ IObject::Ptr Hive::add()
     target->state[slot_idx] = SlotState::Active;
     ++target->live_count;
 
-    // Prepare the HiveControlBlock before construction so the object is
-    // born with the correct block (no post-construction swap needed).
-    auto* hcb = new HiveControlBlock{};
+    // Set active bit.
+    size_t word = slot_idx / 64;
+    size_t bit = slot_idx % 64;
+    target->active_bits[word] |= uint64_t(1) << bit;
+
+    // Initialize the embedded HiveControlBlock (no heap allocation).
+    auto* hcb = &target->hcbs[slot_idx];
     hcb->ecb.strong.store(1, std::memory_order_relaxed);
     hcb->ecb.weak.store(1, std::memory_order_relaxed);
     hcb->ecb.destroy = hive_destroy;
+    hcb->ecb.set_ptr(nullptr);
     hcb->page = target;
 
     // Placement-construct the object, installing the hive's control block.
@@ -333,12 +402,10 @@ IObject::Ptr Hive::add()
     void* slot = slot_ptr(*target, slot_idx);
     auto* obj = factory_->construct_in_place(slot, &hcb->ecb, ObjectFlags::HiveManaged);
 
-    // Set the self-pointer and external tag on the block.
+    // Set the self-pointer and external + embedded tags on the block.
     hcb->ecb.set_ptr(static_cast<void*>(obj));
     hcb->ecb.set_external_tag();
-
-    // Store the HCB pointer in the page's per-slot array.
-    target->blocks[slot_idx] = hcb;
+    hcb->ecb.set_embedded_tag();
 
     // The hive owns one strong ref (keeps the object alive while in the hive).
     // The returned shared_ptr will acquire a second strong ref via adopt_ref + ref().
@@ -355,6 +422,11 @@ ReturnValue Hive::remove(IObject& object)
     if (!find_slot(&object, page_idx, slot_idx)) {
         return ReturnValue::Fail;
     }
+
+    // Clear active bit before transitioning to Zombie.
+    size_t word = slot_idx / 64;
+    size_t bit = slot_idx % 64;
+    pages_[page_idx]->active_bits[word] &= ~(uint64_t(1) << bit);
 
     // Transition Active -> Zombie. The object stays alive until external refs drop.
     // When the last strong ref drops, unref() calls hive_destroy which transitions
@@ -379,8 +451,19 @@ void Hive::for_each(void* context, VisitorFn visitor) const
 {
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
-        for (size_t i = 0; i < page.capacity; ++i) {
-            if (page.state[i] == SlotState::Active) {
+        size_t num_words = bitmask_words(page.capacity);
+        for (size_t w = 0; w < num_words; ++w) {
+            uint64_t bits = page.active_bits[w];
+            while (bits) {
+                unsigned b = bitscan_forward64(bits);
+                bits &= bits - 1; // clear lowest set bit
+                size_t i = w * 64 + b;
+                // Re-check the live bit: a visitor callback may have triggered
+                // hive_destroy (via unref) which clears the bit for a slot in
+                // this same word.
+                if (!(page.active_bits[w] & (uint64_t(1) << b))) {
+                    continue;
+                }
                 auto* obj = static_cast<IObject*>(slot_ptr(page, i));
                 if (!visitor(context, *obj)) {
                     return;

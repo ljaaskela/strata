@@ -30,6 +30,14 @@ namespace velk {
  */
 struct control_block
 {
+    /// Pointer tag bits (stored in the low bits of ptr_, safe because pointers are 8-byte aligned).
+    ///  bit 0 (external): block is an external_control_block with a destroy function pointer.
+    ///  bit 1 (embedded): block lives inside a larger allocation (e.g. a hive page) and must
+    ///                     not be individually deleted or returned to the pool.
+    static constexpr uintptr_t tag_external = 1;
+    static constexpr uintptr_t tag_embedded = 2;
+    static constexpr uintptr_t tag_mask = tag_external | tag_embedded;
+
     std::atomic<int32_t> strong{0};
     std::atomic<int32_t> weak{1}; ///< 1 = "strong group exists"
 
@@ -68,24 +76,34 @@ struct control_block
         return false;
     }
 
-    /** @brief Sets the stored pointer. Asserts that the value is aligned (low bit clear). */
+    /** @brief Sets the stored pointer. Asserts that the value is aligned (tag bits clear). */
     void set_ptr(void* p)
     {
-        assert((reinterpret_cast<uintptr_t>(p) & 1) == 0 && "control_block::set_ptr: unaligned pointer");
+        assert((reinterpret_cast<uintptr_t>(p) & tag_mask) == 0 &&
+               "control_block::set_ptr: unaligned pointer");
         ptr_ = p;
     }
 
-    /** @brief Returns the stored pointer with the external tag bit masked off. */
-    void* get_ptr() const
+    /** @brief Returns the stored pointer with tag bits masked off. */
+    void* get_ptr() const { return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) & ~tag_mask); }
+
+    /** @brief Sets the external tag. Preserves other tags. */
+    void set_external_tag()
     {
-        return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) & ~uintptr_t(1));
+        ptr_ = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) | tag_external);
     }
 
-    /** @brief Tags the ptr low bit to mark this as an external control block. */
-    void set_external_tag() { ptr_ = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) | 1); }
+    /** @brief Returns true if the external tag is set. */
+    bool is_external() const { return reinterpret_cast<uintptr_t>(ptr_) & tag_external; }
 
-    /** @brief Returns true if the ptr low bit is set (external block). */
-    bool is_external() const { return reinterpret_cast<uintptr_t>(ptr_) & 1; }
+    /** @brief Sets the embedded tag. Preserves other tags. */
+    void set_embedded_tag()
+    {
+        ptr_ = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr_) | tag_embedded);
+    }
+
+    /** @brief Returns true if the embedded tag is set. */
+    bool is_embedded() const { return reinterpret_cast<uintptr_t>(ptr_) & tag_embedded; }
 
     /** @brief Increments the weak count (relaxed). */
     void add_weak() { weak.fetch_add(1, std::memory_order_relaxed); }
@@ -97,7 +115,7 @@ struct control_block
     bool release_weak() { return weak.fetch_sub(1, std::memory_order_acq_rel) == 1; }
 
 private:
-    void* ptr_{nullptr}; ///< Tagged pointer: low bit = external flag, remaining bits = object address.
+    void* ptr_{nullptr}; ///< Tagged pointer: bit 0 = external, bit 1 = embedded, bits 2+ = object address.
 };
 
 /**

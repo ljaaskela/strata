@@ -5,6 +5,7 @@
 #include <velk/interface/hive/intf_hive.h>
 #include <velk/interface/intf_object_factory.h>
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -24,15 +25,18 @@ struct HiveControlBlock;
 
 struct HivePage
 {
-    void* allocation{nullptr};          ///< Single aligned allocation for state+blocks+slots.
-    SlotState* state{nullptr};          ///< Per-slot state array (points into allocation).
-    HiveControlBlock** blocks{nullptr}; ///< Per-slot HiveControlBlock pointer array (points into allocation).
-    void* slots{nullptr};               ///< Aligned contiguous slot memory (points into allocation).
-    size_t capacity{0};                 ///< Total slots in page.
-    size_t free_head{HIVE_SENTINEL};    ///< Intrusive freelist head.
-    size_t live_count{0};               ///< Active + Zombie count.
-    size_t slot_size{0};                ///< Aligned slot size in bytes.
+    void* allocation{nullptr};              ///< Single aligned allocation for all arrays + slots.
+    SlotState* state{nullptr};              ///< Per-slot state array (points into allocation).
+    uint64_t* active_bits{nullptr};         ///< Bitmask: 1 bit per slot, set = Active.
+    HiveControlBlock* hcbs{nullptr};        ///< Contiguous HCB array (embedded, points into allocation).
+    void* slots{nullptr};                   ///< Aligned contiguous slot memory (points into allocation).
+    size_t capacity{0};                     ///< Total slots in page.
+    size_t free_head{HIVE_SENTINEL};        ///< Intrusive freelist head.
+    size_t live_count{0};                   ///< Active + Zombie count.
+    size_t slot_size{0};                    ///< Aligned slot size in bytes.
     const IObjectFactory* factory{nullptr}; ///< Factory for objects in this page.
+    std::atomic<size_t> weak_hcb_count{0};  ///< Embedded HCBs with outstanding weak_ptrs (orphan tracking).
+    bool orphaned{false};                   ///< Page detached from Hive (destructor ran).
 };
 
 /**
@@ -83,12 +87,15 @@ private:
     /** @brief Finds the page and slot index for a given object pointer. Returns false if not found. */
     bool find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const;
 
+    /** @brief Number of uint64_t words needed for a bitmask covering @p capacity slots. */
+    static size_t bitmask_words(size_t capacity) { return (capacity + 63) / 64; }
+
     Uid element_class_uid_;
     const IObjectFactory* factory_{nullptr};
     size_t slot_size_{0};
     size_t slot_alignment_{0};
     size_t live_count_{0};
-    HivePage* current_page_{nullptr};   ///< Hint: last page with free slots.
+    HivePage* current_page_{nullptr}; ///< Hint: last page with free slots.
     std::vector<std::unique_ptr<HivePage>> pages_;
 };
 

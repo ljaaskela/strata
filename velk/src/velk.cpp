@@ -283,6 +283,19 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
 
 VELK_EXPORT void detail::dealloc_control_block(control_block* block, bool external)
 {
+    // Embedded blocks live inside a larger allocation and must not be deleted or pooled.
+    // When external+embedded, call the destroy callback as a "weak dealloc" notification
+    // so the owning container (e.g. Hive) can track outstanding weak references.
+    if (block->is_embedded()) {
+        if (external) {
+            auto* ecb = static_cast<external_control_block*>(block);
+            if (ecb->destroy) {
+                ecb->destroy(ecb);
+            }
+        }
+        return;
+    }
+
     if (external) {
         auto* pool = get_pool_ptr();
         if (!pool || pool->ext_size >= block_pool_max_size) {
@@ -320,6 +333,16 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
 
 VELK_EXPORT void detail::dealloc_control_block(control_block* block, bool external)
 {
+    if (block->is_embedded()) {
+        if (external) {
+            auto* ecb = static_cast<external_control_block*>(block);
+            if (ecb->destroy) {
+                ecb->destroy(ecb);
+            }
+        }
+        return;
+    }
+
     if (external) {
         delete static_cast<external_control_block*>(block);
     } else {
