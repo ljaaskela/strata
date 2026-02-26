@@ -24,12 +24,15 @@ struct HiveControlBlock;
 
 struct HivePage
 {
-    void* slots{nullptr};               ///< Aligned contiguous slot memory.
-    SlotState* state{nullptr};          ///< Per-slot state array.
-    HiveControlBlock** blocks{nullptr}; ///< Per-slot HiveControlBlock pointer array.
+    void* allocation{nullptr};          ///< Single aligned allocation for state+blocks+slots.
+    SlotState* state{nullptr};          ///< Per-slot state array (points into allocation).
+    HiveControlBlock** blocks{nullptr}; ///< Per-slot HiveControlBlock pointer array (points into allocation).
+    void* slots{nullptr};               ///< Aligned contiguous slot memory (points into allocation).
     size_t capacity{0};                 ///< Total slots in page.
     size_t free_head{HIVE_SENTINEL};    ///< Intrusive freelist head.
     size_t live_count{0};               ///< Active + Zombie count.
+    size_t slot_size{0};                ///< Aligned slot size in bytes.
+    const IObjectFactory* factory{nullptr}; ///< Factory for objects in this page.
 };
 
 /**
@@ -85,6 +88,7 @@ private:
     size_t slot_size_{0};
     size_t slot_alignment_{0};
     size_t live_count_{0};
+    HivePage* current_page_{nullptr};   ///< Hint: last page with free slots.
     std::vector<std::unique_ptr<HivePage>> pages_;
 };
 

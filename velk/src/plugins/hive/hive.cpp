@@ -43,16 +43,14 @@ size_t align_up(size_t size, size_t alignment)
 /**
  * @brief Extended control block for hive-managed objects.
  *
- * Embeds the page/slot context needed by the destroy callback so that
- * the slot can be reclaimed when the last strong reference drops.
+ * Stores only the ECB and a back-pointer to the page. The slot index
+ * is recovered from the object address; factory and slot_size live on
+ * the page.
  */
 struct HiveControlBlock
 {
     external_control_block ecb;
     HivePage* page;
-    size_t slot_index;
-    const IObjectFactory* factory;
-    size_t slot_size;
 };
 
 /**
@@ -66,9 +64,14 @@ struct HiveControlBlock
 static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
 {
     HivePage* page = hcb->page;
-    size_t slot_index = hcb->slot_index;
-    size_t slot_sz = hcb->slot_size;
-    const IObjectFactory* factory = hcb->factory;
+    size_t slot_sz = page->slot_size;
+    const IObjectFactory* factory = page->factory;
+
+    // Recover slot index from the object address.
+    auto obj_addr = reinterpret_cast<uintptr_t>(hcb->ecb.get_ptr());
+    auto base_addr = reinterpret_cast<uintptr_t>(page->slots);
+    size_t slot_index = static_cast<size_t>(obj_addr - base_addr) / slot_sz;
+
     auto* slot = static_cast<char*>(page->slots) + slot_index * slot_sz;
 
     // Prevent the block from being freed during the destructor chain.
@@ -101,9 +104,7 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
     --page->live_count;
 
     if (orphan && page->live_count == 0) {
-        delete[] page->state;
-        delete[] page->blocks;
-        aligned_free_impl(page->slots);
+        aligned_free_impl(page->allocation);
         delete page;
     }
 }
@@ -198,14 +199,27 @@ void Hive::alloc_page(size_t capacity)
 {
     auto page = std::make_unique<HivePage>();
     page->capacity = capacity;
-    size_t total = align_up(capacity * slot_size_, slot_alignment_);
-    page->slots = aligned_alloc_impl(slot_alignment_, total);
-    page->state = new SlotState[capacity];
-    page->blocks = new HiveControlBlock*[capacity]();
+    page->slot_size = slot_size_;
+    page->factory = factory_;
+
+    // Compute layout: [ SlotState[capacity] | padding | HCB*[capacity] | padding | slots ]
+    size_t state_bytes = capacity * sizeof(SlotState);
+    size_t blocks_offset = align_up(state_bytes, alignof(HiveControlBlock*));
+    size_t blocks_bytes = capacity * sizeof(HiveControlBlock*);
+    size_t slots_offset = align_up(blocks_offset + blocks_bytes, slot_alignment_);
+    size_t slots_bytes = capacity * slot_size_;
+    size_t total = slots_offset + slots_bytes;
+
+    auto* mem = static_cast<char*>(aligned_alloc_impl(slot_alignment_, total));
+    page->allocation = mem;
+    page->state = reinterpret_cast<SlotState*>(mem);
+    page->blocks = reinterpret_cast<HiveControlBlock**>(mem + blocks_offset);
+    page->slots = mem + slots_offset;
 
     for (size_t i = 0; i < capacity; ++i) {
         page->state[i] = SlotState::Free;
     }
+    std::memset(page->blocks, 0, blocks_bytes);
 
     // Build intrusive freelist through slot memory.
     for (size_t i = 0; i < capacity - 1; ++i) {
@@ -217,16 +231,16 @@ void Hive::alloc_page(size_t capacity)
     page->free_head = 0;
     page->live_count = 0;
 
+    current_page_ = page.get();
     pages_.push_back(std::move(page));
 }
 
 void Hive::free_page(HivePage& page)
 {
-    delete[] page.state;
+    aligned_free_impl(page.allocation);
+    page.allocation = nullptr;
     page.state = nullptr;
-    delete[] page.blocks;
     page.blocks = nullptr;
-    aligned_free_impl(page.slots);
     page.slots = nullptr;
 }
 
@@ -278,12 +292,16 @@ IObject::Ptr Hive::add()
         return {};
     }
 
-    // Find a page with free slots.
+    // Check cached page hint first, then scan.
     HivePage* target = nullptr;
-    for (auto& page_ptr : pages_) {
-        if (page_ptr->free_head != HIVE_SENTINEL) {
-            target = page_ptr.get();
-            break;
+    if (current_page_ && current_page_->free_head != HIVE_SENTINEL) {
+        target = current_page_;
+    } else {
+        for (auto& page_ptr : pages_) {
+            if (page_ptr->free_head != HIVE_SENTINEL) {
+                target = page_ptr.get();
+                break;
+            }
         }
     }
 
@@ -291,6 +309,8 @@ IObject::Ptr Hive::add()
         alloc_page(next_page_capacity());
         target = pages_.back().get();
     }
+
+    current_page_ = target;
 
     // Pop slot from freelist.
     size_t slot_idx = target->free_head;
@@ -307,9 +327,6 @@ IObject::Ptr Hive::add()
     hcb->ecb.weak.store(1, std::memory_order_relaxed);
     hcb->ecb.destroy = hive_destroy;
     hcb->page = target;
-    hcb->slot_index = slot_idx;
-    hcb->factory = factory_;
-    hcb->slot_size = slot_size_;
 
     // Placement-construct the object, installing the hive's control block.
     // The factory swaps in our block and returns the auto-allocated one to the pool.
