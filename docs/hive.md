@@ -254,11 +254,12 @@ Slot reuse is LIFO within a page: the most recently freed slot is the next one a
 
 ## Performance
 
-The tables below compare three configurations using 512 objects with 10 members (5 floats + 5 ints):
+The tables below compare four configurations using 512 objects with 10 members (5 floats + 5 ints):
 
 1. **Plain struct** -- `std::vector<PlainData>` (a class with constructor-initialized members, 40 bytes).
-2. **Velk vector** -- `std::vector<IObject::Ptr>` of individually heap-allocated Velk objects.
-3. **Hive** -- Velk objects stored contiguously in a hive.
+2. **Heap object** -- `std::vector<unique_ptr<HeapBase>>` of individually heap-allocated objects with a virtual base class and virtual destructor (a more typical OOP pattern).
+3. **Velk vector** -- `std::vector<IObject::Ptr>` of individually heap-allocated Velk objects.
+4. **Hive** -- Velk objects stored contiguously in a hive.
 
 Both Velk benchmarks use `get_property_state<T>()` for direct state access. The "Hive state" row uses `for_each_hive<T>()` which pre-computes the state offset once and avoids per-element `interface_cast`. No metadata containers are allocated (lazy init is never triggered).
 
@@ -277,42 +278,48 @@ The per-object overhead (88 bytes) covers the MI base layout (vtable pointers), 
 
 | | Time | Ratio |
 |---|---|---|
-| `vector<PlainData>(512)` | ~632 ns | 1x |
-| Hive `add()` x 512 | ~9,137 ns | ~14x |
-| Velk vector `create()` x 512 | ~37,772 ns | ~60x |
+| `vector<PlainData>(512)` | ~571 ns | 1x |
+| Heap object `make_unique` x 512 | ~16,445 ns | ~29x |
+| Hive `add()` x 512 | ~9,193 ns | ~16x |
+| Velk vector `create()` x 512 | ~39,022 ns | ~68x |
 
-The hive is roughly 4x faster than individual heap allocation because it uses placement-new into pre-allocated pages and embeds control blocks directly in the page allocation, eliminating all per-object heap allocations.
+The hive is roughly 1.8x faster than plain heap-allocated objects and 4x faster than Velk heap allocation because it uses placement-new into pre-allocated pages and embeds control blocks directly in the page allocation, eliminating all per-object heap allocations.
 
 ### Iteration: read all 10 fields (512 items)
 
 | | Time | Ratio |
 |---|---|---|
-| Plain vector | ~645 ns | 1x |
-| Hive state (`for_each_hive`) | ~2,298 ns | ~3.6x |
-| Hive + `interface_cast` | ~3,665 ns | ~5.7x |
-| Velk vector + `get_property_state` | ~4,829 ns | ~7.5x |
+| Plain vector | ~654 ns | 1x |
+| Heap object vector | ~757 ns | ~1.2x |
+| Hive state (`for_each_hive`) | ~2,317 ns | ~3.5x |
+| Hive + `interface_cast` | ~3,675 ns | ~5.6x |
+| Velk vector + `get_property_state` | ~4,854 ns | ~7.4x |
 
 ### Iteration: write all 10 fields (512 items)
 
 | | Time | Ratio |
 |---|---|---|
-| Plain vector | ~652 ns | 1x |
-| Hive state (`for_each_hive`) | ~2,355 ns | ~3.6x |
-| Hive + `interface_cast` | ~3,830 ns | ~5.9x |
-| Velk vector + `get_property_state` | ~4,838 ns | ~7.4x |
+| Plain vector | ~762 ns | 1x |
+| Heap object vector | ~656 ns | ~0.9x |
+| Hive state (`for_each_hive`) | ~2,365 ns | ~3.1x |
+| Hive + `interface_cast` | ~4,013 ns | ~5.3x |
+| Velk vector + `get_property_state` | ~4,908 ns | ~6.4x |
 
-The hive's contiguous page layout gives it ~1.3x better iteration performance than a vector of individually heap-allocated objects. Using `for_each_hive<T>()` adds another ~40% speedup on top by eliminating per-element `interface_cast` (~8 ns) and virtual `get_property_state()` (~2 ns) calls; the state offset is computed once and applied via pointer arithmetic. Both iteration paths use prefetching to load the next active slot's cache line before calling the visitor, and a per-page active bitmask (`uint64_t` words scanned with `_BitScanForward64`) to skip empty/free slots in bulk. The heap-allocated objects are scattered across memory, causing more cache misses on each pointer chase.
+The heap object vector iterates nearly as fast as the plain vector in these benchmarks because `make_unique` in a tight loop produces nearly contiguous allocations. In a real application with interleaved allocations, heap objects would be scattered across memory and iteration would suffer more cache misses.
+
+The hive's contiguous page layout gives it ~1.3x better iteration performance than a vector of individually heap-allocated Velk objects. Using `for_each_hive<T>()` adds another ~40% speedup on top by eliminating per-element `interface_cast` (~8 ns) and virtual `get_property_state()` (~2 ns) calls; the state offset is computed once and applied via pointer arithmetic. Both iteration paths use prefetching to load the next active slot's cache line before calling the visitor, and a per-page active bitmask (`uint64_t` words scanned with `_BitScanForward64`) to skip empty/free slots in bulk.
 
 ### Churn: erase every 4th element + repopulate (512 items, pre-populated)
 
 | | Time | Ratio |
 |---|---|---|
-| Plain vector (erase + emplace_back) | ~7,521 ns | 1x |
-| Hive (remove + add) | ~4,436 ns | ~0.6x |
-| Velk vector (erase + create) | ~29,756 ns | ~4x |
+| Plain vector (erase + emplace_back) | ~7,383 ns | 1x |
+| Hive (remove + add) | ~4,336 ns | ~0.6x |
+| Heap object vector (erase + make_unique) | ~20,742 ns | ~2.8x |
+| Velk vector (erase + create) | ~29,318 ns | ~4x |
 
-For churn workloads the hive is faster than a plain vector and nearly 7x faster than a vector of heap-allocated objects. Vector erase shifts all subsequent elements on each removal (O(n) per erase). The hive flips a state byte, clears an active bit, and pushes the slot onto the freelist (O(1) per remove), then repopulation reuses freed slots via LIFO with no reallocation or element shifting. With embedded control blocks, repopulation has zero heap allocations. The heap-allocated vector pays both the O(n) shift cost and the per-object heap allocation cost.
+For churn workloads the hive is faster than a plain vector, ~5x faster than a heap object vector, and nearly 7x faster than a vector of heap-allocated Velk objects. Vector erase shifts all subsequent elements on each removal (O(n) per erase). The hive flips a state byte, clears an active bit, and pushes the slot onto the freelist (O(1) per remove), then repopulation reuses freed slots via LIFO with no reallocation or element shifting. With embedded control blocks, repopulation has zero heap allocations. The heap object vector pays the O(n) shift cost plus per-object `new`/`delete`, while the Velk vector adds Velk object construction overhead on top of that.
 
 ### Summary
 
-For the iteration and creation overhead you get: reference-counted lifetime with `shared_ptr`/`weak_ptr` support, runtime interface dispatch, type-erased metadata available on demand, O(1) removal with slot reuse, zombie/orphan safety, and `ObjectFlags::HiveManaged` tagging. Compared to a vector of heap-allocated Velk objects, the hive is ~4x faster for creation, ~1.3x faster for iteration (or ~2x with `for_each_hive`), and ~7x faster for churn. For workloads with frequent add/remove churn, the hive outperforms a plain `std::vector` of structs thanks to O(1) removal and zero-allocation slot reuse.
+For the iteration and creation overhead you get: reference-counted lifetime with `shared_ptr`/`weak_ptr` support, runtime interface dispatch, type-erased metadata available on demand, O(1) removal with slot reuse, zombie/orphan safety, and `ObjectFlags::HiveManaged` tagging. Compared to a typical heap-allocated OOP class (virtual base, `unique_ptr`), the hive is ~1.8x faster for creation and ~5x faster for churn. Compared to heap-allocated Velk objects, the hive is ~4x faster for creation, ~1.3x faster for iteration (or ~2x with `for_each_hive`), and ~7x faster for churn. For workloads with frequent add/remove churn, the hive outperforms all alternatives including a plain `std::vector` of structs, thanks to O(1) removal and zero-allocation slot reuse.

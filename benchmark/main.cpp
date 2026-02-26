@@ -11,6 +11,7 @@
 #include <velk/interface/intf_metadata.h>
 
 #include <benchmark/benchmark.h>
+#include <memory>
 #include <vector>
 
 using namespace velk;
@@ -281,6 +282,27 @@ public:
     int i0, i1, i2, i3, i4;
 };
 
+class HeapBase
+{
+public:
+    virtual ~HeapBase() = default;
+    virtual float sum_fields() const = 0;
+};
+
+class HeapObject : public HeapBase
+{
+public:
+    HeapObject() : f0(0.f), f1(1.f), f2(2.f), f3(3.f), f4(4.f), i0(0), i1(1), i2(2), i3(3), i4(4) {}
+
+    float sum_fields() const override
+    {
+        return f0 + f1 + f2 + f3 + f4 + static_cast<float>(i0 + i1 + i2 + i3 + i4);
+    }
+
+    float f0, f1, f2, f3, f4;
+    int i0, i1, i2, i3, i4;
+};
+
 class IHiveData : public Interface<IHiveData>
 {
 public:
@@ -363,6 +385,19 @@ static void BM_CreatePlainVector(benchmark::State& state)
 }
 BENCHMARK(BM_CreatePlainVector);
 
+static void BM_CreateHeapVector(benchmark::State& state)
+{
+    for (auto _ : state) {
+        std::vector<std::unique_ptr<HeapBase>> vec;
+        vec.reserve(kHiveCount);
+        for (size_t i = 0; i < kHiveCount; ++i) {
+            vec.push_back(std::make_unique<HeapObject>());
+        }
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_CreateHeapVector);
+
 static void BM_CreateVelkVector(benchmark::State& state)
 {
     ensureRegistered();
@@ -427,6 +462,29 @@ static void BM_IteratePlainVector(benchmark::State& state)
     }
 }
 BENCHMARK(BM_IteratePlainVector);
+
+static void BM_IterateHeapVector(benchmark::State& state)
+{
+    std::vector<std::unique_ptr<HeapBase>> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        auto obj = std::make_unique<HeapObject>();
+        obj->f0 = static_cast<float>(i);
+        obj->i0 = static_cast<int>(i);
+        vec.push_back(std::move(obj));
+    }
+
+    for (auto _ : state) {
+        float sum = 0.f;
+        for (auto& obj : vec) {
+            auto* h = static_cast<HeapObject*>(obj.get());
+            sum += h->f0 + h->f1 + h->f2 + h->f3 + h->f4;
+            sum += static_cast<float>(h->i0 + h->i1 + h->i2 + h->i3 + h->i4);
+        }
+        benchmark::DoNotOptimize(sum);
+    }
+}
+BENCHMARK(BM_IterateHeapVector);
 
 static void BM_IterateVelkVector(benchmark::State& state)
 {
@@ -556,6 +614,38 @@ static void BM_IterateWritePlainVector(benchmark::State& state)
     }
 }
 BENCHMARK(BM_IterateWritePlainVector);
+
+static void BM_IterateWriteHeapVector(benchmark::State& state)
+{
+    std::vector<std::unique_ptr<HeapBase>> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        vec.push_back(std::make_unique<HeapObject>());
+    }
+
+    float counter = 0.f;
+    for (auto _ : state) {
+        float v = counter;
+        for (auto& obj : vec) {
+            auto* h = static_cast<HeapObject*>(obj.get());
+            h->f0 = v;
+            h->f1 = v;
+            h->f2 = v;
+            h->f3 = v;
+            h->f4 = v;
+            int iv = static_cast<int>(v);
+            h->i0 = iv;
+            h->i1 = iv;
+            h->i2 = iv;
+            h->i3 = iv;
+            h->i4 = iv;
+            v += 1.f;
+        }
+        benchmark::ClobberMemory();
+        counter = v;
+    }
+}
+BENCHMARK(BM_IterateWriteHeapVector);
 
 static void BM_IterateWriteVelkVector(benchmark::State& state)
 {
@@ -700,6 +790,32 @@ static void BM_ChurnPlainVector(benchmark::State& state)
     }
 }
 BENCHMARK(BM_ChurnPlainVector);
+
+static void BM_ChurnHeapVector(benchmark::State& state)
+{
+    std::vector<std::unique_ptr<HeapBase>> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        vec.push_back(std::make_unique<HeapObject>());
+    }
+
+    for (auto _ : state) {
+        // Erase every 4th element (iterate backwards to keep indices stable).
+        for (size_t i = vec.size(); i > 0; --i) {
+            if ((i - 1) % 4 == 0) {
+                vec.erase(vec.begin() + static_cast<ptrdiff_t>(i - 1));
+            }
+        }
+
+        // Repopulate back to 512.
+        while (vec.size() < kHiveCount) {
+            vec.push_back(std::make_unique<HeapObject>());
+        }
+
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_ChurnHeapVector);
 
 static void BM_ChurnVelkVector(benchmark::State& state)
 {
