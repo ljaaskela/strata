@@ -4,7 +4,9 @@
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_any.h>
+#include <velk/interface/intf_array_any.h>
 #include <velk/interface/intf_velk.h>
+#include <velk/vector.h>
 
 #include <cstring>
 #include <type_traits>
@@ -231,6 +233,180 @@ public:
 private:
     T* ptr_{};
 };
+
+/**
+ * @brief An AnyRef for vector<T> that also implements IArrayAny for element-level access.
+ *
+ * Points to external vector<T> storage (e.g. in a State struct). Provides both
+ * whole-vector IAny operations (get/set the entire vector) and element-level
+ * operations (get_at, set_at, push_back, erase_at, clear_array) via IArrayAny.
+ *
+ * @tparam T The element type of the vector.
+ */
+template <class T>
+class ArrayAnyRef final : public AnyCore<ArrayAnyRef<T>, vector<T>, IArrayAny>
+{
+    using Base = AnyCore<ArrayAnyRef<T>, vector<T>, IArrayAny>;
+    using vec_type = vector<T>;
+
+public:
+    explicit ArrayAnyRef(vec_type* ptr = nullptr) : ptr_(ptr) {}
+
+    ReturnValue set_value(const vec_type& value) override
+    {
+        if (*ptr_ != value) {
+            *ptr_ = value;
+            return ReturnValue::Success;
+        }
+        return ReturnValue::NothingToDo;
+    }
+
+    const vec_type& get_value() const override { return *ptr_; }
+
+    IAny::Ptr clone() const override
+    {
+        auto c = AnyValue<vec_type>::get_factory().template create_instance<IAny>();
+        return c && succeeded(c->copy_from(*this)) ? c : nullptr;
+    }
+
+    // IArrayAny
+    size_t array_size() const override { return ptr_->size(); }
+
+    ReturnValue get_at(size_t index, IAny& out) const override
+    {
+        if (index >= ptr_->size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        return out.set_data(&(*ptr_)[index], sizeof(T), type_uid<T>());
+    }
+
+    ReturnValue set_at(size_t index, const IAny& value) override
+    {
+        if (index >= ptr_->size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        T elem{};
+        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
+        if (failed(ret)) {
+            return ReturnValue::InvalidArgument;
+        }
+        (*ptr_)[index] = elem;
+        return ReturnValue::Success;
+    }
+
+    ReturnValue push_back(const IAny& value) override
+    {
+        T elem{};
+        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
+        if (failed(ret)) {
+            return ReturnValue::InvalidArgument;
+        }
+        ptr_->push_back(elem);
+        return ReturnValue::Success;
+    }
+
+    ReturnValue erase_at(size_t index) override
+    {
+        if (index >= ptr_->size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        ptr_->erase(ptr_->begin() + index);
+        return ReturnValue::Success;
+    }
+
+    void clear_array() override { ptr_->clear(); }
+
+private:
+    vec_type* ptr_{};
+};
+
+/**
+ * @brief An owned Any for vector<T> that implements IArrayAny for element-level access.
+ *
+ * Stores the vector inline (like AnyValue<T>). Provides both whole-vector IAny
+ * operations and element-level operations via IArrayAny.
+ *
+ * @tparam T The element type of the vector.
+ */
+template <class T>
+class ArrayAnyValue final : public AnyCore<ArrayAnyValue<T>, vector<T>, IArrayAny>
+{
+    using Base = AnyCore<ArrayAnyValue<T>, vector<T>, IArrayAny>;
+    using vec_type = vector<T>;
+
+public:
+    ArrayAnyValue() = default;
+    explicit ArrayAnyValue(const vec_type& value) : data_(value) {}
+
+    ReturnValue set_value(const vec_type& value) override
+    {
+        if (data_ != value) {
+            data_ = value;
+            return ReturnValue::Success;
+        }
+        return ReturnValue::NothingToDo;
+    }
+
+    const vec_type& get_value() const override { return data_; }
+
+    // IArrayAny
+    size_t array_size() const override { return data_.size(); }
+
+    ReturnValue get_at(size_t index, IAny& out) const override
+    {
+        if (index >= data_.size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        return out.set_data(&data_[index], sizeof(T), type_uid<T>());
+    }
+
+    ReturnValue set_at(size_t index, const IAny& value) override
+    {
+        if (index >= data_.size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        T elem{};
+        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
+        if (failed(ret)) {
+            return ReturnValue::InvalidArgument;
+        }
+        data_[index] = elem;
+        return ReturnValue::Success;
+    }
+
+    ReturnValue push_back(const IAny& value) override
+    {
+        T elem{};
+        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
+        if (failed(ret)) {
+            return ReturnValue::InvalidArgument;
+        }
+        data_.push_back(elem);
+        return ReturnValue::Success;
+    }
+
+    ReturnValue erase_at(size_t index) override
+    {
+        if (index >= data_.size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        data_.erase(data_.begin() + index);
+        return ReturnValue::Success;
+    }
+
+    void clear_array() override { data_.clear(); }
+
+private:
+    vec_type data_{};
+};
+
+/** @brief Creates an ArrayAnyRef<T> wrapped in a shared_ptr, pointing to the given vector. */
+template <class T>
+IAny::Ptr create_array_any_ref(vector<T>* ptr)
+{
+    auto* obj = new ArrayAnyRef<T>(ptr);
+    return IAny::Ptr(static_cast<IAny*>(obj));
+}
 
 /** @brief Creates an AnyRef<T> wrapped in a shared_ptr, pointing to the given address. */
 template <class T>
