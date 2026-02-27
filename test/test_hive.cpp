@@ -1,7 +1,6 @@
+#include <velk/api/hive/hive.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
-#include <velk/api/hive/raw_hive.h>
-#include <velk/api/hive/iterate.h>
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
@@ -501,7 +500,7 @@ TEST_F(HiveTest, ForEachHiveTypedAccess)
 
     float sum = 0.f;
     int count = 0;
-    for_each_hive<IObjectHiveWidget>(*hive, [&](IObject&, IObjectHiveWidget::State& s) {
+    ObjectHive(hive).for_each<IObjectHiveWidget>([&](IObject&, IObjectHiveWidget::State& s) {
         sum += s.x;
         ++count;
         return true;
@@ -519,7 +518,7 @@ TEST_F(HiveTest, ForEachHiveOnEmptyHive)
 {
     auto hive = fresh_hive();
     int count = 0;
-    for_each_hive<IObjectHiveGadget>(*hive, [&](IObject&, IObjectHiveGadget::State&) {
+    ObjectHive(hive).for_each<IObjectHiveGadget>([&](IObject&, IObjectHiveGadget::State&) {
         ++count;
         return true;
     });

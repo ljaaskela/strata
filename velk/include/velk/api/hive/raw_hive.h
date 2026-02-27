@@ -21,7 +21,7 @@ class RawHive
 {
 public:
     /** @brief Wraps an existing IRawHive. */
-    explicit RawHive(IRawHive::Ptr hive) : hive_(static_cast<IRawHive::Ptr&&>(hive)) {}
+    explicit RawHive(IRawHive::Ptr hive) : hive_(std::move(hive)) {}
 
     /** @brief Creates a RawHive for type T from a hive store. */
     explicit RawHive(IHiveStore& store) : hive_(store.get_raw_hive<T>()) {}
@@ -75,6 +75,8 @@ public:
     template <class Fn>
     void for_each(Fn&& fn) const
     {
+        static_assert(std::is_invocable_v<std::decay_t<Fn>, T&>,
+                      "RawHive::for_each visitor must be callable as void(T&) or bool(T&)");
         if (!hive_) {
             return;
         }

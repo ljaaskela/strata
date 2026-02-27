@@ -72,10 +72,10 @@ public:
      * useful for tight loops where the visitor body is cheap relative to
      * the virtual dispatch overhead (bulk reads, writes, physics ticks).
      *
-     * Prefer the typed for_each_hive<T> wrapper in api/hive/iterate.h,
-     * which computes the offset automatically. Use this method directly
-     * when you need to cache the offset across repeated iterations or
-     * pass through a C-style context pointer.
+     * Prefer the typed ObjectHive::for_each<StateInterface> wrapper in
+     * api/hive/object_hive.h, which computes the offset automatically.
+     * Use this method directly when you need to cache the offset across
+     * repeated iterations or pass through a C-style context pointer.
      *
      * @param state_offset Byte offset from object start to the state struct.
      * @param context Opaque pointer forwarded to the visitor.

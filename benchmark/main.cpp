@@ -2,7 +2,7 @@
 #include <velk/api/callback.h>
 #include <velk/api/event.h>
 #include <velk/api/function.h>
-#include <velk/api/hive/iterate.h>
+#include <velk/api/hive/object_hive.h>
 #include <velk/api/hive/raw_hive.h>
 #include <velk/api/property.h>
 #include <velk/api/state.h>
@@ -570,7 +570,7 @@ static void BM_IterateHiveState(benchmark::State& state)
 
     for (auto _ : state) {
         float sum = 0.f;
-        for_each_hive<IHiveData>(*hive, [&](IObject&, IHiveData::State& s) {
+        ObjectHive(hive).for_each<IHiveData>([&](IObject&, IHiveData::State& s) {
             sum += s.f0 + s.f1 + s.f2 + s.f3 + s.f4;
             sum += static_cast<float>(s.i0 + s.i1 + s.i2 + s.i3 + s.i4);
             return true;
@@ -733,7 +733,7 @@ static void BM_IterateWriteHiveState(benchmark::State& state)
     float counter = 0.f;
     for (auto _ : state) {
         float v = counter;
-        for_each_hive<IHiveData>(*hive, [&](IObject&, IHiveData::State& s) {
+        ObjectHive(hive).for_each<IHiveData>([&](IObject&, IHiveData::State& s) {
             s.f0 = v;
             s.f1 = v;
             s.f2 = v;

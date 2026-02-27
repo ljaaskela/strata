@@ -57,10 +57,11 @@ add_library(velk SHARED
     include/velk/ext/object.h
     include/velk/ext/event.h
     include/velk/ext/plugin.h
+    include/velk/api/hive/hive.h
+    include/velk/api/hive/object_hive.h
     include/velk/api/hive/raw_hive.h
     include/velk/ext/interface_dispatch.h
     include/velk/ext/refcounted_dispatch.h
-    include/velk/api/hive/iterate.h
     include/velk/interface/hive/intf_hive.h
     include/velk/interface/hive/intf_hive_store.h
     src/hive/page_allocator.h

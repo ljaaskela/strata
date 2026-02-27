@@ -25,8 +25,8 @@ This document covers runtime performance and memory usage related topics.
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~12 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~18 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property get** | 1 virtual call + `memcpy` | ~9 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~11 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~14 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
@@ -34,7 +34,7 @@ This document covers runtime performance and memory usage related topics.
 | **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
 | **Event dispatch (immediate)** | Loop over handlers | ~11 ns | Iterates immediate handlers in-place; no allocations |
 | **Event dispatch (deferred)** | Clone + queue | ~122 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
-| **interface_cast** | Linear scan | ~7 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
+| **interface_cast** | Linear scan | ~4 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
 | **Metadata lookup (cold)** | Linear scan + alloc | ~553 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
 | **Object creation** | 1 heap alloc + pool emplace | ~55 ns | Factory lookup (`O(log N)`), then allocate object; `MetadataContainer` pool-allocated from `Hive<T>`; control block reused from pool |
