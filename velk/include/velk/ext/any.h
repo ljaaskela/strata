@@ -316,6 +316,16 @@ public:
 
     void clear_array() override { ptr_->clear(); }
 
+    ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) override
+    {
+        if (elementType != type_uid<T>()) {
+            return ReturnValue::InvalidArgument;
+        }
+        auto* elems = reinterpret_cast<const T*>(data);
+        *ptr_ = vec_type(elems, elems + count);
+        return ReturnValue::Success;
+    }
+
 private:
     vec_type* ptr_{};
 };
@@ -395,6 +405,16 @@ public:
     }
 
     void clear_array() override { data_.clear(); }
+
+    ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) override
+    {
+        if (elementType != type_uid<T>()) {
+            return ReturnValue::InvalidArgument;
+        }
+        auto* elems = reinterpret_cast<const T*>(data);
+        data_ = vec_type(elems, elems + count);
+        return ReturnValue::Success;
+    }
 
 private:
     vec_type data_{};

@@ -48,6 +48,7 @@ public:
     /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
 
+protected:
     /** @brief Returns the underlying const IAny pointer. */
     const IAny* get_any_interface() const noexcept { return any_.get(); }
 
@@ -60,10 +61,7 @@ class ArrayAnyStorage
 protected:
     ArrayAnyStorage() = default;
 
-    void set_from_mutable(const IAny::Ptr& any) noexcept
-    {
-        arr_ = interface_pointer_cast<IArrayAny>(any);
-    }
+    void set_from_mutable(const IAny::Ptr& any) noexcept { arr_ = interface_pointer_cast<IArrayAny>(any); }
     void set_from_const(const IAny::ConstPtr& any) noexcept
     {
         if (any) {
@@ -74,16 +72,21 @@ protected:
         }
     }
 
+    void create_from_buffer(const void* data, size_t count, Uid vecUid, Uid elemUid) noexcept
+    {
+        set_from_mutable(instance().create_any(vecUid));
+        if (arr_) {
+            arr_->set_from_buffer(data, count, elemUid);
+        }
+    }
+
 public:
     /** @brief Returns true if the wrapper holds a valid IArrayAny-backed IAny. */
     operator bool() const noexcept { return arr_.operator bool(); }
-
     /** @brief Implicit conversion to const IAny pointer. */
     operator const IAny*() const noexcept { return arr_ ? interface_cast<IAny>(arr_) : nullptr; }
-
     /** @brief Returns the number of elements. */
     size_t size() const { return arr_ ? arr_->array_size() : 0; }
-
     /** @brief Returns true if the array is empty. */
     bool empty() const { return size() == 0; }
 
@@ -230,40 +233,37 @@ public:
 
     /** @brief Wraps an existing mutable IAny pointer that implements IArrayAny (read-write). */
     template <bool RW = IsReadWrite, detail::require<RW> = 0>
-    explicit ArrayAny(const IAny::Ptr& any) noexcept { set_from_mutable(any); }
+    explicit ArrayAny(const IAny::Ptr& any) noexcept
+    {
+        set_from_mutable(any);
+    }
 
     /** @brief Wraps an existing const IAny pointer that implements IArrayAny (read-only). */
     template <bool RO = IsReadOnly, detail::require<RO> = 0>
-    explicit ArrayAny(const IAny::ConstPtr& any) noexcept { set_from_const(any); }
+    explicit ArrayAny(const IAny::ConstPtr& any) noexcept
+    {
+        set_from_const(any);
+    }
 
     /** @brief Constructs an owned empty array (read-write only). */
     template <bool RW = IsReadWrite, detail::require<RW> = 0>
-    ArrayAny() noexcept { set_from_mutable(instance().create_any(VEC_UID)); }
+    ArrayAny() noexcept
+    {
+        set_from_mutable(instance().create_any(VEC_UID));
+    }
 
     /** @brief Constructs an owned array from an initializer list (read-write only). */
     template <bool RW = IsReadWrite, detail::require<RW> = 0>
     ArrayAny(std::initializer_list<Type> init) noexcept
     {
-        set_from_mutable(instance().create_any(VEC_UID));
-        vector<Type> v;
-        v.reserve(init.size());
-        for (auto& e : init) {
-            v.push_back(e);
-        }
-        get_any()->set_data(&v, sizeof(vector<Type>), VEC_UID);
+        create_from_buffer(init.begin(), init.size(), VEC_UID, ELEM_UID);
     }
 
     /** @brief Constructs an owned array from an array_view (read-write only). */
     template <bool RW = IsReadWrite, detail::require<RW> = 0>
     ArrayAny(array_view<Type> view) noexcept
     {
-        set_from_mutable(instance().create_any(VEC_UID));
-        vector<Type> v;
-        v.reserve(view.size());
-        for (size_t i = 0; i < view.size(); ++i) {
-            v.push_back(view[i]);
-        }
-        get_any()->set_data(&v, sizeof(vector<Type>), VEC_UID);
+        create_from_buffer(view.begin(), view.size(), VEC_UID, ELEM_UID);
     }
 
     /** @brief Returns the element at @p index, or default-constructed T on failure. */

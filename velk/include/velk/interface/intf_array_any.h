@@ -26,6 +26,8 @@ public:
     virtual ReturnValue erase_at(size_t index) = 0;
     /** @brief Removes all elements. */
     virtual void clear_array() = 0;
+    /** @brief Bulk-sets contents from a raw element buffer. */
+    virtual ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) = 0;
 };
 
 } // namespace velk
