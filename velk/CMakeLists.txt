@@ -8,6 +8,8 @@ add_library(velk SHARED
     include/velk/common.h
     include/velk/memory.h
     include/velk/string_view.h
+    include/velk/string.h
+    include/velk/vector.h
     include/velk/uid.h
     src/metadata_container.cpp
     src/metadata_container.h

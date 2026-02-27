@@ -9,6 +9,7 @@
 
 #include <velk/ext/any.h>
 #include <velk/interface/intf_log.h>
+#include <velk/string.h>
 
 #include <algorithm>
 
@@ -33,7 +34,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<int16_t>>();
     ITypeRegistry::register_type<ext::AnyValue<int32_t>>();
     ITypeRegistry::register_type<ext::AnyValue<int64_t>>();
-    ITypeRegistry::register_type<ext::AnyValue<std::string>>();
+    ITypeRegistry::register_type<ext::AnyValue<string>>();
 }
 
 const IObjectFactory* TypeRegistry::find(Uid uid) const
