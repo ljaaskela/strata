@@ -61,7 +61,7 @@ public:
     void init(Uid classUid);
 
     // IObjectHive overrides
-    Uid get_element_class_uid() const override;
+    Uid get_element_uid() const override;
     size_t size() const override;
     bool empty() const override;
     IObject::Ptr add() override;

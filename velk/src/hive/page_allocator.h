@@ -115,6 +115,24 @@ inline size_t pop_free_slot(void* slots, size_t slot_size, size_t& free_head)
     return index;
 }
 
+/**
+ * @brief Page for simple pool allocators (RawHiveImpl).
+ *
+ * Stores a contiguous array of slots with an active bitmask and
+ * intrusive freelist. No reference counting, zombie, or orphan
+ * management (those belong to ObjectHive's HivePage).
+ */
+struct SimpleHivePage
+{
+    void* allocation{nullptr};
+    uint64_t* active_bits{nullptr};
+    void* slots{nullptr};
+    size_t capacity{0};
+    size_t free_head{PAGE_SENTINEL};
+    size_t live_count{0};
+    size_t slot_size{0};
+};
+
 } // namespace velk
 
 #endif // VELK_PAGE_ALLOCATOR_H

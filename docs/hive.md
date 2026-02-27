@@ -1,10 +1,14 @@
 # Hive
 
-A hive is a dense, typed container that stores objects of a single class contiguously in memory. Instead of allocating each object individually on the heap, a hive groups objects into cache-friendly pages and constructs them in place. This is useful for systems that manage large numbers of homogeneous objects (entities, particles, nodes) where iteration performance matters.
+A hive is a dense, typed container that stores elements contiguously in memory. Instead of allocating each element individually on the heap, a hive groups elements into cache-friendly pages and constructs them in place. This is useful for systems that manage large numbers of homogeneous objects (entities, particles, nodes) where iteration performance matters.
 
-The design shares core ideas with C++26's `std::hive` (P0447): paged allocation, O(1) erase via a per-page freelist, stable references across insertion and removal, and no element shifting. Where `std::hive` is a general-purpose standard container, Velk's hive is specialized for Velk objects, providing reference counting, interface dispatch, metadata, and zombie/orphan lifetime management on top of the same underlying storage model.
+The design shares core ideas with C++26's `std::hive` (P0447): paged allocation, O(1) erase via a per-page freelist, stable references across insertion and removal, and no element shifting. Velk provides two hive types:
 
-Objects in a hive are full Velk objects with reference counting, metadata, and interface support. They can be passed around as `IObject::Ptr` just like any other object. The only difference is where they live in memory, and that removed objects can [outlive the hive itself](#lifetime-and-zombies) if external references still hold them.
+**Object hives** (`IObjectHive`) store full Velk objects with reference counting, interface dispatch, metadata, and zombie/orphan lifetime management. Objects can be passed around as `IObject::Ptr` and removed objects can [outlive the hive itself](#lifetime-and-zombies) if external references still hold them.
+
+**Raw hives** (`IRawHive`) store plain data without reference counting overhead. They provide type-erased slot allocation and deallocation, with a typed `RawHive<T>` wrapper for convenient construction and destruction. Raw hives are ideal for particles, transforms, spatial nodes, and other plain data that doesn't need Velk object machinery.
+
+Both hive types share a common base interface (`IHive`) and can be managed from the same `IHiveStore`.
 
 ## Contents
 
@@ -15,6 +19,7 @@ Objects in a hive are full Velk objects with reference counting, metadata, and i
 - [Removing objects](#removing-objects)
 - [Iterating objects](#iterating-objects)
 - [Checking membership](#checking-membership)
+- [Raw hives](#raw-hives)
 - [Object flags](#object-flags)
 - [Lifetime and zombies](#lifetime-and-zombies)
 - [Thread safety](#thread-safety)
@@ -31,8 +36,16 @@ classDiagram
         <<interface>>
         get_hive(classUid)
         find_hive(classUid)
+        get_raw_hive(uid, size, align)
+        find_raw_hive(uid)
         hive_count()
         for_each_hive()
+    }
+
+    class IHive {
+        <<interface>>
+        get_element_uid()
+        size() / empty()
     }
 
     class IObjectHive {
@@ -42,7 +55,14 @@ classDiagram
         contains(object)
         for_each(visitor)
         for_each_state(offset, visitor)
-        size() / empty()
+    }
+
+    class IRawHive {
+        <<interface>>
+        allocate()
+        deallocate(ptr)
+        contains(ptr)
+        for_each(visitor)
     }
 
     class IObject {
@@ -50,18 +70,25 @@ classDiagram
         get_self()
     }
 
-    class ObjectHiveStore {
+    class HiveStore {
         ClassId::HiveStore
     }
 
     class ObjectHive {
-        ClassId::Hive
+        ClassId::ObjectHive
+    }
+
+    class RawHive {
+        ClassId::RawHive
     }
 
     IHiveStore <|.. HiveStore : implements
+    IHive <|-- IObjectHive : extends
+    IHive <|-- IRawHive : extends
+    IObject <|-- IHive : extends
     IObjectHive <|.. ObjectHive : implements
-    IObject <|-- IObjectHive : extends
-    IHiveStore --> "0..*" IObjectHive : manages
+    IRawHive <|.. RawHive : implements
+    IHiveStore --> "0..*" IHive : manages
     IObjectHive --> "0..*" IObject : stores
 ```
 
@@ -100,13 +127,13 @@ auto hive = registry->get_hive<MyWidget>();
 auto hive = registry->find_hive<MyWidget>();
 ```
 
-You can enumerate all active hives:
+You can enumerate all active hives (both object and raw):
 
 ```cpp
 registry->hive_count();  // number of active hives
 
-registry->for_each_hive(nullptr, [](void*, IObjectHive& hive) -> bool {
-    // hive.get_element_class_uid(), hive.size(), ...
+registry->for_each_hive(nullptr, [](void*, IHive& hive) -> bool {
+    // hive.get_element_uid(), hive.size(), ...
     return true;  // return false to stop early
 });
 ```
@@ -205,6 +232,81 @@ hive->size();           // number of live objects
 hive->empty();          // true if no objects
 ```
 
+## Raw hives
+
+Raw hives store plain data without Velk object overhead. They provide O(1) allocation and deallocation with the same page-based contiguous storage as object hives, but without reference counting, metadata, or zombie management.
+
+### Creating a raw hive
+
+```cpp
+#include <velk/api/hive/raw_hive.h>
+#include <velk/interface/hive/intf_hive_store.h>
+
+struct Particle {
+    float x, y, z;
+    float vx, vy, vz;
+};
+
+auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+
+// Get (or create) a raw hive for Particle
+auto raw = registry->get_raw_hive<Particle>();
+
+// Wrap in the typed helper
+RawHive<Particle> hive(raw);
+```
+
+### Adding and removing elements
+
+```cpp
+// emplace constructs in-place (like std::vector::emplace_back)
+Particle* p = hive.emplace(1.f, 2.f, 3.f, 0.f, 0.f, 0.f);
+
+// deallocate destroys and reclaims the slot
+hive.deallocate(p);
+```
+
+### Iterating elements
+
+```cpp
+// void-returning visitor (visits all elements)
+hive.for_each([](Particle& p) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.z += p.vz;
+});
+
+// bool-returning visitor (return false to stop early)
+hive.for_each([](Particle& p) -> bool {
+    if (p.y < 0.f) return false;
+    return true;
+});
+```
+
+### Low-level API
+
+The `IRawHive` interface provides type-erased access for C-style interop:
+
+```cpp
+void* slot = raw->allocate();
+auto* p = new (slot) Particle{};
+// ...
+p->~Particle();
+raw->deallocate(slot);
+```
+
+### Thread safety
+
+Raw hives use the same locking strategy as object hives:
+
+| Operation | Lock |
+|---|---|
+| `allocate()` | exclusive |
+| `deallocate()` | exclusive |
+| `for_each()` | shared |
+| `contains()` | shared |
+| `size()`, `empty()` | none |
+
 ## Object flags
 
 Objects created by a hive have the `ObjectFlags::HiveManaged` flag set. This allows code to check whether an object is hive-managed without needing a reference to the hive:
@@ -291,74 +393,54 @@ Slot reuse is LIFO within a page: the most recently freed slot is the next one a
 
 ## Performance
 
-The tables below compare four configurations using 512 objects with 10 members (5 floats + 5 ints):
+All benchmarks use 512 elements with 10 members (5 floats + 5 ints). Measured on x64 (16 cores, 32 MiB L3), MSVC Release, Google Benchmark. Source: `benchmark/main.cpp`.
 
-1. **Plain struct** -- `std::vector<PlainData>` (a class with constructor-initialized members, 40 bytes).
-2. **Heap object** -- `std::vector<unique_ptr<HeapBase>>` of individually heap-allocated objects with a virtual base class and virtual destructor (a more typical OOP pattern).
-3. **Velk vector** -- `std::vector<IObject::Ptr>` of individually heap-allocated Velk objects.
-4. **Hive** -- Velk objects stored contiguously in a hive.
+### What you get
 
-Both Velk benchmarks use `get_property_state<T>()` for direct state access. The "Hive state" row uses `for_each_hive<T>()` which pre-computes the state offset once and avoids per-element `interface_cast`. No metadata containers are allocated (lazy init is never triggered).
+**Object hive** (128 B per element): ref-counted lifetime with `shared_ptr`/`weak_ptr`, runtime interface dispatch, lazy metadata, zombie/orphan safety, thread-safe mutation, and `ObjectFlags::HiveManaged` tagging.
 
-Measured on an x64 desktop (16 cores, 32 MiB L3). MSVC Release build, Google Benchmark. The benchmark source is in `benchmark/main.cpp` (search for `BM_Churn`, `BM_Create`, `BM_Iterate`, `BM_Memory`).
+**Raw hive** (element size only): O(1) allocation and deallocation, contiguous paged storage, bitmask iteration, thread-safe mutation. No ref-counting or interface dispatch overhead.
 
-### Memory
+### Containers under test
 
-| | Per-element | 512 items |
-|---|---|---|
-| Plain struct | 40 bytes | 20,480 bytes |
-| Velk object | 128 bytes | ~65,536 bytes + control blocks |
+| Label | Description |
+|---|---|
+| `std::vector<PlainData>` | vector of 40-byte structs |
+| `std::vector<unique_ptr<T>>` | vector with virtual base + destructor |
+| `RawHive<PlainData>` | `ClassId::RawHive`storing the same 40-byte struct |
+| `std::vector<IObject::Ptr>` | vector of heap-allocated Velk objects |
+| `IObjectHive`::Ptr | Velk objects in a `ClassId::ObjectHive`, [Full functionality](#what-you-get) |
 
-The per-object overhead (88 bytes) covers the MI base layout (vtable pointers), ObjectData (flags + control block pointer), the lazy metadata pointer, and state tuple alignment padding. Both Velk vector and hive objects have the same per-element size.
+### Results
 
-### Creation (512 items)
+| Container | Create (ns) | Iterate (read, ns) | Iterate (write, ns) | Churn (ns) | Element size (bytes) |
+|---|---|---|---|---|---|
+| `std::vector<PlainData>`| ~580 | ~640 | ~740 | ~7,400 | 40 |
+| `std::vector<unique_ptr<T>>` | ~16,500 | ~760 | ~760 | ~20,400 <br>~17,700 [(2)](#note-2) | 40 + ptr |
+| `RawHive<PlainData>` | ~4,800 | ~2,100 | ~2,040 | ~2,000 | 40 |
+| `std::vector<IObject::Ptr>` | ~40,600 | ~4,800 | ~4,900 | ~30,700 | 128 |
+| Object hive | ~10,300 | ~3,800 <br>~2,360 [(1)](#note-1) | ~3,980 <br>~2,370 [(1)](#note-1) | ~5,900 | 128 |
 
-| | Time | Ratio |
-|---|---|---|
-| `vector<PlainData>(512)` | ~608 ns | 1x |
-| Heap object `make_unique` x 512 | ~14,228 ns | ~23x |
-| Hive `add()` x 512 | ~10,414 ns | ~17x |
-| Velk vector `create()` x 512 | ~39,274 ns | ~65x |
+#### Note 1 
+Velk object rows use `get_property_state<T>()` for direct state access. The object hive read/write columns show two values: 
+* the first uses `interface_cast` per element
+* the second uses `for_each_hive<T>()` which [pre-computes the state offset once](#state-iteration).
 
-The hive is roughly 1.4x faster than plain heap-allocated objects and 3.8x faster than Velk heap allocation because it uses placement-new into pre-allocated pages and embeds control blocks directly in the page allocation, eliminating all per-object heap allocations. The hive's `add()` acquires an exclusive lock per call; in single-threaded benchmarks this adds a small constant overhead.
+#### Note 2
+The heap vector churn column shows two values: unlocked and locked (each insert/erase wrapped in `std::mutex`).
 
-### Iteration: read all 10 fields (512 items)
+### Analysis
 
-| | Time | Ratio |
-|---|---|---|
-| Plain vector | ~648 ns | 1x |
-| Heap object vector | ~707 ns | ~1.1x |
-| Hive state (`for_each_hive`) | ~2,297 ns | ~3.5x |
-| Hive + `interface_cast` | ~3,699 ns | ~5.7x |
-| Velk vector + `get_property_state` | ~4,946 ns | ~7.6x |
+#### Creation
 
-### Iteration: write all 10 fields (512 items)
+Both hive types use placement-new into pre-allocated pages, avoiding per-element heap allocations. The raw hive is the fastest pooled option (~8x faster than plain `make_unique`) since it skips ref-counting setup and control block allocation. The object hive is ~4x faster than Velk heap allocation.
 
-| | Time | Ratio |
-|---|---|---|
-| Plain vector | ~650 ns | 1x |
-| Heap object vector | ~652 ns | ~1.0x |
-| Hive state (`for_each_hive`) | ~2,457 ns | ~3.8x |
-| Hive + `interface_cast` | ~3,983 ns | ~6.1x |
-| Velk vector + `get_property_state` | ~4,876 ns | ~7.5x |
+####### Iteration
 
-The heap object vector iterates nearly as fast as the plain vector in these benchmarks because `make_unique` in a tight loop produces nearly contiguous allocations. In a real application with interleaved allocations, heap objects would be scattered across memory and iteration would suffer more cache misses.
+The heap vector iterates nearly as fast as the plain vector here because `make_unique` in a tight loop produces nearly contiguous allocations; real applications with interleaved allocations would see more cache misses.
 
-The hive's contiguous page layout gives it ~1.3x better iteration performance than a vector of individually heap-allocated Velk objects. Using `for_each_hive<T>()` adds another ~40% speedup on top by eliminating per-element `interface_cast` (~8 ns) and virtual `get_property_state()` (~2 ns) calls; the state offset is computed once and applied via pointer arithmetic. Both iteration paths acquire a shared lock for the duration of the call, then use prefetching to load the next active slot's cache line before calling the visitor, and a per-page active bitmask (`uint64_t` words scanned with `_BitScanForward64`) to skip empty/free slots in bulk.
+The raw hive iterates at ~2,100 ns, within ~3.3x of a plain vector and comparable to the object hive's state path. Both hive types prefetch the next active slot and scan a per-page bitmask (`_BitScanForward64`) to skip free slots in bulk. The small gap vs. a plain vector comes from the bitmask scan and function pointer callback overhead.
 
-### Churn: erase every 4th element + repopulate (512 items, pre-populated)
+#### Churn
 
-| | Time | Ratio |
-|---|---|---|
-| Hive (remove + add) | ~5,790 ns | 1x |
-| Plain vector | ~7,514 ns | ~1.3x |
-| Plain vector (locked) | ~9,384 ns | ~1.6x |
-| Heap object vector (locked) | ~18,444 ns | ~3.2x |
-| Heap object vector | ~20,423 ns | ~3.5x |
-| Velk vector (erase + create) | ~28,974 ns | ~5.0x |
-
-The "locked" rows wrap each erase and insert in a `std::mutex` lock, matching the per-operation locking the hive performs internally. For thread-safe churn workloads the hive is ~1.6x faster than a locked plain vector and ~3.2x faster than a locked heap object vector. Vector erase shifts all subsequent elements on each removal (O(n) per erase). The hive flips a state byte, clears an active bit, and pushes the slot onto the freelist (O(1) per remove), then repopulation reuses freed slots via LIFO with no reallocation or element shifting. With embedded control blocks, repopulation has zero heap allocations. The heap object vector pays the O(n) shift cost plus per-object `new`/`delete`, while the Velk vector adds Velk object construction overhead on top of that.
-
-### Summary
-
-For the iteration and creation overhead you get: reference-counted lifetime with `shared_ptr`/`weak_ptr` support, runtime interface dispatch, type-erased metadata available on demand, O(1) removal with slot reuse, zombie/orphan safety, thread-safe mutation, and `ObjectFlags::HiveManaged` tagging. Compared to a typical heap-allocated OOP class (virtual base, `unique_ptr`), the hive is ~1.4x faster for creation and ~3.2x faster for churn (locked). Compared to heap-allocated Velk objects, the hive is ~3.8x faster for creation, ~1.3x faster for iteration (or ~2x with `for_each_hive`), and ~5x faster for churn. For workloads with frequent add/remove churn, the hive outperforms all alternatives including a locked plain `std::vector` of structs, thanks to O(1) removal and zero-allocation slot reuse.
+The raw hive is the clear winner at ~2,000 ns, ~3.7x faster than a plain vector and ~2.9x faster than the object hive. All hive types use O(1) removal (clear a bit + push to freelist) and LIFO slot reuse with zero heap allocations. Vectors pay O(n) element shifting per erase. The raw hive's advantage over the object hive comes from skipping ref-count manipulation and zombie lifecycle management.

@@ -1,6 +1,7 @@
 #include "hive_store.h"
 
 #include "object_hive.h"
+#include "raw_hive.h"
 
 #include <velk/api/velk.h>
 
@@ -13,7 +14,7 @@ IObjectHive::Ptr HiveStore::get_hive(Uid classUid)
     HiveEntry key{classUid, {}};
     auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
     if (it != hives_.end() && it->uid == classUid) {
-        return it->hive;
+        return interface_pointer_cast<IObjectHive>(it->hive);
     }
 
     auto& velk = instance();
@@ -27,10 +28,10 @@ IObjectHive::Ptr HiveStore::get_hive(Uid classUid)
     auto hive_obj = ext::make_object<ObjectHive>();
     auto* hive = static_cast<ObjectHive*>(hive_obj.get());
     hive->init(classUid);
-    auto hive_ptr = interface_pointer_cast<IObjectHive>(hive_obj);
+    auto hive_ptr = interface_pointer_cast<IHive>(hive_obj);
 
     hives_.insert(it, HiveEntry{classUid, hive_ptr});
-    return hive_ptr;
+    return interface_pointer_cast<IObjectHive>(hive_ptr);
 }
 
 IObjectHive::Ptr HiveStore::find_hive(Uid classUid) const
@@ -38,7 +39,35 @@ IObjectHive::Ptr HiveStore::find_hive(Uid classUid) const
     HiveEntry key{classUid, {}};
     auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
     if (it != hives_.end() && it->uid == classUid) {
-        return it->hive;
+        return interface_pointer_cast<IObjectHive>(it->hive);
+    }
+    return {};
+}
+
+IRawHive::Ptr HiveStore::get_raw_hive(Uid uid, size_t element_size, size_t element_align)
+{
+    HiveEntry key{uid, {}};
+    auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
+    if (it != hives_.end() && it->uid == uid) {
+        return interface_pointer_cast<IRawHive>(it->hive);
+    }
+
+    // Create and initialize a new raw hive.
+    auto hive_obj = ext::make_object<RawHiveImpl>();
+    auto* hive = static_cast<RawHiveImpl*>(hive_obj.get());
+    hive->init(uid, element_size, element_align);
+    auto hive_ptr = interface_pointer_cast<IHive>(hive_obj);
+
+    hives_.insert(it, HiveEntry{uid, hive_ptr});
+    return interface_pointer_cast<IRawHive>(hive_ptr);
+}
+
+IRawHive::Ptr HiveStore::find_raw_hive(Uid uid) const
+{
+    HiveEntry key{uid, {}};
+    auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
+    if (it != hives_.end() && it->uid == uid) {
+        return interface_pointer_cast<IRawHive>(it->hive);
     }
     return {};
 }
@@ -51,7 +80,8 @@ size_t HiveStore::hive_count() const
 void HiveStore::for_each_hive(void* context, HiveVisitorFn visitor) const
 {
     for (auto& entry : hives_) {
-        if (!visitor(context, *entry.hive)) {
+        auto* hive = interface_cast<IHive>(entry.hive);
+        if (hive && !visitor(context, *hive)) {
             return;
         }
     }

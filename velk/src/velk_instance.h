@@ -1,12 +1,12 @@
 #ifndef VELK_INSTANCE_H
 #define VELK_INSTANCE_H
 
-#include "hive/hive.h"
 #include "plugin_registry.h"
 #include "type_registry.h"
 
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
+#include <velk/api/hive/raw_hive.h>
 #include <velk/interface/intf_velk.h>
 
 #include <mutex>
@@ -60,7 +60,7 @@ private:
     /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
     void flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const;
 
-    mutable Hive<MetadataContainer> metadata_hive_;  ///< Pool allocator for MetadataContainers (destroyed last).
+    mutable RawHive<MetadataContainer> metadata_hive_;  ///< Pool allocator for MetadataContainers (destroyed last).
     LogLevel level_{LogLevel::Info};    ///< Minimum log level (before type_registry_ for init order).
     ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
     TypeRegistry type_registry_;        ///< Registry of class factories.

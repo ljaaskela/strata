@@ -1,13 +1,25 @@
 #include "velk_instance.h"
 
 #include "function.h"
+#include "hive/raw_hive.h"
 #include "metadata_container.h"
 
 #include <velk/interface/types.h>
 
 namespace velk {
 
-VelkInstance::VelkInstance() : type_registry_(*this), plugin_registry_(*this, type_registry_) {}
+static IRawHive::Ptr create_metadata_hive()
+{
+    auto obj = ext::make_object<RawHiveImpl>();
+    auto* hive = static_cast<RawHiveImpl*>(obj.get());
+    hive->init(type_uid<MetadataContainer>(), sizeof(MetadataContainer), alignof(MetadataContainer));
+    return interface_pointer_cast<IRawHive>(obj);
+}
+
+VelkInstance::VelkInstance()
+    : metadata_hive_(create_metadata_hive()), type_registry_(*this), plugin_registry_(*this, type_registry_)
+{
+}
 
 VelkInstance::~VelkInstance()
 {

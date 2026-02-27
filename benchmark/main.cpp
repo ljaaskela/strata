@@ -2,11 +2,12 @@
 #include <velk/api/callback.h>
 #include <velk/api/event.h>
 #include <velk/api/function.h>
+#include <velk/api/hive/iterate.h>
+#include <velk/api/hive/raw_hive.h>
 #include <velk/api/property.h>
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
-#include <velk/api/hive/iterate.h>
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
@@ -922,3 +923,120 @@ static void BM_ChurnHive(benchmark::State& state)
     }
 }
 BENCHMARK(BM_ChurnHive);
+
+// ---------------------------------------------------------------------------
+// RawHive<PlainData> benchmarks
+// ---------------------------------------------------------------------------
+
+static void BM_CreateRawHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+
+    for (auto _ : state) {
+        RawHive<PlainData> hive(registry->get_raw_hive(
+            type_uid<PlainData>(), sizeof(PlainData), alignof(PlainData)));
+        for (size_t i = 0; i < kHiveCount; ++i) {
+            auto* p = hive.emplace();
+            benchmark::DoNotOptimize(p);
+        }
+    }
+}
+BENCHMARK(BM_CreateRawHive);
+
+static void BM_IterateRawHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+    RawHive<PlainData> hive(registry->get_raw_hive(
+        type_uid<PlainData>(), sizeof(PlainData), alignof(PlainData)));
+
+    std::vector<PlainData*> ptrs;
+    ptrs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        auto* p = hive.emplace();
+        p->f0 = static_cast<float>(i);
+        p->i0 = static_cast<int>(i);
+        ptrs.push_back(p);
+    }
+
+    for (auto _ : state) {
+        float sum = 0.f;
+        hive.for_each([&](PlainData& d) {
+            sum += d.f0 + d.f1 + d.f2 + d.f3 + d.f4;
+            sum += static_cast<float>(d.i0 + d.i1 + d.i2 + d.i3 + d.i4);
+        });
+        benchmark::DoNotOptimize(sum);
+    }
+}
+BENCHMARK(BM_IterateRawHive);
+
+static void BM_IterateWriteRawHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+    RawHive<PlainData> hive(registry->get_raw_hive(
+        type_uid<PlainData>(), sizeof(PlainData), alignof(PlainData)));
+
+    std::vector<PlainData*> ptrs;
+    ptrs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        ptrs.push_back(hive.emplace());
+    }
+
+    float counter = 0.f;
+    for (auto _ : state) {
+        float v = counter;
+        hive.for_each([&](PlainData& d) {
+            d.f0 = v;
+            d.f1 = v;
+            d.f2 = v;
+            d.f3 = v;
+            d.f4 = v;
+            int iv = static_cast<int>(v);
+            d.i0 = iv;
+            d.i1 = iv;
+            d.i2 = iv;
+            d.i3 = iv;
+            d.i4 = iv;
+            v += 1.f;
+        });
+        benchmark::ClobberMemory();
+        counter = v;
+    }
+}
+BENCHMARK(BM_IterateWriteRawHive);
+
+static void BM_ChurnRawHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+    RawHive<PlainData> hive(registry->get_raw_hive(
+        type_uid<PlainData>(), sizeof(PlainData), alignof(PlainData)));
+
+    std::vector<PlainData*> ptrs;
+    ptrs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        ptrs.push_back(hive.emplace());
+    }
+
+    for (auto _ : state) {
+        // Remove every 4th element.
+        for (size_t i = 0; i < ptrs.size(); i += 4) {
+            hive.deallocate(ptrs[i]);
+            ptrs[i] = nullptr;
+        }
+
+        // Repopulate the removed slots.
+        for (size_t i = 0; i < ptrs.size(); i += 4) {
+            ptrs[i] = hive.emplace();
+        }
+
+        benchmark::DoNotOptimize(ptrs.data());
+    }
+}
+BENCHMARK(BM_ChurnRawHive);

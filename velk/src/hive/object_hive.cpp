@@ -182,7 +182,7 @@ void ObjectHive::init(Uid classUid)
     }
 }
 
-Uid ObjectHive::get_element_class_uid() const
+Uid ObjectHive::get_element_uid() const
 {
     return element_class_uid_;
 }

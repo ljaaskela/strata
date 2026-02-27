@@ -1,10 +1,12 @@
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
+#include <velk/api/hive/raw_hive.h>
 #include <velk/api/hive/iterate.h>
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
 #include <gtest/gtest.h>
+#include <string>
 #include <vector>
 
 using namespace velk;
@@ -104,7 +106,7 @@ TEST_F(HiveTest, GetHiveTyped)
 {
     auto hive = registry_->get_hive<HiveWidget>();
     ASSERT_TRUE(hive);
-    EXPECT_EQ(HiveWidget::class_id(), hive->get_element_class_uid());
+    EXPECT_EQ(HiveWidget::class_id(), hive->get_element_uid());
 }
 
 TEST_F(HiveTest, ForEachHive)
@@ -113,7 +115,7 @@ TEST_F(HiveTest, ForEachHive)
     registry_->get_hive(HiveWidget::class_id());
 
     int count = 0;
-    registry_->for_each_hive(&count, [](void* ctx, IObjectHive&) -> bool {
+    registry_->for_each_hive(&count, [](void* ctx, IHive&) -> bool {
         ++(*static_cast<int*>(ctx));
         return true;
     });
@@ -132,7 +134,7 @@ TEST_F(HiveTest, NewHiveIsEmpty)
 TEST_F(HiveTest, ElementClassUid)
 {
     auto hive = fresh_hive();
-    EXPECT_EQ(HiveGadget::class_id(), hive->get_element_class_uid());
+    EXPECT_EQ(HiveGadget::class_id(), hive->get_element_uid());
 }
 
 TEST_F(HiveTest, AddCreatesObject)
@@ -522,4 +524,284 @@ TEST_F(HiveTest, ForEachHiveOnEmptyHive)
         return true;
     });
     EXPECT_EQ(0, count);
+}
+
+// --- IRawHive tests ---
+
+struct RawPoint
+{
+    float x, y, z;
+    RawPoint() : x(0.f), y(0.f), z(0.f) {}
+    RawPoint(float x, float y, float z) : x(x), y(y), z(z) {}
+};
+
+TEST_F(HiveTest, RawHiveAllocateDeallocate)
+{
+    auto hive = registry_->get_raw_hive<RawPoint>();
+    ASSERT_TRUE(hive);
+    EXPECT_TRUE(hive->empty());
+    EXPECT_EQ(0u, hive->size());
+
+    void* slot = hive->allocate();
+    ASSERT_NE(nullptr, slot);
+    auto* pt = new (slot) RawPoint(1.f, 2.f, 3.f);
+    EXPECT_EQ(1u, hive->size());
+    EXPECT_FALSE(hive->empty());
+
+    EXPECT_FLOAT_EQ(1.f, pt->x);
+    EXPECT_FLOAT_EQ(2.f, pt->y);
+    EXPECT_FLOAT_EQ(3.f, pt->z);
+
+    pt->~RawPoint();
+    hive->deallocate(slot);
+    EXPECT_EQ(0u, hive->size());
+    EXPECT_TRUE(hive->empty());
+}
+
+TEST_F(HiveTest, RawHiveContains)
+{
+    auto hive = registry_->get_raw_hive<RawPoint>();
+    void* slot = hive->allocate();
+    auto* pt = new (slot) RawPoint();
+
+    EXPECT_TRUE(hive->contains(pt));
+
+    RawPoint stack_pt;
+    EXPECT_FALSE(hive->contains(&stack_pt));
+
+    pt->~RawPoint();
+    hive->deallocate(slot);
+    EXPECT_FALSE(hive->contains(slot));
+}
+
+TEST_F(HiveTest, RawHiveForEach)
+{
+    auto hive = registry_->get_raw_hive<RawPoint>();
+    std::vector<RawPoint*> ptrs;
+    for (int i = 0; i < 5; ++i) {
+        void* slot = hive->allocate();
+        ptrs.push_back(new (slot) RawPoint(static_cast<float>(i), 0.f, 0.f));
+    }
+
+    float sum = 0.f;
+    hive->for_each(&sum, [](void* ctx, void* elem) -> bool {
+        auto& pt = *static_cast<RawPoint*>(elem);
+        *static_cast<float*>(ctx) += pt.x;
+        return true;
+    });
+    EXPECT_FLOAT_EQ(10.f, sum); // 0+1+2+3+4
+
+    for (auto* p : ptrs) {
+        p->~RawPoint();
+        hive->deallocate(p);
+    }
+}
+
+TEST_F(HiveTest, RawHiveForEachStopsOnFalse)
+{
+    auto hive = registry_->get_raw_hive<RawPoint>();
+    std::vector<RawPoint*> ptrs;
+    for (int i = 0; i < 3; ++i) {
+        void* slot = hive->allocate();
+        ptrs.push_back(new (slot) RawPoint());
+    }
+
+    int count = 0;
+    hive->for_each(&count, [](void* ctx, void*) -> bool {
+        ++(*static_cast<int*>(ctx));
+        return false; // stop after first
+    });
+    EXPECT_EQ(1, count);
+
+    for (auto* p : ptrs) {
+        p->~RawPoint();
+        hive->deallocate(p);
+    }
+}
+
+TEST_F(HiveTest, RawHiveElementUid)
+{
+    auto hive = registry_->get_raw_hive<RawPoint>();
+    EXPECT_EQ(type_uid<RawPoint>(), hive->get_element_uid());
+}
+
+TEST_F(HiveTest, RawHiveSlotReuse)
+{
+    auto hive = registry_->get_raw_hive<RawPoint>();
+    void* slot1 = hive->allocate();
+    new (slot1) RawPoint();
+    void* slot2 = hive->allocate();
+    new (slot2) RawPoint();
+
+    // Deallocate first slot
+    static_cast<RawPoint*>(slot1)->~RawPoint();
+    hive->deallocate(slot1);
+    EXPECT_EQ(1u, hive->size());
+
+    // Allocate again, should reuse the freed slot
+    void* slot3 = hive->allocate();
+    new (slot3) RawPoint();
+    EXPECT_EQ(2u, hive->size());
+
+    // Clean up
+    static_cast<RawPoint*>(slot2)->~RawPoint();
+    hive->deallocate(slot2);
+    static_cast<RawPoint*>(slot3)->~RawPoint();
+    hive->deallocate(slot3);
+}
+
+// --- RawHive<T> tests ---
+
+TEST_F(HiveTest, ExtRawHiveEmplace)
+{
+    auto raw = registry_->get_raw_hive<RawPoint>();
+    RawHive<RawPoint> hive(raw);
+
+    auto* pt = hive.emplace(1.f, 2.f, 3.f);
+    ASSERT_NE(nullptr, pt);
+    EXPECT_FLOAT_EQ(1.f, pt->x);
+    EXPECT_FLOAT_EQ(2.f, pt->y);
+    EXPECT_FLOAT_EQ(3.f, pt->z);
+    EXPECT_EQ(1u, hive.size());
+    EXPECT_TRUE(hive.contains(pt));
+
+    hive.deallocate(pt);
+    EXPECT_EQ(0u, hive.size());
+}
+
+TEST_F(HiveTest, ExtRawHiveForEach)
+{
+    auto raw = registry_->get_raw_hive<RawPoint>();
+    RawHive<RawPoint> hive(raw);
+
+    std::vector<RawPoint*> ptrs;
+    for (int i = 0; i < 4; ++i) {
+        ptrs.push_back(hive.emplace(static_cast<float>(i), 0.f, 0.f));
+    }
+
+    float sum = 0.f;
+    hive.for_each([&](RawPoint& pt) {
+        sum += pt.x;
+    });
+    EXPECT_FLOAT_EQ(6.f, sum); // 0+1+2+3
+
+    // Test bool-returning variant
+    int count = 0;
+    hive.for_each([&](RawPoint&) -> bool {
+        ++count;
+        return false;
+    });
+    EXPECT_EQ(1, count);
+
+    for (auto* p : ptrs) {
+        hive.deallocate(p);
+    }
+}
+
+struct NonTrivial
+{
+    std::string name;
+    int value;
+    NonTrivial(std::string n, int v) : name(static_cast<std::string&&>(n)), value(v) {}
+};
+
+TEST_F(HiveTest, ExtRawHiveNonTrivialType)
+{
+    auto raw = registry_->get_raw_hive<NonTrivial>();
+    RawHive<NonTrivial> hive(raw);
+
+    auto* obj = hive.emplace("hello", 42);
+    EXPECT_EQ("hello", obj->name);
+    EXPECT_EQ(42, obj->value);
+
+    hive.deallocate(obj); // destructor runs, string freed
+    EXPECT_EQ(0u, hive.size());
+}
+
+// --- IHiveStore raw hive integration tests ---
+
+TEST_F(HiveTest, ExtRawHiveClear)
+{
+    auto raw = registry_->get_raw_hive<NonTrivial>();
+    RawHive<NonTrivial> hive(raw);
+
+    hive.emplace("a", 1);
+    hive.emplace("b", 2);
+    hive.emplace("c", 3);
+    EXPECT_EQ(3u, hive.size());
+
+    hive.clear();
+    EXPECT_EQ(0u, hive.size());
+    EXPECT_TRUE(hive.empty());
+
+    // Hive is still usable after clear.
+    auto* p = hive.emplace("d", 4);
+    EXPECT_EQ(1u, hive.size());
+    EXPECT_EQ("d", p->name);
+    hive.deallocate(p);
+}
+
+TEST_F(HiveTest, ExtRawHiveDestructorCleansUp)
+{
+    auto raw = registry_->get_raw_hive<NonTrivial>();
+    {
+        RawHive<NonTrivial> hive(raw);
+        hive.emplace("x", 1);
+        hive.emplace("y", 2);
+        // hive goes out of scope, destructor should destroy all elements
+    }
+    // The underlying IRawHive should be empty after RawHive destroyed elements.
+    EXPECT_EQ(0u, raw->size());
+}
+
+TEST_F(HiveTest, ExtRawHiveFromStore)
+{
+    RawHive<RawPoint> hive(*registry_);
+    EXPECT_TRUE(hive);
+    auto* p = hive.emplace(1.f, 2.f, 3.f);
+    EXPECT_EQ(1u, hive.size());
+    hive.deallocate(p);
+}
+
+TEST_F(HiveTest, HiveStoreGetRawHiveReturnsSameInstance)
+{
+    auto h1 = registry_->get_raw_hive<RawPoint>();
+    auto h2 = registry_->get_raw_hive<RawPoint>();
+    EXPECT_EQ(h1.get(), h2.get());
+}
+
+TEST_F(HiveTest, HiveStoreFindRawHive)
+{
+    EXPECT_FALSE(registry_->find_raw_hive<RawPoint>());
+
+    registry_->get_raw_hive<RawPoint>();
+    auto found = registry_->find_raw_hive<RawPoint>();
+    ASSERT_TRUE(found);
+}
+
+TEST_F(HiveTest, ExtRawHiveNullSafety)
+{
+    RawHive<RawPoint> hive(nullptr);
+    EXPECT_FALSE(hive);
+    EXPECT_TRUE(hive.empty());
+    EXPECT_EQ(0u, hive.size());
+    EXPECT_EQ(nullptr, hive.emplace(1.f, 2.f, 3.f));
+    EXPECT_FALSE(hive.contains(nullptr));
+
+    int count = 0;
+    hive.for_each([&](RawPoint&) { ++count; });
+    EXPECT_EQ(0, count);
+}
+
+TEST_F(HiveTest, ForEachHiveVisitsBothTypes)
+{
+    registry_->get_hive(HiveWidget::class_id());
+    registry_->get_raw_hive<RawPoint>();
+
+    int count = 0;
+    registry_->for_each_hive(&count, [](void* ctx, IHive&) -> bool {
+        ++(*static_cast<int*>(ctx));
+        return true;
+    });
+    EXPECT_GE(count, 2);
 }
