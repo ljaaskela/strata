@@ -42,6 +42,9 @@ velk/
     api/                 User-facing typed wrappers for API usage
     common.h             Uid, type_uid<T>(), get_name<T>()
     array_view.h         Lightweight constexpr span-like view
+    vector.h             Owning resizable array (ABI-stable std::vector replacement)
+    string_view.h        Non-owning string reference
+    string.h             Owning string with SSO (ABI-stable std::string replacement)
   src/                   Internal runtime implementations (compiled into DLL)
 ```
 
@@ -295,7 +298,9 @@ Velk's solution to this is to provide its own vocabulary types with fixed, docum
 | Velk type | STL equivalent | Layout | Purpose |
 |---|---|---|---|
 | `string_view` | `std::string_view` | `{const char*, size_t}` = 16 bytes | Non-owning string reference in interface signatures and metadata |
+| `string` | `std::string` | `union{heap, local}` = 24 bytes | Owning string with SSO (up to 22 chars inline, no allocation) |
 | `array_view<T>` | `std::span<const T>` | `{const T*, size_t}` = 16 bytes | Constexpr view over contiguous data (metadata arrays, member lists) |
+| `vector<T>` | `std::vector<T>` | `{T*, size_t, size_t}` = 24 bytes | Owning resizable array using malloc/free with placement new |
 | `shared_ptr<T>` | `std::shared_ptr<T>` | `{T*, control_block*}` = 16 bytes | Shared ownership across DLL boundary with weak reference support |
 | `weak_ptr<T>` | `std::weak_ptr<T>` | `{T*, control_block*}` = 16 bytes | Non-owning observer that can attempt to lock a `shared_ptr` |
 | `refcnt_ptr<T>` | `std::shared_ptr<T>` (intrusive) | `{T*}` = 8 bytes | Lightweight intrusive refcounted pointer (no control block) |
@@ -325,16 +330,19 @@ The mode is selected at compile time via `std::is_convertible_v<T*, IInterface*>
 
 Types that do not cross the DLL boundary can safely use STL types:
 
-- `std::vector`, `std::unique_ptr`, `std::mutex`, `std::atomic` are used in internal implementations compiled into the DLL.
-- `std::string` — used in user `State` structs (the state pointer is passed as `void*` through `IPropertyState`, so the DLL never interprets the layout).
+- `std::unique_ptr`, `std::mutex`, `std::atomic` are used in internal implementations compiled into the DLL.
 - `std::tuple` — used in `ext::Object` for the states tuple, but only within user code that compiles against the same headers.
+
+`velk::string` and `velk::vector<T>` are available as ABI-stable replacements for `std::string` and `std::vector<T>` in public interface signatures. Internal DLL code may still use the STL variants when values do not cross the boundary.
 
 ## Key types
 
 | Type | Role |
 |---|---|
 | `string_view` | ABI-stable non-owning string reference (`{const char*, size_t}`); replaces `std::string_view` at DLL boundaries |
+| `string` | ABI-stable owning string with SSO (`union{heap, local}` = 24 bytes); up to 22 chars stored inline; implicitly converts to `string_view` |
 | `array_view<T>` | ABI-stable constexpr span-like view over contiguous const data (`{const T*, size_t}`); replaces `std::span` |
+| `vector<T>` | ABI-stable owning resizable array (`{T*, size_t, size_t}` = 24 bytes); uses malloc/free with placement new; implicitly converts to `array_view<T>` |
 | `shared_ptr<T>` | ABI-stable shared ownership pointer (`{T*, control_block*}`); intrusive for IInterface types, external for others |
 | `weak_ptr<T>` | ABI-stable non-owning observer (`{T*, control_block*}`); locks to a `shared_ptr` if the object is still alive |
 | `refcnt_ptr<T>` | Lightweight intrusive refcounted pointer (`{T*}`); calls `ref()`/`unref()` directly, no control block |

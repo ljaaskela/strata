@@ -10,12 +10,12 @@
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_velk.h>
 #include <velk/interface/types.h>
+#include <velk/string.h>
 
 #include <iostream>
 
 using std::cout;
 using std::endl;
-using std::string;
 using namespace velk;
 
 // Custom data
