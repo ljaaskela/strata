@@ -304,6 +304,8 @@ IObject::Ptr ObjectHive::add()
         return {};
     }
 
+    check_iteration_guard(mutex_, "add");
+
     std::lock_guard<std::shared_mutex> lock(mutex_);
 
     // Check cached page hint first, then scan.
@@ -365,6 +367,8 @@ IObject::Ptr ObjectHive::add()
 
 ReturnValue ObjectHive::remove(IObject& object)
 {
+    check_iteration_guard(mutex_, "remove");
+
     {
         std::lock_guard<std::shared_mutex> lock(mutex_);
 
@@ -453,12 +457,14 @@ void ObjectHive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
 void ObjectHive::for_each(void* context, VisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);
+    IterationGuard guard(&mutex_);
     scan_active(0, [&](void* slot) { return visitor(context, *static_cast<IObject*>(slot)); });
 }
 
 void ObjectHive::for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);
+    IterationGuard guard(&mutex_);
     scan_active(state_offset, [&](void* slot) {
         auto* obj = static_cast<IObject*>(slot);
         return visitor(context, *obj, reinterpret_cast<char*>(slot) + state_offset);

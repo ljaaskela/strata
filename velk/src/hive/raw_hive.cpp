@@ -82,6 +82,8 @@ void RawHiveImpl::alloc_page(size_t capacity)
 
 void* RawHiveImpl::allocate()
 {
+    check_iteration_guard(mutex_, "allocate");
+
     std::lock_guard<std::shared_mutex> lock(mutex_);
 
     RawHivePage* target = nullptr;
@@ -116,6 +118,8 @@ void* RawHiveImpl::allocate()
 
 void RawHiveImpl::deallocate(void* ptr)
 {
+    check_iteration_guard(mutex_, "deallocate");
+
     std::lock_guard<std::shared_mutex> lock(mutex_);
     auto ptr_addr = reinterpret_cast<uintptr_t>(ptr);
     for (auto& page_ptr : pages_) {
@@ -166,6 +170,7 @@ bool RawHiveImpl::contains(const void* ptr) const
 void RawHiveImpl::for_each(void* context, RawVisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);
+    IterationGuard guard(&mutex_);
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
         size_t num_words = bitmask_words(page.capacity);
@@ -201,6 +206,8 @@ void RawHiveImpl::for_each(void* context, RawVisitorFn visitor) const
 
 void RawHiveImpl::clear(void* context, DestroyFn destroy)
 {
+    check_iteration_guard(mutex_, "clear");
+
     std::lock_guard<std::shared_mutex> lock(mutex_);
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
