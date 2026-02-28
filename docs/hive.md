@@ -446,11 +446,11 @@ All benchmarks use 512 elements with 10 members (5 floats + 5 ints). Measured on
 
 | Container | Create (ns) | Iterate (read, ns) | Iterate (write, ns) | Churn (ns) | Element size (bytes) |
 |---|---|---|---|---|---|
-| `std::vector<PlainData>`| ~570 | ~650 | ~650 | ~7,400 | 40 |
-| `std::vector<unique_ptr<T>>` | ~16,300 | ~700 | ~650 | ~16,200 <br>~23,100 [(2)](#note-2) | 40 + ptr |
-| `RawHive<PlainData>` | ~5,400 | ~2,200 | ~2,060 | ~2,000 | 40 |
-| `std::vector<IObject::Ptr>` | ~40,600 | ~2,400 | ~2,240 | ~30,700 | 80 |
-| `ObjectHive<>` | ~10,500 | ~3,700 <br>~2,400 [(1)](#note-1) | ~3,900 <br>~2,240 [(1)](#note-1) | ~5,800 | 80 |
+| `std::vector<PlainData>`| ~600 | ~650 | ~650 | ~7,500 | 40 |
+| `std::vector<unique_ptr<T>>` | ~14,500 | ~720 | ~700 | ~15,700 <br>~22,700 [(2)](#note-2) | 40 + ptr |
+| `RawHive<PlainData>` | ~4,800 | ~1,700 | ~1,750 | ~2,100 | 40 |
+| `std::vector<IObject::Ptr>` | ~38,000 | ~2,100 | ~2,000 | ~29,900 | 80 |
+| `ObjectHive<>` | ~10,100 | ~2,800 <br>~1,800 [(1)](#note-1) | ~2,900 <br>~1,700 [(1)](#note-1) | ~5,700 | 80 |
 
 #### Note 1
 Velk object rows use `get_property_state<T>()` for direct state access. The object hive read/write columns show two values:
@@ -470,8 +470,8 @@ Both hive types use placement-new into pre-allocated pages, avoiding per-element
 
 The heap vector iterates nearly as fast as the plain vector here because `make_unique` in a tight loop produces nearly contiguous allocations; real applications with interleaved allocations would see more cache misses. The Velk vector (`std::vector<IObject::Ptr>`) benefits from `interface_cast`'s compile-time `is_base_of` short-circuit, which eliminates virtual dispatch when the target type is a base of the source.
 
-The raw hive iterates at ~2,200 ns, within ~3.4x of a plain vector and comparable to the object hive's state path. Both hive types prefetch the next active slot and scan a per-page bitmask (`_BitScanForward64`) to skip free slots in bulk. The small gap vs. a plain vector comes from the bitmask scan and function pointer callback overhead.
+The raw hive iterates at ~1,700 ns, within ~2.6x of a plain vector and comparable to the object hive's state path. When all slots in a 64-bit bitmask word are active, the iteration loop skips bitscan and prefetch logic entirely, falling into a tight sequential loop. For sparse pages, the slow path prefetches the next active slot and scans a per-page bitmask (`_BitScanForward64`) to skip free slots in bulk. The remaining gap vs. a plain vector comes from the function pointer callback overhead (the visitor crosses the DLL boundary and cannot be inlined).
 
 #### Churn
 
-The raw hive is the clear winner at ~2,000 ns, ~3.7x faster than a plain vector and ~2.9x faster than the object hive. All hive types use O(1) removal (clear a bit + push to freelist) and LIFO slot reuse with zero heap allocations. Vectors pay O(n) element shifting per erase. The raw hive's advantage over the object hive comes from skipping ref-count manipulation and zombie lifecycle management.
+The raw hive is the clear winner at ~2,100 ns, ~3.6x faster than a plain vector and ~2.7x faster than the object hive. All hive types use O(1) removal (clear a bit + push to freelist) and LIFO slot reuse with zero heap allocations. Vectors pay O(n) element shifting per erase. The raw hive's advantage over the object hive comes from skipping ref-count manipulation and zombie lifecycle management.

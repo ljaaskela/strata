@@ -438,32 +438,48 @@ void ObjectHive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
 {
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
+        bool dense = page.live_count == page.capacity;
         size_t num_words = bitmask_words(page.capacity);
         for (size_t w = 0; w < num_words; ++w) {
             uint64_t bits = page.active_bits[w];
+            if (!bits) {
+                continue;
+            }
+            size_t base = w * 64;
+            // Fast path: all 64 slots active, skip bitscan and prefetch.
+            if (bits == ~uint64_t(0)) {
+                for (size_t i = 0; i < 64; ++i) {
+                    if (!visit(slot_ptr(page, base + i))) {
+                        return;
+                    }
+                }
+                continue;
+            }
             while (bits) {
                 unsigned b = bitscan_forward64(bits);
                 bits &= bits - 1;
-                size_t i = w * 64 + b;
+                size_t i = base + b;
                 // Re-check the live bit: a visitor callback may have triggered
                 // hive_destroy (via unref) which clears the bit for a slot in
                 // this same word.
                 if (!is_slot_active(page.active_bits, w, b)) {
                     continue;
                 }
-                // Prefetch next active slot.
-                uint64_t remaining = bits;
-                if (remaining) {
-                    unsigned nb = bitscan_forward64(remaining);
-                    prefetch_line(static_cast<char*>(slot_ptr(page, w * 64 + nb)) + prefetch_offset);
-                } else if (w + 1 < num_words) {
-                    for (size_t nw = w + 1; nw < num_words; ++nw) {
-                        uint64_t next_bits = page.active_bits[nw];
-                        if (next_bits) {
-                            prefetch_line(
-                                static_cast<char*>(slot_ptr(page, nw * 64 + bitscan_forward64(next_bits))) +
-                                prefetch_offset);
-                            break;
+                // Prefetch next active slot (skip for fully dense pages).
+                if (!dense) {
+                    uint64_t remaining = bits;
+                    if (remaining) {
+                        unsigned nb = bitscan_forward64(remaining);
+                        prefetch_line(static_cast<char*>(slot_ptr(page, base + nb)) + prefetch_offset);
+                    } else if (w + 1 < num_words) {
+                        for (size_t nw = w + 1; nw < num_words; ++nw) {
+                            uint64_t next_bits = page.active_bits[nw];
+                            if (next_bits) {
+                                prefetch_line(static_cast<char*>(
+                                                  slot_ptr(page, nw * 64 + bitscan_forward64(next_bits))) +
+                                              prefetch_offset);
+                                break;
+                            }
                         }
                     }
                 }
