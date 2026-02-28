@@ -109,14 +109,15 @@ Use `VELK_INTERFACE` to declare properties, events, and functions. This generate
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    // Static interface metadata: 2 writable properties, 1 read-only property, 1 event and 2 functions
+    // Static interface metadata:
     VELK_INTERFACE(
-        (PROP, float, width, 100.f),
+        (PROP, float, width, 100.f),                // Read-write float property, default value 100.f
         (PROP, float, height, 100.f),
-        (RPROP, int, id, 0),
-        (EVT, on_clicked),
-        (FN, void, reset),
-        (FN, void, resize, (float, w), (float, h))
+        (RPROP, int, id, 0),                        // Read-only int property, default value 0
+        (ARR, uint32_t, layers, 1u, 2u, 3u),        // Array uint32_t property (array of values), default value {1u, 2u, 3u}
+        (EVT, on_clicked),                          // Event
+        (FN, void, reset),                          // Function without arguments
+        (FN, void, resize, (float, w), (float, h))  // Function with 2 arguments
     )
 
     // Regular pure virtual function, part of the interface but not metadata.
@@ -241,9 +242,11 @@ if (auto writer = write_state<IMyWidget>(iw)) {
     //   float width { 100.f };
     //   float height { 100.f };
     //   int id { 0 };
+    //   velk::vector<uint32_t> layers { 1u, 2u, 3u };
     // }
     writer->width = 200.f;
     writer->height = 50.f;
+    writer->layers.push_back(4u);
 }                                                               // ~StateWriter notifies listeners
 
 iw->width().get_value();                                        // 200.f
