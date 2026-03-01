@@ -2,6 +2,8 @@
 
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
+#include <velk/interface/intf_event.h>
+#include <velk/interface/intf_property.h>
 
 #include <algorithm>
 
@@ -71,7 +73,7 @@ void AnimationImpl::finish()
     }
     ensure_init(*s);
     if (!keyframes_.empty() && target_) {
-        target_->set_value(*keyframes_.back().value, Deferred);
+        write_to_target(*keyframes_.back().value);
     }
     s->elapsed = s->duration;
     s->progress = 1.f;
@@ -141,20 +143,20 @@ void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
 {
     if (keyframes_.size() < 2 || !target_) {
         if (!keyframes_.empty() && target_) {
-            target_->set_value(*keyframes_.front().value, Deferred);
+            write_to_target(*keyframes_.front().value);
         }
         return;
     }
 
     if (global_t >= 1.f) {
         if (keyframes_.back().value) {
-            target_->set_value(*keyframes_.back().value, Deferred);
+            write_to_target(*keyframes_.back().value);
         }
         return;
     }
     if (global_t <= 0.f) {
         if (keyframes_.front().value) {
-            target_->set_value(*keyframes_.front().value, Deferred);
+            write_to_target(*keyframes_.front().value);
         }
         return;
     }
@@ -166,7 +168,7 @@ void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
     }
     if (i >= keyframes_.size()) {
         if (keyframes_.back().value) {
-            target_->set_value(*keyframes_.back().value, Deferred);
+            write_to_target(*keyframes_.back().value);
         }
         return;
     }
@@ -180,7 +182,23 @@ void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
                           : 1.f;
         float eased_t = kf1.easing(seg_t);
         interpolator_(*kf0.value, *kf1.value, eased_t, *result_);
-        target_->set_value(*result_, Deferred);
+        write_to_target(*result_);
+    }
+}
+
+void AnimationImpl::write_to_target(const IAny& value)
+{
+    auto pi = interface_pointer_cast<IPropertyInternal>(target_);
+    // This is essentially the same as calling target_->set_value(value, Deferred);
+    // - But this way we we avoid cloning the value into the deferred task queue.
+    // - Animations are usually ticked in instance().update()
+    // - We're already anyway just about to set the value
+    // - Instead of queuing the set_value, we set the value immediately but queue the property on_changed()
+    //   invocation.
+    if (pi && pi->set_value_silent(value) == ReturnValue::Success) {
+        // Queue notification-only (null value) so on_changed fires during flush
+        // alongside other deferred property notifications.
+        instance().queue_deferred_property({pi, nullptr});
     }
 }
 
@@ -201,7 +219,7 @@ bool AnimationImpl::tick(const UpdateInfo& info)
 
     if (keyframes_.size() < 2) {
         if (!keyframes_.empty() && target_) {
-            target_->set_value(*keyframes_.front().value, Deferred);
+            write_to_target(*keyframes_.front().value);
         }
         s.state = PlayState::Finished;
         s.progress = 1.f;
@@ -213,7 +231,7 @@ bool AnimationImpl::tick(const UpdateInfo& info)
 
     // Set initial value on first tick
     if (s.elapsed.us == 0 && target_ && keyframes_.front().value) {
-        target_->set_value(*keyframes_.front().value, Deferred);
+        write_to_target(*keyframes_.front().value);
     }
 
     if (dt.us) {
@@ -224,7 +242,7 @@ bool AnimationImpl::tick(const UpdateInfo& info)
         s.elapsed = s.duration;
         s.progress = 1.f;
         if (target_ && keyframes_.back().value) {
-            target_->set_value(*keyframes_.back().value, Deferred);
+            write_to_target(*keyframes_.back().value);
         }
         s.state = PlayState::Finished;
         notify_state(s);
@@ -243,7 +261,7 @@ bool AnimationImpl::tick(const UpdateInfo& info)
 
     if (i >= keyframes_.size()) {
         if (target_ && keyframes_.back().value) {
-            target_->set_value(*keyframes_.back().value, Deferred);
+            write_to_target(*keyframes_.back().value);
         }
         s.state = PlayState::Finished;
         s.progress = 1.f;
@@ -260,7 +278,7 @@ bool AnimationImpl::tick(const UpdateInfo& info)
                           : 1.f;
         float eased_t = kf1.easing(seg_t);
         interpolator_(*kf0.value, *kf1.value, eased_t, *result_);
-        target_->set_value(*result_, Deferred);
+        write_to_target(*result_);
     }
 
     notify_state(s);

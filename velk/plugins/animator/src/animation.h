@@ -35,6 +35,7 @@ private:
     IAnimation::State* state();
     void ensure_init(IAnimation::State& state);
     void apply_at(IAnimation::State& s, float t);
+    void write_to_target(const IAny& value);
     void notify_state(IAnimation::State& state);
 
     IProperty::Ptr target_;
