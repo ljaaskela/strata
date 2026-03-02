@@ -182,15 +182,11 @@ TEST_F(AnimatorPluginTest, AnimationProperties)
     auto* anim = interface_cast<IAnimation>(obj);
     ASSERT_NE(nullptr, anim);
 
-    // Default state via VELK_INTERFACE accessors
+    // Default state via VELK_INTERFACE accessors (all read-only)
     EXPECT_EQ(0, anim->duration().get_value().us);
     EXPECT_EQ(0, anim->elapsed().get_value().us);
     EXPECT_FLOAT_EQ(0.f, anim->progress().get_value());
     EXPECT_EQ(PlayState::Idle, anim->state().get_value());
-
-    // Write duration via accessor
-    anim->duration().set_value(sec(2.f));
-    EXPECT_EQ(sec(2.f).us, anim->duration().get_value().us);
 }
 
 // ============================================================================

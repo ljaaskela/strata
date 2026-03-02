@@ -40,10 +40,10 @@ class IAnimation : public Interface<IAnimation>
 {
 public:
     VELK_INTERFACE(
-        (PROP, Duration,  duration, {}),
-        (PROP, Duration,  elapsed,  {}),
-        (PROP, float,     progress, 0.f),
-        (PROP, PlayState, state,    PlayState::Idle)
+        (RPROP, Duration,  duration, {}),
+        (RPROP, Duration,  elapsed,  {}),
+        (RPROP, float,     progress, 0.f),
+        (RPROP, PlayState, state,    PlayState::Idle)
     )
 
     /** @brief Advances the animation. Called by the animator; not for external use. */
