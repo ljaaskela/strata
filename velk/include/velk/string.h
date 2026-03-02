@@ -2,6 +2,7 @@
 #define VELK_STRING_H
 
 #include <velk/string_view.h>
+#include <velk/uid.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -527,6 +528,25 @@ private:
 };
 
 static_assert(sizeof(string) == 3 * sizeof(void*), "velk::string must be 24 bytes");
+
+/** @brief Returns the UUID as a string (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). */
+inline string to_string(Uid uid)
+{
+    char buf[37];
+    char* p = buf;
+    constexpr char hex[] = "0123456789abcdef";
+    auto put = [&](uint64_t v, int nibbles) {
+        for (int i = (nibbles - 1) * 4; i >= 0; i -= 4) {
+            *p++ = hex[(v >> i) & 0xF];
+        }
+    };
+    put(uid.hi >> 32, 8); *p++ = '-';
+    put(uid.hi >> 16, 4); *p++ = '-';
+    put(uid.hi, 4);       *p++ = '-';
+    put(uid.lo >> 48, 4); *p++ = '-';
+    put(uid.lo, 12);
+    return string(buf, 36);
+}
 
 } // namespace velk
 
