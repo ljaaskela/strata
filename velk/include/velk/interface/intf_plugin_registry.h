@@ -63,17 +63,6 @@ public:
     }
 };
 
-/**
- * @brief Typed wrapper for get_or_load_plugin from instance().plugin_registry().
- * @see IPluginRegistry::get_or_load_plugin
- */
-template <class T>
-T* get_or_load_plugin(Uid pluginId)
-{
-    auto& reg = instance().plugin_registry();
-    return interface_cast<T>(reg.get_or_load_plugin(pluginId));
-}
-
 } // namespace velk
 
 #endif // VELK_INTF_PLUGIN_REGISTRY_H
