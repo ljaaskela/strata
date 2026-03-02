@@ -98,8 +98,14 @@ ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
 IInterface::Ptr TypeRegistry::create(Uid uid, uint32_t flags) const
 {
     if (auto* factory = find(uid)) {
-        return factory->create_instance(flags);
+        auto object = factory->create_instance(flags);
+        if (!object) {
+            VELK_LOG(
+                E, "Failed to instantiate %s: %s", factory->get_class_info().name, to_string(uid).c_str());
+        }
+        return object;
     }
+    VELK_LOG(E, "Failed to instantiate %s", to_string(uid).c_str());
     return {};
 }
 
@@ -125,10 +131,10 @@ void TypeRegistry::sweep_owner(Uid uid)
 {
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
-    interpolators_.erase(
-        std::remove_if(interpolators_.begin(), interpolators_.end(),
-                        [&](const InterpolatorEntry& e) { return e.owner == uid; }),
-        interpolators_.end());
+    interpolators_.erase(std::remove_if(interpolators_.begin(),
+                                        interpolators_.end(),
+                                        [&](const InterpolatorEntry& e) { return e.owner == uid; }),
+                         interpolators_.end());
 }
 
 ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)
