@@ -4,6 +4,16 @@ This document covers runtime performance and memory usage related topics.
 
 ## Contents
 
+- [Design philosophy](#design-philosophy)
+  - [Lazy metadata creation](#lazy-metadata-creation)
+  - [Lazy change events](#lazy-change-events)
+  - [Extension chain](#extension-chain)
+  - [Direct state access](#direct-state-access-1)
+  - [Static metadata](#static-metadata)
+  - [Control block pooling](#control-block-pooling)
+  - [Compile-time interface_cast](#compile-time-interface_cast)
+  - [No RTTI, no exceptions](#no-rtti-no-exceptions)
+  - [Hive slot reuse](#hive-slot-reuse)
 - [Operation costs](#operation-costs)
   - [Property get/set](#property-getset)
   - [Direct state access](#direct-state-access)
@@ -18,6 +28,46 @@ This document covers runtime performance and memory usage related topics.
   - [Layout notes](#layout-notes)
   - [Common base layers](#common-base-layers)
   - [Base types](#base-types)
+
+## Design philosophy
+
+Velk follows a "pay for what you use" principle. Every abstraction layer is designed so that unused features impose zero runtime or memory cost. The techniques below work together to keep objects lightweight in the common case while still offering rich functionality when needed.
+
+### Lazy metadata creation
+
+`MetadataContainer` is not allocated until the first runtime metadata access (e.g. `get_property()`, `get_event()`, `get_function()`). Until then, the object carries only a null pointer. Once the container exists, individual member instances (`PropertyImpl`, `FunctionImpl`, `EventImpl`) are created on demand by `find_or_create()`, which checks a cache of already-created instances before scanning the static metadata array. An object that never touches its metadata at runtime pays nothing beyond the object itself.
+
+### Lazy change events
+
+Properties use `LazyEvent` for their `on_changed` notification. `LazyEvent` holds a single `shared_ptr<IEvent>` that starts null. The underlying `EventImpl` is created only on first access, either when a handler is registered or when the event is explicitly retrieved. Properties that are never observed pay no event overhead (16 bytes for the null `shared_ptr`, no heap allocation).
+
+### Extension chain
+
+`IAnyExtension` is a chainable wrapper that sits in a property's `data_` slot, intercepting `get_data` / `set_data` calls. Each extension wraps an inner `IAny` (which may itself be another extension), forming a chain. Extensions are installed via `install_extension()`, which splices the new extension in front of the existing backing store. When no extensions are installed, the property reads and writes its `AnyRef` directly with no indirection.
+
+### Direct state access
+
+`get_property_state<T>(object)` returns a typed pointer to the interface's `State` struct, which is stored inline in the object. Reading and writing fields through this pointer is a plain dereference with no virtual dispatch, no `IAny` layer, and no change-event firing. This is the fastest path (~1 ns read, <1 ns write) and is appropriate when the caller owns the object and does not need property-system features like change notification or extension interception.
+
+### Static metadata
+
+Interface metadata (`MemberDesc` arrays, `InterfaceInfo` lists) is generated at compile time by the `VELK_INTERFACE` macro and stored as `static constexpr` data. `ext::Object<T, Interfaces...>` concatenates metadata from all interfaces into a single `constexpr` array via `CollectedMetadata<Interfaces...>`. These arrays are shared across all instances of a type at zero per-object cost.
+
+### Control block pooling
+
+Every `shared_ptr`-managed object needs a control block for its reference counts. Velk maintains a thread-local free-list of recycled `control_block` and `external_control_block` instances, avoiding the global allocator on the create/destroy hot path. Pooled allocation is ~2.5x faster than `new`/`delete` in benchmarks. The pool uses Fiber Local Storage (FLS) on Windows and `pthread_key` on POSIX, with automatic cleanup on thread exit. Pooling can be disabled at build time with `-DVELK_ENABLE_BLOCK_POOL=OFF`.
+
+### Compile-time interface_cast
+
+`interface_cast<T>(obj)` uses `std::is_base_of_v<T, U>` at compile time. When the target type `T` is a known base of the source type `U`, the cast compiles down to a plain pointer return with no virtual dispatch. The runtime path (linear scan of the interface pack + parent chains) is only taken when the relationship cannot be determined statically.
+
+### No RTTI, no exceptions
+
+The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs-c-` on MSVC, `-fno-rtti -fno-exceptions` on other compilers). Type identity uses compile-time FNV-1a hashing of type names instead of `typeid`. Error conditions are reported through return values (`nullptr`, `false`) rather than exceptions. This reduces binary size and avoids the overhead of exception-handling tables.
+
+### Hive slot reuse
+
+`Hive<T>` (the pool allocator used for `MetadataContainer` and other internal types) pre-allocates pages of fixed-size slots. Each page maintains an intrusive LIFO free-list threaded through the slot memory itself. Allocating a slot pops from the head; deallocating pushes back. After the initial page allocation, steady-state add/remove cycles never touch the heap. Active slots are tracked with a bitset for iteration.
 
 ## Operation costs
 
