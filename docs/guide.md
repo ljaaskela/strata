@@ -866,34 +866,30 @@ auto c1 = find_or_create_attachment<IContainer>(storage, ClassId::Container);
 auto c2 = find_or_create_attachment<IContainer>(obj.get(), ClassId::Container);
 ```
 
-### Container: adding hierarchy
+### Hierarchy
 
-`IContainer` is a built-in interface for managing an ordered list of child objects. For hierarchy use cases, use `Node` (in `api/node.h`) which implements `IContainer` and lazy-creates a `ClassId::Container` attachment internally for storage.
+Velk objects are flat by default: an `IObject` has metadata and attachments, but no notion of parent/child relationships. Hierarchy support is injected through the attachment system using two building blocks.
+
+**`IContainer`** (`ClassId::Container`) is a pure data layer: an ordered list of child `IObject` pointers with a vector-like API (`add`, `remove`, `insert`, `replace`, `get_at`, `get_all`, `size`, `clear`). It can be attached to any object that has `IObjectStorage`, but on its own it is just storage with no extra behavior.
+
+**`Node`** (`ClassId::Node`) also implements `IContainer`, but instead of storing children directly it lazy-creates a `ClassId::Container` attachment on itself when the first child is added. This means read operations on a fresh node are free (no allocation), and the actual storage is only created on demand. Node is the recommended entry point for hierarchy.
 
 ```cpp
 #include <velk/api/node.h>
 
-// Create a node and add children
+// Create a standalone node
 auto node = create_node();
-auto a = instance().create<IObject>(MyWidget::class_id());
-auto b = instance().create<IObject>(MyWidget::class_id());
-node.add(a);
-node.add(b);
+node.add(instance().create<IObject>(MyWidget::class_id()));
+node.add(instance().create<IObject>(MyWidget::class_id()));
 node.size();    // 2
 
-// Retrieve by index
-auto first = node.get_at(0);
-
-// Typed retrieval
-IMyWidget::Ptr w = node.get_at<IMyWidget>(0);
-
-// Attach a node to another object
+// Attach a node to an existing object
 auto parent = instance().create<IObject>(MyWidget::class_id());
 auto container = find_or_create_attachment<IContainer>(parent.get(), ClassId::Node);
 container->add(child);
 ```
 
-`Node` inherits `Container` (in `api/container.h`), which provides the full vector-like API: `add`, `remove`, `insert`, `replace`, `get_at`, `get_all`, `size`, and `clear`. Templated methods provide typed access:
+`Node` inherits `Container` (in `api/container.h`), which wraps `IContainer` with null-safe access and templated methods for typed retrieval:
 
 ```cpp
 Node node(create_node());

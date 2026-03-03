@@ -53,6 +53,7 @@ add_library(velk SHARED
     include/velk/interface/intf_metadata.h
     include/velk/interface/intf_object_storage.h
     include/velk/interface/intf_container.h
+    include/velk/interface/intf_node.h
     include/velk/interface/member_desc.h
     include/velk/interface/types.h
     include/velk/api/any.h
@@ -76,6 +77,7 @@ add_library(velk SHARED
     include/velk/ext/metadata.h
     include/velk/ext/object.h
     include/velk/ext/event.h
+    include/velk/ext/node.h
     include/velk/ext/plugin.h
     include/velk/api/hive/hive.h
     include/velk/api/hive/object_hive.h
