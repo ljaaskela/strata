@@ -540,10 +540,14 @@ inline string to_string(Uid uid)
             *p++ = hex[(v >> i) & 0xF];
         }
     };
-    put(uid.hi >> 32, 8); *p++ = '-';
-    put(uid.hi >> 16, 4); *p++ = '-';
-    put(uid.hi, 4);       *p++ = '-';
-    put(uid.lo >> 48, 4); *p++ = '-';
+    put(uid.hi >> 32, 8);
+    *p++ = '-';
+    put(uid.hi >> 16, 4);
+    *p++ = '-';
+    put(uid.hi, 4);
+    *p++ = '-';
+    put(uid.lo >> 48, 4);
+    *p++ = '-';
     put(uid.lo, 12);
     return string(buf, 36);
 }
