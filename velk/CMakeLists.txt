@@ -19,6 +19,8 @@ add_library(velk SHARED
     src/object_storage.h
     src/container.cpp
     src/container.h
+    src/node.cpp
+    src/node.h
     src/future.cpp
     src/future.h
     src/type_registry.cpp
@@ -65,6 +67,7 @@ add_library(velk SHARED
     include/velk/api/velk.h
     include/velk/api/attachment.h
     include/velk/api/container.h
+    include/velk/api/node.h
     include/velk/api/object.h
     include/velk/ext/any.h
     include/velk/ext/any_extension.h

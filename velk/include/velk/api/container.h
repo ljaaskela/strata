@@ -9,55 +9,26 @@
 namespace velk {
 
 /**
- * @brief Returns the IContainer attachment on an object, or nullptr if none exists.
- * @param obj The object to search for a container attachment.
+ * @brief Convenience wrapper around IContainer.
+ *
+ * Provides null-safe access and child operations on top of the raw
+ * IContainer interface. Templated methods provide typed access where needed:
+ *
+ *   Container c(create_container());
+ *   c.add(child);
+ *   IMyWidget::Ptr w = c.get_at<IMyWidget>(0);
+ *   c.for_each<IMyWidget>([](IMyWidget& w) { ... });
  */
-inline IContainer* get_container(const IInterface* obj)
-{
-    auto* storage = interface_cast<IObjectStorage>(obj);
-    if (!storage) {
-        return nullptr;
-    }
-    return interface_cast<IContainer>(storage->find_attachment<IContainer>());
-}
-
-/**
- * @brief Returns the existing IContainer attachment, or creates and attaches a new one.
- * @param obj The object to get or create a container on.
- * @return Shared pointer to the IContainer, or nullptr if the object has no IObjectStorage.
- */
-inline IContainer::Ptr ensure_container(IInterface* obj)
-{
-    return find_or_create_attachment<IContainer>(obj, ClassId::Container);
-}
-
-/**
- * @brief Typed convenience wrapper around IContainer.
- *
- * Provides null-safe access and typed child operations on top of the raw
- * IContainer interface.
- *
- * The template parameter T controls the interface type used by add(),
- * remove(), get_at(), get_all(), and for_each():
- *
- *   Container<IMyWidget> c(ensure_container(obj));
- *   c.add(widget);                          // accepts IMyWidget::Ptr
- *   IMyWidget::Ptr w = c.get_at(0);         // returns IMyWidget::Ptr
- *   c.for_each([](IMyWidget& w) { ... });
- *
- * Use Container<> (defaults to IObject) when you don't need a specific interface.
- *
- * @tparam T The interface type for add/remove/get_at/get_all/for_each. Defaults to IObject.
- */
-template <class T = IObject>
 class Container : public Object
 {
 public:
     /** @brief Default-constructed Container wraps no object. */
     Container() = default;
 
-    /** @brief Wraps an existing IObject pointer as a container. */
-    explicit Container(IObject::Ptr obj) : Object(std::move(obj)) {}
+    /** @brief Wraps an existing IObject pointer, rejected if it does not implement IContainer. */
+    explicit Container(IObject::Ptr obj)
+        : Object(obj && interface_cast<IContainer>(obj) ? std::move(obj) : IObject::Ptr{})
+    {}
 
     /** @brief Wraps an existing IContainer pointer. */
     explicit Container(IContainer::Ptr c)
@@ -87,42 +58,58 @@ public:
         }
     }
 
-    /** @brief Appends a child to the end of the container (null-safe). */
-    ReturnValue add(const typename T::Ptr& child)
+    /** @brief Appends a child to the end of the container. */
+    ReturnValue add(const IObject::Ptr& child)
     {
         auto* c = intf();
-        return c ? c->add(interface_pointer_cast<IObject>(child)) : ReturnValue::InvalidArgument;
+        return c ? c->add(child) : ReturnValue::InvalidArgument;
     }
 
-    /** @brief Removes a child by pointer identity (null-safe). */
-    ReturnValue remove(const typename T::Ptr& child)
+    /** @brief Removes a child by pointer identity. */
+    ReturnValue remove(const IObject::Ptr& child)
     {
         auto* c = intf();
-        return c ? c->remove(interface_pointer_cast<IObject>(child)) : ReturnValue::InvalidArgument;
+        return c ? c->remove(child) : ReturnValue::InvalidArgument;
     }
 
-    /** @brief Inserts a child at the given index (null-safe). */
-    ReturnValue insert(size_t index, const typename T::Ptr& child)
+    /** @brief Inserts a child at the given index. */
+    ReturnValue insert(size_t index, const IObject::Ptr& child)
     {
         auto* c = intf();
-        return c ? c->insert(index, interface_pointer_cast<IObject>(child)) : ReturnValue::InvalidArgument;
+        return c ? c->insert(index, child) : ReturnValue::InvalidArgument;
     }
 
-    /** @brief Replaces the child at the given index (null-safe). */
-    ReturnValue replace(size_t index, const typename T::Ptr& child)
+    /** @brief Replaces the child at the given index. */
+    ReturnValue replace(size_t index, const IObject::Ptr& child)
     {
         auto* c = intf();
-        return c ? c->replace(index, interface_pointer_cast<IObject>(child)) : ReturnValue::InvalidArgument;
+        return c ? c->replace(index, child) : ReturnValue::InvalidArgument;
     }
 
-    /** @brief Returns the child at the given index cast to T, or nullptr (null-safe). */
+    /** @brief Returns the child at the given index, or nullptr. */
+    IObject::Ptr get_at(size_t index) const
+    {
+        auto* c = intf();
+        return c ? c->get_at(index) : IObject::Ptr{};
+    }
+
+    /** @brief Returns the child at the given index cast to T, or nullptr. */
+    template <class T>
     typename T::Ptr get_at(size_t index) const
     {
         auto* c = intf();
         return c ? interface_pointer_cast<T>(c->get_at(index)) : typename T::Ptr{};
     }
 
+    /** @brief Returns all children. */
+    vector<IObject::Ptr> get_all() const
+    {
+        auto* c = intf();
+        return c ? c->get_all() : vector<IObject::Ptr>{};
+    }
+
     /** @brief Returns all children cast to T. */
+    template <class T>
     vector<typename T::Ptr> get_all() const
     {
         vector<typename T::Ptr> result;
@@ -139,14 +126,15 @@ public:
     }
 
     /**
-     * @brief Iterates all children with a typed callback (null-safe).
+     * @brief Iterates all children with a typed callback.
      *
      * Each child is cast to T& via interface_cast. Children that do not
      * implement T are skipped.
      *
+     * @tparam T The interface type to cast each child to.
      * @param fn Callable as void(T&) or bool(T&). Return false to stop early.
      */
-    template <class Fn>
+    template <class T, class Fn>
     void for_each(Fn&& fn) const
     {
         static_assert(std::is_invocable_v<std::decay_t<Fn>, T&>,
@@ -183,6 +171,12 @@ private:
 
     mutable IContainer* container_ = nullptr;
 };
+
+/** @brief Creates a new ClassId::Container instance. */
+inline Container create_container()
+{
+    return Container(instance().create<IContainer>(ClassId::Container));
+}
 
 } // namespace velk
 

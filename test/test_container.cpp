@@ -320,54 +320,6 @@ TEST_F(ContainerTest, OrderPreservation)
 }
 
 // ============================================================
-// Convenience helper tests
-// ============================================================
-
-TEST_F(ContainerTest, GetContainerReturnsNullOnFreshObject)
-{
-    auto obj = instance().create<IObject>(AttachTestObj::class_id());
-    EXPECT_EQ(get_container(obj.get()), nullptr);
-}
-
-TEST_F(ContainerTest, EnsureContainerCreatesAndAttaches)
-{
-    auto obj = instance().create<IObject>(AttachTestObj::class_id());
-    auto container = ensure_container(obj.get());
-    ASSERT_TRUE(container);
-    EXPECT_EQ(container->size(), 0u);
-}
-
-TEST_F(ContainerTest, EnsureContainerCalledTwiceReturnsSameInstance)
-{
-    auto obj = instance().create<IObject>(AttachTestObj::class_id());
-    auto c1 = ensure_container(obj.get());
-    auto c2 = ensure_container(obj.get());
-    ASSERT_TRUE(c1);
-    ASSERT_TRUE(c2);
-    EXPECT_EQ(c1.get(), c2.get());
-}
-
-TEST_F(ContainerTest, GetContainerFindsWhatEnsureContainerCreated)
-{
-    auto obj = instance().create<IObject>(AttachTestObj::class_id());
-    auto ensured = ensure_container(obj.get());
-    ASSERT_TRUE(ensured);
-
-    auto* found = get_container(obj.get());
-    EXPECT_EQ(found, ensured.get());
-}
-
-TEST_F(ContainerTest, GetContainerOnNullReturnsNull)
-{
-    EXPECT_EQ(get_container(nullptr), nullptr);
-}
-
-TEST_F(ContainerTest, EnsureContainerOnNullReturnsNull)
-{
-    EXPECT_FALSE(ensure_container(nullptr));
-}
-
-// ============================================================
 // find_or_create_attachment tests
 // ============================================================
 
@@ -419,17 +371,17 @@ TEST_F(ContainerTest, FindOrCreateAttachmentOnNullReturnsNull)
 }
 
 // ============================================================
-// Container<T> wrapper tests
+// Container wrapper tests
 // ============================================================
 
 TEST_F(ContainerTest, WrapperBoolAndEmpty)
 {
-    Container<> valid(instance().create<IContainer>(ClassId::Container));
+    Container valid(instance().create<IContainer>(ClassId::Container));
     EXPECT_TRUE(valid);
     EXPECT_TRUE(valid.empty());
     EXPECT_EQ(valid.size(), 0u);
 
-    Container<> invalid;
+    Container invalid;
     EXPECT_FALSE(invalid);
     EXPECT_TRUE(invalid.empty());
     EXPECT_EQ(invalid.size(), 0u);
@@ -437,7 +389,7 @@ TEST_F(ContainerTest, WrapperBoolAndEmpty)
 
 TEST_F(ContainerTest, WrapperAddAndGetAt)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     auto child = instance().create<IObject>(AttachTestObj::class_id());
 
     EXPECT_EQ(c.add(child), ReturnValue::Success);
@@ -450,7 +402,7 @@ TEST_F(ContainerTest, WrapperAddAndGetAt)
 
 TEST_F(ContainerTest, WrapperRemove)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     auto child = instance().create<IObject>(AttachTestObj::class_id());
     c.add(child);
 
@@ -460,7 +412,7 @@ TEST_F(ContainerTest, WrapperRemove)
 
 TEST_F(ContainerTest, WrapperInsertAndReplace)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     auto a = instance().create<IObject>(AttachTestObj::class_id());
     auto b = instance().create<IObject>(AttachTestObj::class_id());
     auto d = instance().create<IObject>(AttachTestObj::class_id());
@@ -477,7 +429,7 @@ TEST_F(ContainerTest, WrapperInsertAndReplace)
 
 TEST_F(ContainerTest, WrapperGetAll)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     auto a = instance().create<IObject>(AttachTestObj::class_id());
     auto b = instance().create<IObject>(AttachTestObj::class_id());
     c.add(a);
@@ -491,7 +443,7 @@ TEST_F(ContainerTest, WrapperGetAll)
 
 TEST_F(ContainerTest, WrapperClear)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
     EXPECT_EQ(c.size(), 2u);
@@ -502,25 +454,25 @@ TEST_F(ContainerTest, WrapperClear)
 
 TEST_F(ContainerTest, WrapperForEach)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
 
     int count = 0;
-    c.for_each([&](IObject&) { count++; });
+    c.for_each<IObject>([&](IObject&) { count++; });
     EXPECT_EQ(count, 3);
 }
 
 TEST_F(ContainerTest, WrapperForEachEarlyStop)
 {
-    Container<> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
     c.add(instance().create<IObject>(AttachTestObj::class_id()));
 
     int count = 0;
-    c.for_each([&](IObject&) -> bool {
+    c.for_each<IObject>([&](IObject&) -> bool {
         count++;
         return count < 2; // stop after 2
     });
@@ -529,7 +481,7 @@ TEST_F(ContainerTest, WrapperForEachEarlyStop)
 
 TEST_F(ContainerTest, WrapperNullSafe)
 {
-    Container<> c;
+    Container c;
     auto child = instance().create<IObject>(AttachTestObj::class_id());
 
     EXPECT_EQ(c.add(child), ReturnValue::InvalidArgument);
@@ -540,29 +492,29 @@ TEST_F(ContainerTest, WrapperNullSafe)
     EXPECT_TRUE(c.get_all().empty());
 
     int count = 0;
-    c.for_each([&](IObject&) { count++; });
+    c.for_each<IObject>([&](IObject&) { count++; });
     EXPECT_EQ(count, 0);
 }
 
 TEST_F(ContainerTest, TypedWrapperGetAt)
 {
-    Container<IAttachTest> c(instance().create<IContainer>(ClassId::Container));
+    Container c(instance().create<IContainer>(ClassId::Container));
     auto child = instance().create<IObject>(AttachTestObj::class_id());
-    c.add(interface_pointer_cast<IAttachTest>(child));
+    c.add(child);
 
-    auto typed = c.get_at(0);
+    auto typed = c.get_at<IAttachTest>(0);
     ASSERT_TRUE(typed);
     EXPECT_EQ(typed->value().get_value(), 42);
 }
 
 TEST_F(ContainerTest, TypedWrapperForEach)
 {
-    Container<IAttachTest> c(instance().create<IContainer>(ClassId::Container));
-    c.add(interface_pointer_cast<IAttachTest>(instance().create<IObject>(AttachTestObj::class_id())));
-    c.add(interface_pointer_cast<IAttachTest>(instance().create<IObject>(AttachTestObj::class_id())));
+    Container c(instance().create<IContainer>(ClassId::Container));
+    c.add(instance().create<IObject>(AttachTestObj::class_id()));
+    c.add(instance().create<IObject>(AttachTestObj::class_id()));
 
     int count = 0;
-    c.for_each([&](IAttachTest& obj) {
+    c.for_each<IAttachTest>([&](IAttachTest& obj) {
         EXPECT_EQ(obj.value().get_value(), 42);
         count++;
     });
@@ -571,11 +523,11 @@ TEST_F(ContainerTest, TypedWrapperForEach)
 
 TEST_F(ContainerTest, TypedWrapperGetAll)
 {
-    Container<IAttachTest> c(instance().create<IContainer>(ClassId::Container));
-    c.add(interface_pointer_cast<IAttachTest>(instance().create<IObject>(AttachTestObj::class_id())));
-    c.add(interface_pointer_cast<IAttachTest>(instance().create<IObject>(AttachTestObj::class_id())));
+    Container c(instance().create<IContainer>(ClassId::Container));
+    c.add(instance().create<IObject>(AttachTestObj::class_id()));
+    c.add(instance().create<IObject>(AttachTestObj::class_id()));
 
-    auto all = c.get_all();
+    auto all = c.get_all<IAttachTest>();
     EXPECT_EQ(all.size(), 2u);
     for (auto& item : all) {
         ASSERT_TRUE(item);
@@ -585,14 +537,14 @@ TEST_F(ContainerTest, TypedWrapperGetAll)
 TEST_F(ContainerTest, WrapperGetContainer)
 {
     auto raw = instance().create<IContainer>(ClassId::Container);
-    Container<> c(raw);
+    Container c(raw);
     EXPECT_EQ(c.get_container_interface().get(), raw.get());
 }
 
 TEST_F(ContainerTest, ContainerInheritsObject)
 {
     auto raw = instance().create<IContainer>(ClassId::Container);
-    Container<> c(raw);
+    Container c(raw);
 
     // Object methods should work through Container
     EXPECT_TRUE(c);
@@ -606,7 +558,7 @@ TEST_F(ContainerTest, ContainerFromIObjectPtr)
     auto obj = instance().create<IObject>(ClassId::Container);
     ASSERT_TRUE(obj);
 
-    Container<> c(obj);
+    Container c(obj);
     EXPECT_TRUE(c);
     EXPECT_EQ(c.class_uid(), ClassId::Container);
     EXPECT_EQ(c.size(), 0u);
@@ -617,7 +569,7 @@ TEST_F(ContainerTest, ContainerFromIObjectPtr)
 
 TEST_F(ContainerTest, DefaultConstructedContainerIsInvalid)
 {
-    Container<> c;
+    Container c;
     EXPECT_FALSE(c);
     EXPECT_EQ(c.size(), 0u);
     EXPECT_TRUE(c.empty());

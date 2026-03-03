@@ -2,6 +2,7 @@
 
 #include "array_property.h"
 #include "container.h"
+#include "node.h"
 #include "event.h"
 #include "function.h"
 #include "future.h"
@@ -29,6 +30,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ObjectHive>();
     ITypeRegistry::register_type<RawHiveImpl>();
     ITypeRegistry::register_type<ContainerImpl>();
+    ITypeRegistry::register_type<NodeImpl>();
 
     ITypeRegistry::register_type<ext::AnyValue<float>>();
     ITypeRegistry::register_type<ext::AnyValue<double>>();

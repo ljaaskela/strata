@@ -1,7 +1,5 @@
 #include "container.h"
 
-#include <algorithm>
-
 namespace velk {
 
 ReturnValue ContainerImpl::add(const IObject::Ptr& child)

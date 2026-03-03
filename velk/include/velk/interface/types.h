@@ -32,6 +32,8 @@ inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
 inline constexpr Uid ArrayProperty{"f8e2a3b1-7c4d-49e6-8f1a-2b3c4d5e6f70"};
 /** @brief Default container object implementation. */
 inline constexpr Uid Container{"b7d3e1a2-5f48-4c96-9e0a-1d2b3c4e5f67"};
+/** @brief Node: IContainer that lazy-creates a ContainerImpl attachment for storage. */
+inline constexpr Uid Node{"c8e4f2b3-6a59-4da7-bf1b-2e3d4c5f6a78"};
 } // namespace ClassId
 
 /** @brief A duration in microseconds. */

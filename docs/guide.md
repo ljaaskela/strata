@@ -868,45 +868,38 @@ auto c2 = find_or_create_attachment<IContainer>(obj.get(), ClassId::Container);
 
 ### Container: adding hierarchy
 
-`IContainer` is a built-in interface for managing an ordered list of child objects. It is typically attached to an object via the attachment system using `ClassId::Container`.
+`IContainer` is a built-in interface for managing an ordered list of child objects. For hierarchy use cases, use `Node` (in `api/node.h`) which implements `IContainer` and lazy-creates a `ClassId::Container` attachment internally for storage.
 
 ```cpp
-#include <velk/api/container.h>
+#include <velk/api/node.h>
 
-auto parent = instance().create<IObject>(MyWidget::class_id());
-
-// Ensure a container is attached (creates one if needed)
-auto container = ensure_container(parent.get());
-
-// Add children
+// Create a node and add children
+auto node = create_node();
 auto a = instance().create<IObject>(MyWidget::class_id());
 auto b = instance().create<IObject>(MyWidget::class_id());
-container->add(a);
-container->add(b);
-container->size();    // 2
+node.add(a);
+node.add(b);
+node.size();    // 2
 
 // Retrieve by index
-auto first = container->get_at(0);
+auto first = node.get_at(0);
 
-// Iterate all children
-for (size_t i = 0; i < container->size(); ++i) {
-    auto child = container->get_at(i);
-    // ...
-}
+// Typed retrieval
+IMyWidget::Ptr w = node.get_at<IMyWidget>(0);
 
-// Later, find the existing container (returns nullptr if none)
-IContainer* found = get_container(parent.get());
+// Attach a node to another object
+auto parent = instance().create<IObject>(MyWidget::class_id());
+auto container = find_or_create_attachment<IContainer>(parent.get(), ClassId::Node);
+container->add(child);
 ```
 
-`IContainer` provides the full vector-like API: `add`, `remove`, `insert`, `replace`, `get_at`, `get_all`, `size`, and `clear`.
-
-For typed access, `Container<T>` (in `api/container.h`) wraps `IContainer` with null-safe operations and automatic `interface_cast` on children:
+`Node` inherits `Container` (in `api/container.h`), which provides the full vector-like API: `add`, `remove`, `insert`, `replace`, `get_at`, `get_all`, `size`, and `clear`. Templated methods provide typed access:
 
 ```cpp
-Container<IMyWidget> c(ensure_container(parent.get()));
-c.add(widget_ptr);                            // accepts IMyWidget::Ptr
-IMyWidget::Ptr w = c.get_at(0);              // returns IMyWidget::Ptr
-c.for_each([](IMyWidget& w) {
+Node node(create_node());
+node.get_at<IMyWidget>(0);               // returns IMyWidget::Ptr
+node.get_all<IMyWidget>();               // returns vector<IMyWidget::Ptr>
+node.for_each<IMyWidget>([](IMyWidget& w) {
     w.width().set_value(100.f);
 });
 ```
