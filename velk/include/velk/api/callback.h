@@ -140,6 +140,13 @@ private:
     IFunction::Ptr fn_;
 };
 
+/** @brief Helper function which creates a callback with @tparam fn. */
+template <class F>
+Callback create_callback(F&& fn)
+{
+    return Callback(std::move(fn));
+}
+
 } // namespace velk
 
 #endif // VELK_API_CALLBACK_H

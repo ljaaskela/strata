@@ -2,6 +2,7 @@
 #include <velk/api/callback.h>
 #include <velk/api/event.h>
 #include <velk/api/function.h>
+#include <velk/api/hierarchy.h>
 #include <velk/api/hive/object_hive.h>
 #include <velk/api/hive/raw_hive.h>
 #include <velk/api/property.h>
@@ -1039,3 +1040,173 @@ static void BM_ChurnRawHive(benchmark::State& state)
     }
 }
 BENCHMARK(BM_ChurnRawHive);
+
+// ===========================================================================
+// Hierarchy benchmarks
+// ===========================================================================
+
+static Hierarchy build_tree(size_t count)
+{
+    auto h = create_hierarchy();
+    if (count == 0) return h;
+    auto root = instance().create<IObject>(BenchWidget::class_id());
+    h.set_root(root);
+    std::vector<IObject::Ptr> nodes = {root};
+    for (size_t i = 1; i < count; ++i) {
+        auto child = instance().create<IObject>(BenchWidget::class_id());
+        h.add(nodes[(i - 1) / 2], child);
+        nodes.push_back(child);
+    }
+    return h;
+}
+
+static void BM_HierarchySetRoot(benchmark::State& state)
+{
+    ensureRegistered();
+    for (auto _ : state) {
+        auto h = create_hierarchy();
+        auto root = instance().create<IObject>(BenchWidget::class_id());
+        h.set_root(root);
+        benchmark::DoNotOptimize(h.root());
+    }
+}
+BENCHMARK(BM_HierarchySetRoot);
+
+static void BM_HierarchyBuildTree(benchmark::State& state)
+{
+    ensureRegistered();
+    const auto count = static_cast<size_t>(state.range(0));
+    for (auto _ : state) {
+        auto h = build_tree(count);
+        benchmark::DoNotOptimize(h.size());
+    }
+}
+BENCHMARK(BM_HierarchyBuildTree)->Range(64, 1024);
+
+static void BM_HierarchyParentOf(benchmark::State& state)
+{
+    ensureRegistered();
+    auto h = build_tree(1024);
+    // Pick a leaf: last node in the tree
+    auto root_node = h.root();
+    // Navigate to a deep leaf via child_at(1) repeatedly
+    Node leaf = root_node;
+    while (leaf.child_count() > 0) {
+        leaf = leaf.child_at(leaf.child_count() - 1);
+    }
+    auto leaf_obj = leaf.object();
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(h.parent_of(leaf_obj));
+    }
+}
+BENCHMARK(BM_HierarchyParentOf);
+
+static void BM_HierarchyChildrenOf(benchmark::State& state)
+{
+    ensureRegistered();
+    // Build a wide tree: root with 512 direct children
+    auto h = create_hierarchy();
+    auto root = instance().create<IObject>(BenchWidget::class_id());
+    h.set_root(root);
+    for (size_t i = 0; i < 512; ++i) {
+        auto child = instance().create<IObject>(BenchWidget::class_id());
+        h.add(root, child);
+    }
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(h.children_of(root));
+    }
+}
+BENCHMARK(BM_HierarchyChildrenOf);
+
+static void BM_HierarchyContains(benchmark::State& state)
+{
+    ensureRegistered();
+    auto h = build_tree(1024);
+    // Pick a leaf
+    Node leaf = h.root();
+    while (leaf.child_count() > 0) {
+        leaf = leaf.child_at(leaf.child_count() - 1);
+    }
+    auto leaf_obj = leaf.object();
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(h.contains(leaf_obj));
+    }
+}
+BENCHMARK(BM_HierarchyContains);
+
+static void BM_HierarchyForEachChild(benchmark::State& state)
+{
+    ensureRegistered();
+    // Wide tree: root with 512 direct children
+    auto h = create_hierarchy();
+    auto root = instance().create<IObject>(BenchWidget::class_id());
+    h.set_root(root);
+    for (size_t i = 0; i < 512; ++i) {
+        auto child = instance().create<IObject>(BenchWidget::class_id());
+        h.add(root, child);
+    }
+    size_t count = 0;
+    for (auto _ : state) {
+        count = 0;
+        h.for_each_child<IObject>(root, [&](IObject&) { ++count; });
+        benchmark::DoNotOptimize(count);
+    }
+}
+BENCHMARK(BM_HierarchyForEachChild);
+
+static void BM_HierarchyAddRemoveLeaf(benchmark::State& state)
+{
+    ensureRegistered();
+    auto h = build_tree(256);
+    auto root_obj = h.root().object();
+    for (auto _ : state) {
+        auto leaf = instance().create<IObject>(BenchWidget::class_id());
+        h.add(root_obj, leaf);
+        h.remove(leaf);
+    }
+}
+BENCHMARK(BM_HierarchyAddRemoveLeaf);
+
+static void BM_HierarchyReplace(benchmark::State& state)
+{
+    ensureRegistered();
+    auto h = build_tree(256);
+    // Pick a mid-level node (index 1 = first child of root)
+    auto target = h.root().child_at(0).object();
+    for (auto _ : state) {
+        auto replacement = instance().create<IObject>(BenchWidget::class_id());
+        h.replace(target, replacement);
+        // Swap back for next iteration
+        h.replace(replacement, target);
+    }
+}
+BENCHMARK(BM_HierarchyReplace);
+
+static void BM_HierarchyAddNoHandler(benchmark::State& state)
+{
+    ensureRegistered();
+    auto h = build_tree(64);
+    auto root_obj = h.root().object();
+    for (auto _ : state) {
+        auto leaf = instance().create<IObject>(BenchWidget::class_id());
+        h.add(root_obj, leaf);
+        h.remove(leaf);
+    }
+}
+BENCHMARK(BM_HierarchyAddNoHandler);
+
+static void BM_HierarchyAddWithHandler(benchmark::State& state)
+{
+    ensureRegistered();
+    auto h = build_tree(64);
+    auto root_obj = h.root().object();
+    auto* ih = interface_cast<IHierarchy>(h.get());
+    Event evt = ih->on_changed();
+    evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::Success; }, Immediate);
+    for (auto _ : state) {
+        auto leaf = instance().create<IObject>(BenchWidget::class_id());
+        h.add(root_obj, leaf);
+        h.remove(leaf);
+    }
+}
+BENCHMARK(BM_HierarchyAddWithHandler);

@@ -68,6 +68,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_plugin.h` | `PluginInfo`, `PluginDependency`, `PluginConfig`, `IPlugin` interface, version helpers (`make_version`, `version_major/minor/patch`) |
 | `intf_plugin_registry.h` | `IPluginRegistry` for loading/unloading plugins by instance or from shared libraries |
 | `intf_velk.h` | `UpdateInfo`, `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` and plugin management to `IPluginRegistry` via `plugin_registry()` |
+| `intf_hierarchy.h` | `HierarchyNode`, `HierarchyChange`, `IHierarchy` external tree of `IObject` references with `on_changing`/`on_changed` events; `IHierarchyAware` optional lifecycle callbacks |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `Duration`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
