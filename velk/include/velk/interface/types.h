@@ -58,6 +58,7 @@ enum ReturnValue : int16_t
     Fail = -1,            ///< Operation failed.
     InvalidArgument = -2, ///< One or more arguments were invalid.
     ReadOnly = -3,        ///< Write rejected: target is read-only.
+    Refused = -4,         ///< Operation refused by the target object.
 };
 
 /** @brief General-purpose object flags. Checked by runtime implementations. */

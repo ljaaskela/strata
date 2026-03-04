@@ -22,6 +22,11 @@ This document covers runtime performance and memory usage related topics.
   - [interface_cast](#interface_cast)
   - [Metadata lookup](#metadata-lookup)
   - [Object creation](#object-creation)
+- [Hierarchy](#hierarchy)
+  - [Queries](#queries)
+  - [Mutation](#mutation)
+  - [Tree construction](#tree-construction)
+  - [Event overhead](#event-overhead)
 - [Memory layout](#memory-layout)
   - [Example: Minimal object with 1 member](#example-minimal-object-with-1-member)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
@@ -140,7 +145,43 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
 
----
+## Hierarchy
+
+Hierarchy operations are measured on balanced binary trees of `BenchWidget` objects. Queries and mutations go through the `IHierarchy` interface; the `Hierarchy` and `Node` API wrappers add minimal overhead on top.
+
+| Operation | Cost | Measured | Notes |
+|---|---|---|---|
+| **parent_of** | Hash lookup | ~77 ns | Returns parent of a leaf in a 1024-node tree |
+| **contains** | Hash lookup | ~13 ns | Checks membership of a known leaf |
+| **children_of** (512 children) | Copy vector | ~30 µs | Returns `vector<IObject::Ptr>`; cost dominated by ref-count bumps |
+| **for_each_child** (512 children) | Iterate + cast | ~5.6 µs | Visits each child via `interface_cast<IObject>` callback |
+| **add + remove** (leaf) | 2 mutations | ~367 ns | Steady-state add then remove on a 256-node tree |
+| **replace** | In-place swap | ~485 ns | Replaces a node, reparents children |
+| **set_root** | 1 mutation | ~380 ns | Sets root on an empty hierarchy (includes object creation) |
+| **Build tree/64** | 64 add ops | ~19 µs | Balanced binary tree construction |
+| **Build tree/512** | 512 add ops | ~157 µs | |
+| **Build tree/1024** | 1024 add ops | ~322 µs | ~315 ns per node amortized |
+
+### Queries
+
+`parent_of()` and `contains()` are hash-map lookups on the internal node table. `children_of()` returns a copy of the children vector, so its cost scales linearly with child count due to `shared_ptr` reference counting. `for_each_child()` avoids the vector copy by iterating in-place with a visitor callback, making it ~5x faster than `children_of()` for the same 512 children.
+
+### Mutation
+
+`add()` and `remove()` insert/erase from the internal node map and update parent/children links. `replace()` does the same plus reparents the old node's children to the new node. All mutations fire `on_changing` / `on_changed` events when handlers are registered.
+
+### Tree construction
+
+Building a balanced binary tree scales linearly. At 1024 nodes the amortized cost is ~315 ns per node, which includes object creation (~55 ns) plus the `add()` operation.
+
+### Event overhead
+
+| Scenario | Measured | Notes |
+|---|---|---|
+| add + remove, no handler | ~369 ns | Baseline: no event listeners |
+| add + remove, with handler | ~567 ns | One `on_changed` handler subscribed |
+
+Subscribing an `on_changed` handler adds ~54% overhead to mutation operations. With no handlers registered, the event system imposes no cost beyond checking for an empty handler list.
 
 ## Memory layout
 

@@ -36,7 +36,9 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
   - [Adding and removing](#adding-and-removing)
   - [Finding attachments](#finding-attachments)
   - [Find or create](#find-or-create)
-  - [Hierarchy](#hierarchy)
+- [Hierarchy](#hierarchy)
+  - [Events](#events)
+  - [IHierarchyAware](#ihierarchyaware)
 
 ## Declaring interfaces
 
@@ -866,7 +868,7 @@ auto h1 = find_or_create_attachment<IHierarchy>(storage, ClassId::Hierarchy);
 auto h2 = find_or_create_attachment<IHierarchy>(obj.get(), ClassId::Hierarchy);
 ```
 
-### Hierarchy
+## Hierarchy
 
 Velk objects are flat by default: an `IObject` has metadata and attachments, but no notion of parent/child relationships. Hierarchy is **external**: a standalone `Hierarchy` object (`ClassId::Hierarchy`) manages a single-root tree of `IObject` references. Objects don't know about hierarchy; hierarchy knows about objects.
 
@@ -939,3 +941,41 @@ h.child_count(node);            // works directly
 `Node` queries the hierarchy on demand, so it always reflects the current state of the tree. Adding or removing children after obtaining a `Node` is immediately visible through that node.
 
 `for_each_child` (on both `Node` and `Hierarchy`) accepts `void(T&)` or `bool(T&)` callables. Returning `false` from a `bool` visitor stops iteration early. Children that do not implement `T` are skipped.
+
+### Events
+
+Every hierarchy exposes two multicast events via `VELK_INTERFACE`: `on_changing` (fires before a mutation) and `on_changed` (fires after). Both deliver a `HierarchyChange` argument describing the operation:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `type` | `HierarchyChange::Type` | `SetRoot`, `Add`, `Insert`, `Remove`, `Replace`, or `Clear` |
+| `hierarchy` | `weak_ptr<IHierarchy>` | The hierarchy that fired the event |
+| `parent` | `IObject::Ptr` | Parent involved in the operation (null for `SetRoot` and `Clear`) |
+| `child` | `IObject::Ptr` | Child being added/removed/replaced (the *new* child for `Replace`) |
+| `old_child` | `IObject::Ptr` | The replaced child (only set for `Replace`) |
+| `index` | `size_t` | Insertion index (only set for `Insert`) |
+
+```cpp
+auto* ih = interface_cast<IHierarchy>(h.get());
+
+ih->on_changed().add_handler(Callback([](const HierarchyChange& change) {
+    if (change.type == HierarchyChange::Type::Add) {
+        // A child was added
+    }
+}));
+```
+
+For `Remove`, events fire once for the subtree root, not per descendant. `on_changing` is informational (no veto); it fires before the mutation so handlers can inspect the pre-mutation state.
+
+### IHierarchyAware
+
+Objects that implement `IHierarchyAware` receive per-object lifecycle callbacks when they enter or leave a hierarchy:
+
+| Callback | When | Can veto? |
+|---|---|---|
+| `on_hierarchy_joining(hierarchy, parent)` | Before add/insert/set_root | Yes (return `false` to refuse) |
+| `on_hierarchy_leaving(hierarchy)` | Before direct remove | Yes (return `false` to refuse) |
+| `on_hierarchy_joined(hierarchy, parent)` | After successful add/insert/set_root/replace | No |
+| `on_hierarchy_left(hierarchy)` | After removal (including subtree descendants) | No |
+
+Veto callbacks are only called on the directly affected object. Subtree removals, `clear()`, and `set_root()` replacing an existing tree do not ask descendants for permission. All callbacks are invoked outside the hierarchy's lock, so it is safe to query or mutate the hierarchy from within a callback.

@@ -50,7 +50,18 @@ public:
     }
 
     /** @brief Returns true if this node has a parent (is not root). */
-    bool has_parent() const { return get_parent().operator bool(); }
+    bool has_parent() const
+    {
+        auto h = hierarchy();
+        return h && h->parent_of(node_.object) != nullptr;
+    }
+
+    /** @brief Returns true if this node is the root node of a hierarchy. */
+    bool is_root() const
+    {
+        auto h = hierarchy();
+        return h && node_.object && h->root() == node_.object;
+    }
 
     /** @brief Returns the ordered list of children as Nodes. */
     vector<Node> get_children() const
@@ -112,18 +123,17 @@ public:
         if (!h) {
             return;
         }
-        auto all = h->children_of(node_.object);
-        for (auto& child : all) {
+        h->for_each_child(node_.object, &fn, [](void* ctx, const IObject::Ptr& child) -> bool {
+            auto& callback = *static_cast<std::decay_t<Fn>*>(ctx);
             if (auto* typed = interface_cast<T>(child)) {
-                if constexpr (std::is_same_v<decltype(fn(*typed)), bool>) {
-                    if (!fn(*typed)) {
-                        return;
-                    }
+                if constexpr (std::is_same_v<decltype(callback(*typed)), bool>) {
+                    return callback(*typed);
                 } else {
-                    fn(*typed);
+                    callback(*typed);
                 }
             }
-        }
+            return true;
+        });
     }
 
     /** @brief Returns the owning hierarchy, or null if expired. */
@@ -282,18 +292,17 @@ public:
         if (!h) {
             return;
         }
-        auto all = h->children_of(object);
-        for (auto& child : all) {
+        h->for_each_child(object, &fn, [](void* ctx, const IObject::Ptr& child) -> bool {
+            auto& callback = *static_cast<std::decay_t<Fn>*>(ctx);
             if (auto* typed = interface_cast<T>(child)) {
-                if constexpr (std::is_same_v<decltype(fn(*typed)), bool>) {
-                    if (!fn(*typed)) {
-                        return;
-                    }
+                if constexpr (std::is_same_v<decltype(callback(*typed)), bool>) {
+                    return callback(*typed);
                 } else {
-                    fn(*typed);
+                    callback(*typed);
                 }
             }
-        }
+            return true;
+        });
     }
 
     /** @brief Returns the number of children of the given object. */
@@ -307,7 +316,7 @@ public:
     bool contains(const IObject::Ptr& object) const
     {
         auto* h = intf();
-        return h ? h->contains(object) : false;
+        return h && h->contains(object);
     }
 
     /** @brief Returns the total number of objects in this hierarchy. */
