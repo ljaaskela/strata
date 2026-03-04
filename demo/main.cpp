@@ -1,5 +1,5 @@
-#include <velk/version.h>
 #include <velk/api/any.h>
+#include <velk/version.h>
 
 static_assert(velk::library_version > 0, "velk version must be non-zero");
 #include <velk/api/callback.h>

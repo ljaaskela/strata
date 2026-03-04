@@ -250,9 +250,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
         return false;
     }
 
-    s.progress = (s.duration.us > 0)
-                     ? static_cast<float>(s.elapsed.us) / static_cast<float>(s.duration.us)
-                     : 0.f;
+    s.progress =
+        (s.duration.us > 0) ? static_cast<float>(s.elapsed.us) / static_cast<float>(s.duration.us) : 0.f;
 
     // Find the segment: first keyframe with time > elapsed
     size_t i = 1;

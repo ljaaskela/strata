@@ -1048,7 +1048,9 @@ BENCHMARK(BM_ChurnRawHive);
 static Hierarchy build_tree(size_t count)
 {
     auto h = create_hierarchy();
-    if (count == 0) return h;
+    if (count == 0) {
+        return h;
+    }
     auto root = instance().create<IObject>(BenchWidget::class_id());
     h.set_root(root);
     std::vector<IObject::Ptr> nodes = {root};

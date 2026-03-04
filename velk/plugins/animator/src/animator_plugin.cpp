@@ -1,5 +1,6 @@
-#include "animated_any.h"
 #include "animator_plugin.h"
+
+#include "animated_any.h"
 
 #include <velk/ext/any.h>
 

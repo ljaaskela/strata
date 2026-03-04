@@ -1,7 +1,6 @@
 #include <velk/vector.h>
 
 #include <gtest/gtest.h>
-
 #include <string>
 
 using namespace velk;
@@ -15,9 +14,22 @@ struct Tracked
     Tracked() : value(0) { ++alive; }
     explicit Tracked(int v) : value(v) { ++alive; }
     Tracked(const Tracked& o) : value(o.value) { ++alive; }
-    Tracked(Tracked&& o) noexcept : value(o.value) { o.value = -1; ++alive; }
-    Tracked& operator=(const Tracked& o) { value = o.value; return *this; }
-    Tracked& operator=(Tracked&& o) noexcept { value = o.value; o.value = -1; return *this; }
+    Tracked(Tracked&& o) noexcept : value(o.value)
+    {
+        o.value = -1;
+        ++alive;
+    }
+    Tracked& operator=(const Tracked& o)
+    {
+        value = o.value;
+        return *this;
+    }
+    Tracked& operator=(Tracked&& o) noexcept
+    {
+        value = o.value;
+        o.value = -1;
+        return *this;
+    }
     ~Tracked() { --alive; }
     bool operator==(const Tracked& o) const { return value == o.value; }
 };

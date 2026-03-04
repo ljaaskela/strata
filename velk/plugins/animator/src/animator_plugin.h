@@ -6,8 +6,8 @@
 #include "transition.h"
 
 #include <velk/ext/plugin.h>
-#include <velk/plugins/animator/interpolator_traits.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
+#include <velk/plugins/animator/interpolator_traits.h>
 
 namespace velk {
 

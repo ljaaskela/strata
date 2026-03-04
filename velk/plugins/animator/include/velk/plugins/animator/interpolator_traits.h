@@ -15,10 +15,7 @@ namespace velk {
 template <class T>
 struct interpolator_trait
 {
-    static T interpolate(const T& a, const T& b, float t)
-    {
-        return static_cast<T>(a + (b - a) * t);
-    }
+    static T interpolate(const T& a, const T& b, float t) { return static_cast<T>(a + (b - a) * t); }
 };
 
 namespace detail {

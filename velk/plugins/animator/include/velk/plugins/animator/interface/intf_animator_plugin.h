@@ -1,11 +1,11 @@
 #ifndef VELK_ANIMATOR_INTF_ANIMATOR_PLUGIN_H
 #define VELK_ANIMATOR_INTF_ANIMATOR_PLUGIN_H
 
-#include <velk/plugins/animator/interface/intf_animator.h>
-#include <velk/plugins/animator/interface/intf_transition.h>
-#include <velk/plugins/animator/easing.h>
 #include <velk/interface/intf_plugin.h>
 #include <velk/interface/intf_property.h>
+#include <velk/plugins/animator/easing.h>
+#include <velk/plugins/animator/interface/intf_animator.h>
+#include <velk/plugins/animator/interface/intf_transition.h>
 
 namespace velk {
 

@@ -39,22 +39,28 @@ public:
     size_t size() const override;
 
 private:
+    // Per-node storage: owning pointer, raw parent backlink, ordered children.
     struct Entry
     {
-        IObject::Ptr object;
-        IObject* parent = nullptr;
-        std::vector<IObject::Ptr> children;
+        IObject::Ptr object;                // Owning reference to the node's object.
+        IObject* parent = nullptr;          // Raw backlink (non-owning); null for root.
+        std::vector<IObject::Ptr> children; // Ordered child list.
     };
 
+    // Recursively erases obj and all descendants from entries_, collecting them in removed.
     void remove_recursive(IObject* obj, std::vector<IObject::Ptr>& removed);
+    // Collects all entry objects into out (unordered). Used before clear/set_root.
     void collect_all(std::vector<IObject::Ptr>& out) const;
+    // Returns the owning Ptr of obj's parent, or null. Caller must hold a lock.
     IObject::Ptr lookup_parent(IObject* obj) const;
+    // Fires on_hierarchy_left on each removed object that implements IHierarchyAware.
     void notify_left(const std::vector<IObject::Ptr>& removed);
+    // Fires on_changing or on_changed if handlers exist. Invoked outside the lock.
     void fire_event(string_view name, HierarchyChange change);
 
-    mutable std::shared_mutex mutex_;
-    IObject::Ptr root_;
-    std::unordered_map<IObject*, Entry> entries_;
+    mutable std::shared_mutex mutex_;             // Shared for reads, exclusive for mutations.
+    IObject::Ptr root_;                           // Root object, or null if empty.
+    std::unordered_map<IObject*, Entry> entries_; // All nodes keyed by raw pointer.
 };
 
 } // namespace velk
