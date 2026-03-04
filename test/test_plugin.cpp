@@ -450,9 +450,9 @@ TEST_F(PluginTest, UpdateProvidesTimeInfo)
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
 
     // Supply explicit time values (microseconds)
-    velk_.update({1'000'000});                    // t = 1s
-    EXPECT_EQ(0, raw->lastInfo.elapsed.us);       // First update is the baseline
-    EXPECT_EQ(0, raw->lastInfo.dt.us);            // First update has no previous
+    velk_.update({1'000'000});              // t = 1s
+    EXPECT_EQ(0, raw->lastInfo.elapsed.us); // First update is the baseline
+    EXPECT_EQ(0, raw->lastInfo.dt.us);      // First update has no previous
 
     velk_.update({1'500'000}); // t = 1.5s
     EXPECT_EQ(500'000, raw->lastInfo.elapsed.us);

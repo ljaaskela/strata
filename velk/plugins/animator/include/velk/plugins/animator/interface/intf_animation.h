@@ -13,10 +13,10 @@ namespace velk {
 /** @brief Playback state for an animation. */
 enum class PlayState : uint8_t
 {
-    Idle = 0,     ///< Created but not yet played, or reset via stop().
-    Playing = 1,  ///< Actively advancing.
-    Paused = 2,   ///< Frozen mid-playback, can resume.
-    Finished = 3  ///< Reached the end naturally or via finish().
+    Idle = 0,    ///< Created but not yet played, or reset via stop().
+    Playing = 1, ///< Actively advancing.
+    Paused = 2,  ///< Frozen mid-playback, can resume.
+    Finished = 3 ///< Reached the end naturally or via finish().
 };
 
 /** @brief A type-erased keyframe: time, value, and easing function. */

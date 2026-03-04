@@ -110,8 +110,7 @@ inline IAnimator& default_animator()
 
 /** @brief Creates and installs an implicit transition on a property. Drop the handle to remove. */
 template <class T>
-Transition transition(Property<T> target, Duration duration,
-                      easing::EasingFn ease = easing::linear)
+Transition transition(Property<T> target, Duration duration, easing::EasingFn ease = easing::linear)
 {
     // Ensure the plugin is loaded (registers TransitionImpl type)
     get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);

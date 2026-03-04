@@ -1,10 +1,10 @@
 #include "type_registry.h"
 
 #include "array_property.h"
-#include "hierarchy.h"
 #include "event.h"
 #include "function.h"
 #include "future.h"
+#include "hierarchy.h"
 #include "hive/hive_store.h"
 #include "hive/object_hive.h"
 #include "hive/raw_hive.h"

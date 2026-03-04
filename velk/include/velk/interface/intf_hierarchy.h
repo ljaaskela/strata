@@ -12,8 +12,8 @@ class IHierarchy;
 /** @brief Lightweight handle binding an object to its hierarchy. */
 struct HierarchyNode
 {
-    IObject::Ptr object;                  ///< The object this node represents.
-    weak_ptr<IHierarchy> hierarchy;       ///< Weak reference to the owning hierarchy.
+    IObject::Ptr object;            ///< The object this node represents.
+    weak_ptr<IHierarchy> hierarchy; ///< Weak reference to the owning hierarchy.
 };
 
 /** @brief Describes a hierarchy mutation for on_changing/on_changed events. */
@@ -21,16 +21,16 @@ struct HierarchyChange
 {
     enum class Type : uint8_t
     {
-        SetRoot,  ///< Root is being set. child = new root.
-        Add,      ///< Child appended. parent, child set.
-        Insert,   ///< Child inserted at index. parent, child, index set.
-        Remove,   ///< Subtree removed. parent, child set. child is subtree root.
-        Replace,  ///< In-place replacement. parent, child (new), old_child set.
-        Clear     ///< All objects removed.
+        SetRoot, ///< Root is being set. child = new root.
+        Add,     ///< Child appended. parent, child set.
+        Insert,  ///< Child inserted at index. parent, child, index set.
+        Remove,  ///< Subtree removed. parent, child set. child is subtree root.
+        Replace, ///< In-place replacement. parent, child (new), old_child set.
+        Clear    ///< All objects removed.
     };
 
     Type type{};
-    weak_ptr<IHierarchy> hierarchy;   ///< The hierarchy that fired this event.
+    weak_ptr<IHierarchy> hierarchy; ///< The hierarchy that fired this event.
     IObject::Ptr parent;
     IObject::Ptr child;
     IObject::Ptr old_child;
@@ -38,8 +38,8 @@ struct HierarchyChange
 
     friend bool operator==(const HierarchyChange& a, const HierarchyChange& b)
     {
-        return a.type == b.type && a.hierarchy.lock() == b.hierarchy.lock() && a.parent == b.parent
-               && a.child == b.child && a.old_child == b.old_child && a.index == b.index;
+        return a.type == b.type && a.hierarchy.lock() == b.hierarchy.lock() && a.parent == b.parent &&
+               a.child == b.child && a.old_child == b.old_child && a.index == b.index;
     }
     friend bool operator!=(const HierarchyChange& a, const HierarchyChange& b) { return !(a == b); }
 };

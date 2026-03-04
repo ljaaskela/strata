@@ -27,10 +27,7 @@ public:
     Node() = default;
 
     /** @brief Wraps a HierarchyNode handle. */
-    explicit Node(HierarchyNode hn)
-        : Object(hn.object),
-          node_(std::move(hn))
-    {}
+    explicit Node(HierarchyNode hn) : Object(hn.object), node_(std::move(hn)) {}
 
     /** @brief Returns true if this node has an object. */
     operator bool() const { return Object::operator bool(); }
@@ -327,10 +324,7 @@ public:
     }
 
     /** @brief Returns true if the hierarchy is empty. */
-    bool empty() const
-    {
-        return size() == 0;
-    }
+    bool empty() const { return size() == 0; }
 
     /** @brief Returns the underlying IHierarchy pointer. */
     IHierarchy::Ptr get_hierarchy_interface() const { return as_ptr<IHierarchy>(); }

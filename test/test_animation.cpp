@@ -11,9 +11,18 @@
 using namespace velk;
 
 namespace {
-constexpr Duration sec(float s) { return Duration::from_seconds(s); }
-UpdateInfo dt(float s) { return {{}, {}, Duration::from_seconds(s)}; }
-void flush() { instance().update({}); }
+constexpr Duration sec(float s)
+{
+    return Duration::from_seconds(s);
+}
+UpdateInfo dt(float s)
+{
+    return {{}, {}, Duration::from_seconds(s)};
+}
+void flush()
+{
+    instance().update({});
+}
 } // namespace
 
 // ============================================================================

@@ -1,7 +1,6 @@
 #include <velk/string.h>
 
 #include <gtest/gtest.h>
-
 #include <sstream>
 
 using namespace velk;

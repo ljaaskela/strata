@@ -38,8 +38,8 @@ private:
 
     IProperty::Ptr target_;
     InterpolatorFn interpolator_ = nullptr; // resolved from type registry during init
-    IAny::Ptr result_;  // cached result buffer, cloned once from first keyframe
-    Uid typeUid_{};     // resolved from target on first tick
+    IAny::Ptr result_;                      // cached result buffer, cloned once from first keyframe
+    Uid typeUid_{};                         // resolved from target on first tick
     bool sorted_ = false;
 };
 

@@ -6,8 +6,8 @@
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
-#include <velk/interface/intf_hierarchy.h>
 #include <velk/interface/intf_event.h>
+#include <velk/interface/intf_hierarchy.h>
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/intf_object_storage.h>
 #include <velk/interface/intf_property.h>

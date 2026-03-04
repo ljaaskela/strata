@@ -46,20 +46,11 @@ public:
         return state_.allow_join;
     }
 
-    bool on_hierarchy_leaving(const IHierarchy::Ptr&) override
-    {
-        return state_.allow_leave;
-    }
+    bool on_hierarchy_leaving(const IHierarchy::Ptr&) override { return state_.allow_leave; }
 
-    void on_hierarchy_joined(const IHierarchy::Ptr&, const IObject::Ptr&) override
-    {
-        state_.joined_count++;
-    }
+    void on_hierarchy_joined(const IHierarchy::Ptr&, const IObject::Ptr&) override { state_.joined_count++; }
 
-    void on_hierarchy_left(const IHierarchy::Ptr&) override
-    {
-        state_.left_count++;
-    }
+    void on_hierarchy_left(const IHierarchy::Ptr&) override { state_.left_count++; }
 };
 
 class HierarchyTest : public ::testing::Test
@@ -71,10 +62,7 @@ protected:
         instance().type_registry().register_type<ListenerObj>();
     }
 
-    IObject::Ptr make_obj()
-    {
-        return instance().create<IObject>(HierarchyTestObj::class_id());
-    }
+    IObject::Ptr make_obj() { return instance().create<IObject>(HierarchyTestObj::class_id()); }
 };
 
 TEST_F(HierarchyTest, CreateHierarchy)
@@ -471,9 +459,7 @@ TEST_F(HierarchyTest, ForEachChild)
     interface_cast<IHierarchyTest>(child2)->value().set_value(20);
 
     int sum = 0;
-    h.for_each_child<IHierarchyTest>(root, [&](IHierarchyTest& obj) {
-        sum += obj.value().get_value();
-    });
+    h.for_each_child<IHierarchyTest>(root, [&](IHierarchyTest& obj) { sum += obj.value().get_value(); });
     EXPECT_EQ(sum, 30);
 }
 
@@ -641,9 +627,7 @@ TEST_F(HierarchyTest, NodeForEachChild)
 
     auto node = h.root();
     int sum = 0;
-    node.for_each_child<IHierarchyTest>([&](IHierarchyTest& obj) {
-        sum += obj.value().get_value();
-    });
+    node.for_each_child<IHierarchyTest>([&](IHierarchyTest& obj) { sum += obj.value().get_value(); });
     EXPECT_EQ(sum, 30);
 }
 
@@ -1169,8 +1153,8 @@ TEST_F(EventHierarchyTest, OnChangingBeforeOnChanged)
 
     // set_root: pre, post; add: pre, post
     ASSERT_EQ(records.size(), 4u);
-    EXPECT_TRUE(records[0].is_pre);   // set_root changing
-    EXPECT_FALSE(records[1].is_pre);  // set_root changed
-    EXPECT_TRUE(records[2].is_pre);   // add changing
-    EXPECT_FALSE(records[3].is_pre);  // add changed
+    EXPECT_TRUE(records[0].is_pre);  // set_root changing
+    EXPECT_FALSE(records[1].is_pre); // set_root changed
+    EXPECT_TRUE(records[2].is_pre);  // add changing
+    EXPECT_FALSE(records[3].is_pre); // add changed
 }
