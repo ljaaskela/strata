@@ -109,6 +109,12 @@ VELK_C_API velk_property velk_get_property(velk_object obj, const char* name);
  */
 VELK_C_API velk_event velk_get_event(velk_object obj, const char* name);
 
+/**
+ * @brief Looks up a function by name. Returns NULL if not found.
+ * The returned handle has one reference; caller must velk_release() it.
+ */
+VELK_C_API velk_function velk_get_function(velk_object obj, const char* name);
+
 /* Property get/set (type-erased) */
 
 /**
@@ -139,6 +145,51 @@ VELK_C_API velk_result velk_property_get_double(velk_property prop, double* out)
 VELK_C_API velk_result velk_property_set_double(velk_property prop, double value);
 VELK_C_API velk_result velk_property_get_bool(velk_property prop, int32_t* out);
 VELK_C_API velk_result velk_property_set_bool(velk_property prop, int32_t value);
+
+/**
+ * @brief Returns the on_changed event for a property.
+ * The returned handle has one reference; caller must velk_release() it.
+ */
+VELK_C_API velk_event velk_property_on_changed(velk_property prop);
+
+/* Functions */
+
+/**
+ * @brief Invokes a function with no arguments.
+ * @param fn  Function handle obtained from velk_get_function().
+ */
+VELK_C_API velk_result velk_invoke(velk_function fn);
+
+/* Function arguments */
+
+/** @brief Opaque argument list for passing typed values to velk_invoke_args(). */
+typedef struct velk_args_s* velk_args;
+
+/**
+ * @brief Creates an argument list with @p count slots.
+ * Each slot must be filled with a velk_args_set_* call before invoking.
+ * Caller must free with velk_args_destroy().
+ */
+VELK_C_API velk_args velk_args_create(size_t count);
+
+/** @brief Destroys an argument list. */
+VELK_C_API void velk_args_destroy(velk_args args);
+
+/** @brief Sets argument at @p index to a float value. */
+VELK_C_API void velk_args_set_float(velk_args args, size_t index, float value);
+/** @brief Sets argument at @p index to an int32 value. */
+VELK_C_API void velk_args_set_int32(velk_args args, size_t index, int32_t value);
+/** @brief Sets argument at @p index to a double value. */
+VELK_C_API void velk_args_set_double(velk_args args, size_t index, double value);
+/** @brief Sets argument at @p index to a bool value. */
+VELK_C_API void velk_args_set_bool(velk_args args, size_t index, int32_t value);
+
+/**
+ * @brief Invokes a function with arguments.
+ * @param fn    Function handle.
+ * @param args  Argument list built with velk_args_create() and velk_args_set_*().
+ */
+VELK_C_API velk_result velk_invoke_args(velk_function fn, velk_args args);
 
 /* Events/callbacks */
 

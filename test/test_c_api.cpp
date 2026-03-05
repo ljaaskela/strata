@@ -13,12 +13,24 @@ public:
     VELK_INTERFACE(
         (PROP, float, width, 100.f),
         (PROP, int, count, 0),
-        (EVT, on_clicked)
+        (EVT, on_clicked),
+        (FN, void, reset),
+        (FN, int, add, (int, x), (int, y))
     )
 };
 
 class CApiWidget : public velk::ext::Object<CApiWidget, ICApiWidget>
 {
+public:
+    int reset_count = 0;
+    int last_add_result = 0;
+
+    void fn_reset() override { reset_count++; }
+    int fn_add(int x, int y) override
+    {
+        last_add_result = x + y;
+        return last_add_result;
+    }
 };
 
 class CApi : public ::testing::Test
@@ -193,6 +205,121 @@ TEST_F(CApi, EventAddRemoveCallback)
     velk_release(obj);
 }
 
+// Property on_changed
+
+static void on_changed_callback(void* user_data, velk_property source)
+{
+    (void)source;
+    int* counter = static_cast<int*>(user_data);
+    (*counter)++;
+}
+
+TEST_F(CApi, PropertyOnChanged)
+{
+    auto cpp_uid = CApiWidget::class_id();
+    velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
+
+    velk_object obj = velk_create(class_id, 0);
+    ASSERT_NE(obj, nullptr);
+
+    velk_property prop = velk_get_property(obj, "width");
+    ASSERT_NE(prop, nullptr);
+
+    velk_event changed = velk_property_on_changed(prop);
+    ASSERT_NE(changed, nullptr);
+
+    int counter = 0;
+    velk_function handler = velk_create_callback(&on_changed_callback, &counter);
+    velk_event_add(changed, handler);
+
+    velk_property_set_float(prop, 200.f);
+    EXPECT_EQ(counter, 1);
+
+    velk_property_set_float(prop, 300.f);
+    EXPECT_EQ(counter, 2);
+
+    // Same value: no change notification
+    velk_property_set_float(prop, 300.f);
+    EXPECT_EQ(counter, 2);
+
+    velk_release(handler);
+    velk_release(changed);
+    velk_release(prop);
+    velk_release(obj);
+}
+
+// Function invocation
+
+TEST_F(CApi, GetFunctionAndInvoke)
+{
+    auto cpp_uid = CApiWidget::class_id();
+    velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
+
+    velk_object obj = velk_create(class_id, 0);
+    ASSERT_NE(obj, nullptr);
+
+    velk_function fn = velk_get_function(obj, "reset");
+    ASSERT_NE(fn, nullptr);
+
+    velk_result r = velk_invoke(fn);
+    EXPECT_GE(r, 0);
+
+    // Verify the function actually ran by checking the C++ side
+    auto* raw = reinterpret_cast<velk::IInterface*>(obj);
+    auto* iw = velk::interface_cast<ICApiWidget>(raw);
+    ASSERT_NE(iw, nullptr);
+    EXPECT_EQ(static_cast<CApiWidget*>(iw)->reset_count, 1);
+
+    velk_invoke(fn);
+    EXPECT_EQ(static_cast<CApiWidget*>(iw)->reset_count, 2);
+
+    velk_release(fn);
+    velk_release(obj);
+}
+
+TEST_F(CApi, InvokeWithArgs)
+{
+    auto cpp_uid = CApiWidget::class_id();
+    velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
+
+    velk_object obj = velk_create(class_id, 0);
+    ASSERT_NE(obj, nullptr);
+
+    velk_function fn = velk_get_function(obj, "add");
+    ASSERT_NE(fn, nullptr);
+
+    velk_args args = velk_args_create(2);
+    ASSERT_NE(args, nullptr);
+    velk_args_set_int32(args, 0, 3);
+    velk_args_set_int32(args, 1, 4);
+
+    velk_result r = velk_invoke_args(fn, args);
+    EXPECT_GE(r, 0);
+
+    // Verify the result on the C++ side
+    auto* iw = velk::interface_cast<ICApiWidget>(reinterpret_cast<velk::IInterface*>(obj));
+    ASSERT_NE(iw, nullptr);
+    EXPECT_EQ(static_cast<CApiWidget*>(iw)->last_add_result, 7);
+
+    velk_args_destroy(args);
+    velk_release(fn);
+    velk_release(obj);
+}
+
+TEST_F(CApi, GetFunctionNotFound)
+{
+    auto cpp_uid = CApiWidget::class_id();
+    velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
+
+    velk_object obj = velk_create(class_id, 0);
+    ASSERT_NE(obj, nullptr);
+
+    velk_function fn = velk_get_function(obj, "nonexistent");
+    EXPECT_EQ(fn, nullptr);
+
+    velk_release(obj);
+}
+
 // Update loop (smoke test)
 
 TEST_F(CApi, UpdateDoesNotCrash)
@@ -211,6 +338,9 @@ TEST_F(CApi, NullHandlesReturnGracefully)
     EXPECT_EQ(velk_cast(velk_interface(nullptr), {0, 0}), nullptr);
     EXPECT_EQ(velk_get_property(nullptr, "x"), nullptr);
     EXPECT_EQ(velk_get_event(nullptr, "x"), nullptr);
+    EXPECT_EQ(velk_get_function(nullptr, "x"), nullptr);
+    EXPECT_EQ(velk_property_on_changed(nullptr), nullptr);
+    EXPECT_EQ(velk_invoke(nullptr), VELK_INVALID_ARG);
 
     velk_uid uid = velk_class_uid(nullptr);
     EXPECT_EQ(uid.hi, uint64_t(0));
