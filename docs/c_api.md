@@ -84,7 +84,18 @@ float val;
 velk_property_get_float(width, &val);     // read default
 velk_property_set_float(width, 42.5f);    // write new value
 
-// Listen for events
+// Listen for property changes
+void on_width_changed(void* ctx, velk_property src) {
+    float new_val;
+    velk_property_get_float(src, &new_val);
+    // ... react to change ...
+}
+
+velk_event changed = velk_property_on_changed(width);
+velk_function watcher = velk_create_callback(on_width_changed, NULL);
+velk_event_add(changed, watcher);
+
+// Listen for named events
 void on_clicked(void* ctx, velk_property src) {
     // handle event
 }
@@ -93,12 +104,28 @@ velk_event evt = velk_get_event(obj, "on_clicked");
 velk_function handler = velk_create_callback(on_clicked, NULL);
 velk_event_add(evt, handler);
 
+// Call functions
+velk_function reset = velk_get_function(obj, "reset");
+velk_invoke(reset);
+
+// Call functions with arguments
+velk_function add = velk_get_function(obj, "add");
+velk_args args = velk_args_create(2);
+velk_args_set_int32(args, 0, 10);
+velk_args_set_int32(args, 1, 20);
+velk_invoke_args(add, args);
+velk_args_destroy(args);
+
 // Advance the runtime (call each frame)
 velk_update(0);
 
 // Cleanup
+velk_release(add);
+velk_release(reset);
 velk_release(handler);
 velk_release(evt);
+velk_release(watcher);
+velk_release(changed);
 velk_release(width);
 velk_release(obj);
 ```
@@ -132,6 +159,7 @@ velk_release(obj);
 |---|---|
 | `velk_get_property(obj, name)` | Look up a property by name. Returns handle with one ref |
 | `velk_get_event(obj, name)` | Look up an event by name. Returns handle with one ref |
+| `velk_get_function(obj, name)` | Look up a function by name. Returns handle with one ref |
 
 ### Property access
 
@@ -150,6 +178,40 @@ Typed convenience (no UID needed):
 | `velk_property_get_int32` / `velk_property_set_int32` | `int32_t` |
 | `velk_property_get_double` / `velk_property_set_double` | `double` |
 | `velk_property_get_bool` / `velk_property_set_bool` | `int32_t` (0 = false, nonzero = true) |
+
+Change notification:
+
+| Function | Description |
+|---|---|
+| `velk_property_on_changed(prop)` | Get the on_changed event for a property. Returns handle with one ref |
+
+### Functions
+
+| Function | Description |
+|---|---|
+| `velk_invoke(fn)` | Invoke a function with no arguments |
+| `velk_invoke_args(fn, args)` | Invoke a function with an argument list |
+
+Argument lists are built with a create/set/destroy pattern:
+
+| Function | Description |
+|---|---|
+| `velk_args_create(count)` | Create an argument list with `count` slots |
+| `velk_args_set_float(args, index, value)` | Set a float argument |
+| `velk_args_set_int32(args, index, value)` | Set an int32 argument |
+| `velk_args_set_double(args, index, value)` | Set a double argument |
+| `velk_args_set_bool(args, index, value)` | Set a bool argument |
+| `velk_args_destroy(args)` | Free the argument list |
+
+```c
+velk_function add = velk_get_function(obj, "add");
+velk_args args = velk_args_create(2);
+velk_args_set_int32(args, 0, 3);
+velk_args_set_int32(args, 1, 4);
+velk_invoke_args(add, args);
+velk_args_destroy(args);
+velk_release(add);
+```
 
 ### Events and callbacks
 

@@ -2,6 +2,7 @@
 
 #include <velk/api/velk.h>
 #include <velk/common.h>
+#include <velk/ext/any.h>
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_function.h>
@@ -154,6 +155,19 @@ velk_event velk_get_event(velk_object obj, const char* name)
     return to_handle<velk_event>(evt);
 }
 
+velk_function velk_get_function(velk_object obj, const char* name)
+{
+    if (!obj || !name) {
+        return nullptr;
+    }
+    auto* meta = interface_cast<IMetadata>(from_handle(reinterpret_cast<velk_interface>(obj)));
+    if (!meta) {
+        return nullptr;
+    }
+    auto fn = meta->get_function(string_view(name, strlen(name)));
+    return to_handle<velk_function>(fn);
+}
+
 // Property get/set (type-erased)
 
 velk_result velk_property_get(velk_property prop, void* out, size_t size, velk_uid type)
@@ -238,6 +252,109 @@ velk_result velk_property_set_bool(velk_property prop, int32_t value)
     bool tmp = value != 0;
     velk_uid t = from_uid(type_uid<bool>());
     return velk_property_set(prop, &tmp, sizeof(bool), t);
+}
+
+// Property on_changed
+
+velk_event velk_property_on_changed(velk_property prop)
+{
+    if (!prop) {
+        return nullptr;
+    }
+    auto* p = static_cast<IProperty*>(from_handle(reinterpret_cast<velk_interface>(prop)));
+    auto evt = p->on_changed();
+    return to_handle<velk_event>(evt);
+}
+
+// Function invocation
+
+velk_result velk_invoke(velk_function fn)
+{
+    if (!fn) {
+        return VELK_INVALID_ARG;
+    }
+    auto* f = static_cast<IFunction*>(from_handle(reinterpret_cast<velk_interface>(fn)));
+    f->invoke({});
+    return VELK_SUCCESS;
+}
+
+// Function arguments
+
+struct velk_args_s
+{
+    size_t count;
+    IAny::Ptr* owned;       // array of owned IAny pointers
+    const IAny** raw;       // array of raw pointers for FnArgs
+
+    velk_args_s(size_t n) : count(n), owned(new IAny::Ptr[n]), raw(new const IAny*[n])
+    {
+        for (size_t i = 0; i < n; ++i) {
+            raw[i] = nullptr;
+        }
+    }
+    ~velk_args_s()
+    {
+        delete[] owned;
+        delete[] raw;
+    }
+};
+
+velk_args velk_args_create(size_t count)
+{
+    if (count == 0) {
+        return nullptr;
+    }
+    return new velk_args_s(count);
+}
+
+void velk_args_destroy(velk_args args)
+{
+    delete args;
+}
+
+template <class T>
+static void args_set(velk_args args, size_t index, T value)
+{
+    if (!args || index >= args->count) {
+        return;
+    }
+    auto any = ::velk::instance().create_any(type_uid<T>());
+    if (any) {
+        any->set_data(&value, sizeof(T), type_uid<T>());
+    }
+    args->owned[index] = any;
+    args->raw[index] = args->owned[index].get();
+}
+
+void velk_args_set_float(velk_args args, size_t index, float value)
+{
+    args_set(args, index, value);
+}
+
+void velk_args_set_int32(velk_args args, size_t index, int32_t value)
+{
+    args_set<int>(args, index, value);
+}
+
+void velk_args_set_double(velk_args args, size_t index, double value)
+{
+    args_set(args, index, value);
+}
+
+void velk_args_set_bool(velk_args args, size_t index, int32_t value)
+{
+    args_set<bool>(args, index, value != 0);
+}
+
+velk_result velk_invoke_args(velk_function fn, velk_args args)
+{
+    if (!fn || !args) {
+        return VELK_INVALID_ARG;
+    }
+    auto* f = static_cast<IFunction*>(from_handle(reinterpret_cast<velk_interface>(fn)));
+    FnArgs fnargs{args->raw, args->count};
+    f->invoke(fnargs);
+    return VELK_SUCCESS;
 }
 
 // Callbacks
