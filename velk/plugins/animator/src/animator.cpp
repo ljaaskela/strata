@@ -6,18 +6,30 @@ namespace velk {
 
 void AnimatorImpl::tick(const UpdateInfo& info)
 {
-    for (auto& anim : animations_) {
-        if (anim && anim->state().get_value() == PlayState::Playing) {
-            anim->tick(info);
+    size_t write = 0;
+    for (size_t i = 0; i < animations_.size(); ++i) {
+        auto anim = animations_[i].lock();
+        if (!anim) {
+            continue;
         }
+        anim->tick(info);
+        animations_[write++] = animations_[i];
     }
+    animations_.resize(write); // Removes any IAnimation::WeakPtrs whose .lock() failed above.
 }
 
 void AnimatorImpl::add(const IAnimation::Ptr& animation)
 {
-    if (animation) {
-        animations_.push_back(animation);
+    if (!animation) {
+        return;
     }
+    for (auto& weak : animations_) {
+        auto locked = weak.lock();
+        if (locked && locked.get() == animation.get()) {
+            return;
+        }
+    }
+    animations_.push_back(IAnimation::WeakPtr(animation));
 }
 
 void AnimatorImpl::remove(const IAnimation::Ptr& animation)
@@ -26,7 +38,8 @@ void AnimatorImpl::remove(const IAnimation::Ptr& animation)
         return;
     }
     for (size_t i = 0; i < animations_.size(); ++i) {
-        if (animations_[i].get() == animation.get()) {
+        auto locked = animations_[i].lock();
+        if (locked && locked.get() == animation.get()) {
             animations_.erase(animations_.begin() + static_cast<ptrdiff_t>(i));
             return;
         }
@@ -35,9 +48,10 @@ void AnimatorImpl::remove(const IAnimation::Ptr& animation)
 
 void AnimatorImpl::cancel_all()
 {
-    for (auto& anim : animations_) {
+    for (auto& weak : animations_) {
+        auto anim = weak.lock();
         if (anim) {
-            anim->stop();
+            anim->uninstall();
         }
     }
     animations_.clear();
@@ -46,8 +60,9 @@ void AnimatorImpl::cancel_all()
 size_t AnimatorImpl::active_count() const
 {
     size_t n = 0;
-    for (auto& anim : animations_) {
-        if (anim && anim->state().get_value() == PlayState::Playing) {
+    for (auto& weak : animations_) {
+        auto anim = weak.lock();
+        if (anim && anim->is_active()) {
             ++n;
         }
     }
@@ -56,7 +71,13 @@ size_t AnimatorImpl::active_count() const
 
 size_t AnimatorImpl::count() const
 {
-    return animations_.size();
+    size_t n = 0;
+    for (auto& weak : animations_) {
+        if (weak.lock()) {
+            ++n;
+        }
+    }
+    return n;
 }
 
 } // namespace velk

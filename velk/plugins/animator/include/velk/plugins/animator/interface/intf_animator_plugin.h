@@ -2,10 +2,7 @@
 #define VELK_ANIMATOR_INTF_ANIMATOR_PLUGIN_H
 
 #include <velk/interface/intf_plugin.h>
-#include <velk/interface/intf_property.h>
-#include <velk/plugins/animator/easing.h>
 #include <velk/plugins/animator/interface/intf_animator.h>
-#include <velk/plugins/animator/interface/intf_transition.h>
 
 namespace velk {
 
@@ -15,9 +12,6 @@ class IAnimatorPlugin : public Interface<IAnimatorPlugin>
 public:
     /** @brief Returns the plugin's default animator. */
     virtual IAnimator& get_default_animator() const = 0;
-
-    /** @brief Registers a transition for automatic ticking during update. */
-    virtual void register_transition(const ITransition::WeakPtr& transition) = 0;
 };
 
 } // namespace velk

@@ -169,6 +169,19 @@ public: // IPropertyState override
     /** @brief Returns a pointer to the State struct for the given interface UID. */
     void* get_property_state(Uid uid) override { return find_state<0>(uid); }
 
+    /** @brief Type-safe state access. Returns a typed pointer to T::State for a VELK_INTERFACE. */
+    template <class T>
+    typename T::State* interface_state()
+    {
+        return static_cast<typename T::State*>(get_property_state(T::UID));
+    }
+    /** @brief Const type-safe state access. Safe because state is always mutable storage owned by the object. */
+    template <class T>
+    const typename T::State* interface_state() const
+    {
+        return const_cast<Object*>(this)->interface_state<T>();
+    }
+
 public:
     /** @brief Returns the singleton factory for creating instances of FinalClass (with metadata). */
     static const IObjectFactory& get_factory()
@@ -210,6 +223,7 @@ private:
             return nullptr;
         }
     }
+
 };
 
 } // namespace velk::ext

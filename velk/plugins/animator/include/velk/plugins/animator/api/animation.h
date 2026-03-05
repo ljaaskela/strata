@@ -4,7 +4,7 @@
 #include <velk/api/any.h>
 #include <velk/api/object.h>
 #include <velk/plugins/animator/easing.h>
-#include <velk/plugins/animator/interface/intf_animation.h>
+#include <velk/plugins/animator/interface/intf_animation_track.h>
 #include <velk/vector.h>
 
 namespace velk {
@@ -18,13 +18,13 @@ struct Keyframe
     easing::EasingFn easing = easing::linear; ///< Easing for the segment arriving at this keyframe.
 };
 
-/** @brief Typed wrapper around an IAnimation, inheriting Object. */
+/** @brief Typed wrapper around an IAnimationTrack, inheriting Object. */
 class Animation : public Object
 {
 public:
     Animation() = default;
     explicit Animation(IObject::Ptr obj) : Object(std::move(obj)) {}
-    explicit Animation(IAnimation::Ptr anim)
+    explicit Animation(IAnimationTrack::Ptr anim)
         : Object(anim ? interface_pointer_cast<IObject>(anim) : IObject::Ptr{}),
           anim_(anim.get())
     {}
@@ -126,8 +126,55 @@ public:
         return a ? a->progress().get_value() : 0.f;
     }
 
-    /** @brief Returns the underlying IAnimation as a shared pointer. */
-    IAnimation::Ptr get_animation_interface() const { return as_ptr<IAnimation>(); }
+    /** @brief Installs this animation on a property target. */
+    void add_target(const IProperty::Ptr& target)
+    {
+        if (auto* a = intf()) {
+            a->add_target(target);
+        }
+    }
+
+    /** @brief Installs this animation on a typed property target. */
+    template <class T>
+    void add_target(Property<T> target)
+    {
+        add_target(target.get_property_interface());
+    }
+
+    /** @brief Removes this animation from a property target. */
+    void remove_target(const IProperty::Ptr& target)
+    {
+        if (auto* a = intf()) {
+            a->remove_target(target);
+        }
+    }
+
+    /** @brief Removes this animation from a typed property target. */
+    template <class T>
+    void remove_target(Property<T> target)
+    {
+        remove_target(target.get_property_interface());
+    }
+
+    /** @brief Detaches from all property targets and releases the handle. */
+    void remove()
+    {
+        if (auto* a = intf()) {
+            a->uninstall();
+        }
+        *this = Animation{};
+    }
+
+    /** @brief When true, dropping the last handle calls uninstall(). Default: false (persistent). */
+    void set_transient(bool t)
+    {
+        if (auto* a = intf()) {
+            a->set_transient(t);
+        }
+    }
+
+    /** @brief Returns the underlying IAnimationTrack as a shared pointer. */
+    IAnimationTrack::Ptr get_animation_interface() const { return as_ptr<IAnimationTrack>(); }
 
     /** @brief Sets typed keyframes on the animation. */
     template <class T>
@@ -149,15 +196,15 @@ public:
     }
 
 private:
-    IAnimation* intf() const
+    IAnimationTrack* intf() const
     {
         if (!anim_ && get()) {
-            anim_ = interface_cast<IAnimation>(get());
+            anim_ = interface_cast<IAnimationTrack>(get());
         }
         return anim_;
     }
 
-    mutable IAnimation* anim_ = nullptr;
+    mutable IAnimationTrack* anim_ = nullptr;
 };
 
 } // namespace velk
