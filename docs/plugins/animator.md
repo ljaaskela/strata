@@ -223,17 +223,6 @@ The returned `Transition` handle holds a strong reference. The transition stays 
 
 Transitions are ticked automatically during `instance().update()`.
 
-You can also install a transition by calling `install_extension` directly on a property:
-
-```cpp
-auto obj = instance().create<IObject>(ClassId::Transition);
-auto tr = interface_pointer_cast<ITransition>(obj);
-tr->duration().set_value(Duration{300});
-
-auto* pi = interface_cast<IPropertyInternal>(widget->width().get_property_interface().get());
-pi->install_extension(interface_pointer_cast<IAnyExtension>(tr));
-```
-
 ### Multi-target transitions
 
 A single transition can animate multiple properties with the same duration and easing. Create a targetless transition and add targets:
@@ -286,7 +275,7 @@ t.remove();                        // explicit removal
 
 After removal, `set_value` takes effect immediately as normal.
 
-Note: `remove()` calls `uninstall()` to eagerly detach from properties. This is necessary because when a transition is installed on a property, the property holds a strong reference to the extension, which would otherwise keep the transition alive.
+Note: `remove()` eagerly detaches from all target properties. This is necessary because installed properties hold a strong reference back to the transition, which would otherwise keep it alive.
 
 ### Modifying a transition
 
@@ -393,39 +382,15 @@ flowchart LR
     end
 ```
 
-An `IAnimationTrack` holds a list of `KeyframeEntry` values and a list of target properties. Each tick, the animation computes the current segment, applies the segment's easing function to get a progress value, and calls the registered interpolator to produce the intermediate value. The result is written to all targets via `copy_from`, which bypasses `set_data` (so installed transitions are not triggered). The animation then queues a deferred `on_changed` notification so listeners see the update.
+An `IAnimationTrack` holds a list of `KeyframeEntry` values and a list of target properties. Each tick, the animation computes the current segment, applies the segment's easing function to get a progress value, and calls the registered interpolator to produce the intermediate value. The result is written directly to all targets (bypassing any installed transitions), and a deferred `on_changed` notification is queued so listeners see the update.
 
 Both `IAnimationTrack` (explicit keyframe animations) and `ITransition` (implicit property transitions) inherit from `IAnimation`, which defines the common contract: `tick()`, `add_target()`, `remove_target()`, `uninstall()`, and `set_transient()`.
 
-The `IAnimator` manages a collection of `IAnimation` objects (both tracks and transitions), ticking all of them each frame. The animator holds weak references; animations persist through their property installation.
+The `IAnimator` manages a collection of `IAnimation` objects (both tracks and transitions), ticking all of them each frame. The animator holds weak references to animations, so they are automatically cleaned up when no longer referenced.
 
 ### Implicit animations (transitions)
 
-Transitions use the [IAnyExtension](../advanced.md#ianyextension-stacking-values-on-a-property) mechanism to intercept property value writes at the storage level.
-
-**Architecture:**
-
-A `TransitionImpl` manages one or more `TransitionProxy` objects. Each proxy is a lightweight `IAnyExtension` installed on a single property, containing a `TransitionDriver` that holds the per-property animation state (display, from, target, and result buffers, plus elapsed time).
-
-Both paths create proxies:
-- `create_transition(prop, ...)` installs the TransitionImpl as an extension, which internally creates a proxy
-- `create_transition(dur, ...)` + `add_target(prop)` creates a proxy directly on each target property
-
-**Installation:**
-
-```mermaid
-flowchart LR
-    A["create_transition(prop, dur, ease)"] --> B[Create TransitionImpl]
-    B --> C["install_extension()"]
-    C --> D[TransitionImpl creates TransitionProxy]
-    D --> E["Register with default animator"]
-
-    subgraph "Property value chain"
-        direction LR
-        F[TransitionImpl] -->|delegates to| G[TransitionProxy]
-        G -->|inner_| H[Original IAny]
-    end
-```
+Transitions intercept property value writes at the storage level.
 
 **Write interception:**
 
@@ -433,43 +398,35 @@ flowchart LR
 sequenceDiagram
     participant User
     participant Property
-    participant Proxy as TransitionProxy
-    participant Driver as TransitionDriver
-    participant Inner as Original IAny
+    participant Transition
 
     User->>Property: set_value(200)
-    Property->>Proxy: set_data(200)
-    Proxy->>Driver: start(200)
-    Note over Driver: Snapshot display → from<br/>Store 200 → target<br/>Reset elapsed
-    Proxy-->>Property: NothingToDo
-    Note over Property: Skips on_changed
+    Property->>Transition: intercepts write
+    Note over Transition: Snapshot current → from<br/>Store 200 → target<br/>Reset elapsed
+    Note over Property: Skips on_changed<br/>(animated value not yet ready)
 ```
 
-When user code calls `set_value`, the property calls `set_data` on the proxy. The proxy delegates to its driver's `start()` method, which snapshots the current display value as "from", stores the new value as "target", resets elapsed time, and returns `NothingToDo` so the property skips its normal `on_changed` notification.
+When user code calls `set_value`, the transition intercepts the write, snapshots the current display value as "from", stores the new value as "target", and resets elapsed time. The property skips its normal `on_changed` notification since the animated value is not yet ready.
 
 **Tick loop:**
 
 ```mermaid
 sequenceDiagram
     participant Animator as IAnimator (default)
-    participant Transition as TransitionImpl
-    participant Proxy as TransitionProxy
-    participant Driver as TransitionDriver
+    participant Transition
     participant Listeners as on_changed
 
     Animator->>Transition: tick(dt)
-    loop Each proxy
-        Transition->>Driver: tick(dt, duration, easing, interpolator)
-        Note over Driver: elapsed += dt<br/>t = elapsed / duration<br/>eased = easing(t)<br/>result = interpolate(from, target, eased)
-        Driver->>Driver: display = result, inner = result
-        Driver->>Listeners: invoke on_changed
+    loop Each target property
+        Note over Transition: elapsed += dt<br/>t = elapsed / duration<br/>eased = easing(t)<br/>result = interpolate(from, target, eased)
+        Transition->>Listeners: invoke on_changed(result)
     end
 ```
 
-Each frame during `instance().update()`, the default animator ticks all managed animations, including transitions. Transitions register themselves with the default animator when first installed on a property. The `TransitionImpl::tick` iterates its proxy children, passing its own duration and easing to each driver. Each driver advances its elapsed time, applies the easing function, and calls the interpolator to blend between "from" and "target". The interpolated result becomes both the display value and the inner value. The property's `on_changed` fires with the interpolated value.
+Each frame during `instance().update()`, the default animator ticks all managed animations, including transitions. Each target property's driver advances its elapsed time, applies the easing function, and calls the interpolator to blend between "from" and "target". The property's `on_changed` fires with the interpolated value.
 
-If `set_value` is called again while animating, the animation retargets: the current display becomes the new "from" and the incoming value becomes the new "target", with elapsed reset to zero.
+If `set_value` is called again while animating, the animation retargets: the current display value becomes the new "from" and the incoming value becomes the new "target", with elapsed reset to zero.
 
-**Removal:** When `uninstall()` is called (via `Transition::remove()` or the destructor), all proxies are removed from their properties via `remove_extension()`, restoring normal write behavior. For directly installed transitions, the TransitionImpl itself is also removed from the property chain.
+**Removal:** When `Transition::remove()` is called (or the handle goes out of scope), the transition detaches from all its target properties, restoring normal write behavior.
 
-This design means transitions are transparent to the rest of the system. Code that reads or observes the property sees smoothly interpolated values without any changes to how it interacts with properties.
+Transitions are transparent to the rest of the system. Code that reads or observes the property sees smoothly interpolated values without any changes to how it interacts with properties.
