@@ -7,6 +7,8 @@
 #include <velk/plugins/animator/plugin.h>
 #include <velk/vector.h>
 
+#include <atomic>
+
 namespace velk {
 
 /**
@@ -28,12 +30,15 @@ struct TransitionDriver
     /** @brief Captures from=display, target=new data, resets elapsed. Returns false if no display. */
     bool start(const void* data, size_t size, Uid type);
 
+    /** @brief Like start(), but copies target from an IAny value (used by deferred stash path). */
+    bool start_from(const IAny& value);
+
     /**
      * @brief Interpolates one tick.
      * @return true if still animating.
      */
-    bool tick(Duration dt, Duration duration, easing::EasingFn easing,
-              InterpolatorFn interpolator, IAny& inner, const IInterface::WeakPtr& owner);
+    bool tick(Duration dt, Duration duration, easing::EasingFn easing, InterpolatorFn interpolator,
+              IAny& inner, const IInterface::WeakPtr& owner);
 
     /** @brief Resets all state. */
     void clear();
@@ -65,11 +70,23 @@ public:
     ReturnValue copy_from(const IAny& other) override;
     IAny::Ptr clone() const override;
 
+    /** @brief Ticks this proxy's driver with its own interpolator/inner/owner. */
+    bool tick(Duration dt, Duration duration, easing::EasingFn easing);
+
     IAny* inner_ptr() { return inner_.get(); }
 
     TransitionDriver driver;
     IInterface::WeakPtr owner_;
     InterpolatorFn interpolator_ = nullptr;
+    IInterface::Ptr parent_; ///< Strong ref to TransitionImpl when persistent (creates intentional cycle).
+    std::atomic<bool>* active_flag_ = nullptr; ///< Points into TransitionImpl::active_; set on driver start.
+
+    // Pending target stash: set_data() may be called from any thread, but driver.start()
+    // mutates driver state (from, target, elapsed) which tick() also reads on the update
+    // thread. To avoid a data race, set_data() stashes the new target value here and sets
+    // has_pending_. The next tick() on the update thread picks it up and calls driver.start().
+    IAny::Ptr pending_;
+    std::atomic<bool> has_pending_{false};
 };
 
 /**
@@ -88,12 +105,16 @@ public:
     VELK_CLASS_UID(ClassId::Transition);
     ~TransitionImpl();
 
-    // ITransition
-    bool tick(Duration dt) override;
-    void set_easing(easing::EasingFn easing) override;
+    // IAnimation (base)
+    ReturnValue tick(const UpdateInfo& info) override;
     void add_target(const IProperty::Ptr& target) override;
     void remove_target(const IProperty::Ptr& target) override;
     void uninstall() override;
+    void set_transient(bool transient) override;
+    bool is_active() const override;
+
+    // ITransition
+    void set_easing(easing::EasingFn easing) override;
 
     // IAnyExtension: installing on a property creates a proxy child
     IAny::ConstPtr get_inner() const override;
@@ -112,17 +133,22 @@ private:
     struct ChildEntry
     {
         IProperty::WeakPtr property;
-        IAnyExtension::Ptr proxy;
+        IAnyExtension::Ptr extension; ///< Strong ref for install/remove_extension.
+        TransitionProxy* proxy;       ///< Typed pointer into extension.
     };
 
+    ChildEntry make_proxy();
     void ensure_registered();
     ITransition::State* state();
+    const ITransition::State* state() const;
     void notify_state();
 
     easing::EasingFn easing_ = easing::linear;
     vector<ChildEntry> children_;
     TransitionProxy* installed_proxy_ = nullptr;
+    std::atomic<bool> active_{false};
     bool registered_ = false;
+    bool transient_ = false;
 };
 
 } // namespace velk

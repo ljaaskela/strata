@@ -86,6 +86,14 @@ public:
         *this = Transition{};
     }
 
+    /** @brief When true, dropping the last handle calls uninstall(). Default: false (persistent). */
+    void set_transient(bool t)
+    {
+        if (auto* tr = intf()) {
+            tr->set_transient(t);
+        }
+    }
+
     /** @brief Returns the underlying ITransition as a shared pointer. */
     ITransition::Ptr get_transition_interface() const { return as_ptr<ITransition>(); }
 

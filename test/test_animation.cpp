@@ -172,10 +172,10 @@ TEST_F(AnimatorPluginTest, LoadAnimatorPlugin)
 
 TEST_F(AnimatorPluginTest, AnimationTypeRegistered)
 {
-    auto obj = instance().create<IObject>(ClassId::Animation);
+    auto obj = instance().create<IObject>(ClassId::AnimationTrack);
     EXPECT_TRUE(obj);
 
-    auto* anim = interface_cast<IAnimation>(obj);
+    auto* anim = interface_cast<IAnimationTrack>(obj);
     EXPECT_NE(nullptr, anim);
 }
 
@@ -190,8 +190,8 @@ TEST_F(AnimatorPluginTest, AnimatorTypeRegistered)
 
 TEST_F(AnimatorPluginTest, AnimationProperties)
 {
-    auto obj = instance().create<IObject>(ClassId::Animation);
-    auto* anim = interface_cast<IAnimation>(obj);
+    auto obj = instance().create<IObject>(ClassId::AnimationTrack);
+    auto* anim = interface_cast<IAnimationTrack>(obj);
     ASSERT_NE(nullptr, anim);
 
     // Default state via VELK_INTERFACE accessors (all read-only)
@@ -692,13 +692,14 @@ TEST_F(ImplicitAnimationTest, DeferredWriteBypassesAnimation)
 
 TEST_F(AnimatorPluginTest, KeyframeArrayProperty)
 {
-    auto obj = instance().create<IObject>(ClassId::Animation);
-    auto* anim = interface_cast<IAnimation>(obj);
+    auto obj = instance().create<IObject>(ClassId::AnimationTrack);
+    auto* anim = interface_cast<IAnimationTrack>(obj);
     ASSERT_NE(nullptr, anim);
 
     auto prop = create_property<float>(0.f);
     auto* pi = interface_cast<IPropertyInternal>(prop.get_property_interface().get());
-    pi->install_extension(interface_pointer_cast<IAnyExtension>(interface_pointer_cast<IAnimation>(obj)));
+    pi->install_extension(
+        interface_pointer_cast<IAnyExtension>(interface_pointer_cast<IAnimationTrack>(obj)));
 
     Any<float> v0(0.f), v1(50.f), v2(100.f);
     KeyframeEntry kfs[] = {
@@ -725,7 +726,7 @@ TEST_F(AnimatorPluginTest, KeyframeArrayProperty)
 
 TEST_F(AnimatorPluginTest, KeyframeArrayPropertyReadOnly)
 {
-    auto obj = instance().create<IObject>(ClassId::Animation);
+    auto obj = instance().create<IObject>(ClassId::AnimationTrack);
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(nullptr, meta);
 
@@ -893,6 +894,88 @@ TEST_F(AnimatorTest, RemoveTargetMidAnimation)
     // prop2 should have finished
     EXPECT_FLOAT_EQ(100.f, prop2.get_value());
     EXPECT_TRUE(h.is_finished());
+}
+
+// ============================================================================
+// Extension persistence tests
+// ============================================================================
+
+TEST_F(ImplicitAnimationTest, TransitionPersistsAfterHandleDrop)
+{
+    // Create a transition, then let the handle go out of scope.
+    {
+        auto tr = create_transition(sec(1.f));
+        tr.add_target(prop_);
+    }
+
+    // The Transition wrapper is gone, but the proxy holds a parent_ strong ref.
+    prop_.set_value(100.f);
+
+    // Should still animate (not jump immediately).
+    EXPECT_NEAR(0.f, prop_.get_value(), 0.1f);
+
+    advance(0.5f);
+    EXPECT_NEAR(50.f, prop_.get_value(), 1.f);
+
+    advance(0.5f);
+    EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
+}
+
+TEST_F(ImplicitAnimationTest, TransitionTransientCleansUpOnHandleDrop)
+{
+    {
+        auto tr = create_transition(sec(1.f));
+        tr.add_target(prop_);
+        tr.set_transient(true);
+    }
+
+    // Handle dropped + transient: transition should have uninstalled.
+    prop_.set_value(100.f);
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+}
+
+TEST_F(ImplicitAnimationTest, TransitionInstallPathPersistsAfterHandleDrop)
+{
+    // Test the install_extension path (create_transition with target).
+    {
+        auto tr = create_transition(prop_, sec(1.f));
+        // Handle goes out of scope.
+    }
+
+    prop_.set_value(100.f);
+    EXPECT_NEAR(0.f, prop_.get_value(), 0.1f);
+
+    advance(1.f);
+    EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
+}
+
+TEST_F(AnimatorTest, AnimationPersistsAfterHandleDrop)
+{
+    {
+        auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+        // Handle goes out of scope.
+    }
+
+    // Animation should still be in the animator and running.
+    EXPECT_EQ(1u, animator_->active_count());
+
+    animator_->tick(dt(1.f));
+    flush();
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+}
+
+TEST_F(AnimatorTest, AnimationTransientCleansUpOnHandleDrop)
+{
+    {
+        auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+        h.set_transient(true);
+        // Handle goes out of scope: transient uninstall removes from property.
+    }
+
+    // The animation extension should have been removed from the property.
+    // Setting a value should be immediate.
+    prop_.set_value(42.f);
+    EXPECT_FLOAT_EQ(42.f, prop_.get_value());
 }
 
 #endif // TEST_ANIMATOR_DLL_PATH

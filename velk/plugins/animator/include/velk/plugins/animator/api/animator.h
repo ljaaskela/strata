@@ -17,10 +17,10 @@ namespace velk {
 
 namespace detail {
 
-inline IAnimation::Ptr animation(const IProperty::Ptr& target, Uid classId)
+inline IAnimationTrack::Ptr animation(const IProperty::Ptr& target, Uid classId)
 {
     auto obj = instance().create<IObject>(classId);
-    auto anim = interface_pointer_cast<IAnimation>(obj);
+    auto anim = interface_pointer_cast<IAnimationTrack>(obj);
     if (anim) {
         auto* pi = interface_cast<IPropertyInternal>(target.get());
         if (pi) {
@@ -30,16 +30,16 @@ inline IAnimation::Ptr animation(const IProperty::Ptr& target, Uid classId)
     return anim;
 }
 
-inline IAnimation::Ptr animation(Uid classId)
+inline IAnimationTrack::Ptr animation(Uid classId)
 {
     auto obj = instance().create<IObject>(classId);
-    return interface_pointer_cast<IAnimation>(obj);
+    return interface_pointer_cast<IAnimationTrack>(obj);
 }
 
-inline IAnimation::Ptr tween(const IProperty::Ptr& target, const IAny& from, const IAny& to,
-                              Duration duration, easing::EasingFn ease = easing::linear)
+inline IAnimationTrack::Ptr tween(const IProperty::Ptr& target, const IAny& from, const IAny& to,
+                                  Duration duration, easing::EasingFn ease = easing::linear)
 {
-    auto anim = animation(target, ClassId::Animation);
+    auto anim = animation(target, ClassId::AnimationTrack);
     if (anim) {
         KeyframeEntry kfs[] = {
             {{}, from.clone(), easing::linear},
@@ -50,10 +50,10 @@ inline IAnimation::Ptr tween(const IProperty::Ptr& target, const IAny& from, con
     return anim;
 }
 
-inline IAnimation::Ptr tween(const IAny& from, const IAny& to, Duration duration,
-                              easing::EasingFn ease = easing::linear)
+inline IAnimationTrack::Ptr tween(const IAny& from, const IAny& to, Duration duration,
+                                  easing::EasingFn ease = easing::linear)
 {
-    auto anim = animation(ClassId::Animation);
+    auto anim = animation(ClassId::AnimationTrack);
     if (anim) {
         KeyframeEntry kfs[] = {
             {{}, from.clone(), easing::linear},
@@ -65,7 +65,7 @@ inline IAnimation::Ptr tween(const IAny& from, const IAny& to, Duration duration
 }
 
 inline ITransition::Ptr transition(const IProperty::Ptr& target, Duration duration,
-                                    easing::EasingFn ease = easing::linear)
+                                   easing::EasingFn ease = easing::linear)
 {
     auto obj = instance().create<IObject>(ClassId::Transition);
     auto tr = interface_pointer_cast<ITransition>(obj);
@@ -126,7 +126,7 @@ template <class T>
 Animation create_track(IAnimator& animator, Property<T> target,
                        detail::non_deduced_t<array_view<Keyframe<T>>> keyframes)
 {
-    auto anim = detail::animation(target, ClassId::Animation);
+    auto anim = detail::animation(target, ClassId::AnimationTrack);
     if (anim) {
         Animation h(anim);
         h.set_keyframes(keyframes);
@@ -141,7 +141,7 @@ Animation create_track(IAnimator& animator, Property<T> target,
 template <class T>
 Animation create_track(IAnimator& animator, detail::non_deduced_t<array_view<Keyframe<T>>> keyframes)
 {
-    auto anim = detail::animation(ClassId::Animation);
+    auto anim = detail::animation(ClassId::AnimationTrack);
     if (anim) {
         Animation h(anim);
         h.set_keyframes(keyframes);
@@ -163,7 +163,7 @@ inline IAnimator& default_animator()
     return ap->get_default_animator();
 }
 
-/** @brief Creates and installs an implicit transition on a property. Drop the handle to remove. */
+/** @brief Creates and installs an implicit transition on a property. Persists until remove() is called. */
 template <class T>
 Transition create_transition(Property<T> target, Duration duration, easing::EasingFn ease = easing::linear)
 {

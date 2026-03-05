@@ -4,17 +4,20 @@
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/intf_property.h>
 #include <velk/plugins/animator/easing.h>
+#include <velk/plugins/animator/interface/intf_animation.h>
 
 namespace velk {
 
 /**
  * @brief Interface for an implicit property transition.
  *
+ * Inherits IAnimation (tick, add_target, remove_target, uninstall, set_transient).
+ *
  * Properties (via VELK_INTERFACE):
  *   - duration  (Duration): Transition duration (read/write).
  *   - animating (bool):     Whether the transition is currently animating (read-only).
  */
-class ITransition : public Interface<ITransition>
+class ITransition : public Interface<ITransition, IAnimation>
 {
 public:
     VELK_INTERFACE(
@@ -22,16 +25,8 @@ public:
         (PROP, bool,     animating, false)
     )
 
-    /** @brief Advances the transition. Returns true if still animating. */
-    virtual bool tick(Duration dt) = 0;
     /** @brief Sets the easing function. */
     virtual void set_easing(easing::EasingFn easing) = 0;
-    /** @brief Installs this transition on a property target. */
-    virtual void add_target(const IProperty::Ptr& target) = 0;
-    /** @brief Removes this transition from a property target. */
-    virtual void remove_target(const IProperty::Ptr& target) = 0;
-    /** @brief Detaches the transition from all properties. */
-    virtual void uninstall() = 0;
 };
 
 } // namespace velk

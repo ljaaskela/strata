@@ -7,7 +7,7 @@ namespace velk {
 ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
 {
     config.enableUpdate = true;
-    auto rv = register_type<AnimationImpl>(velk);
+    auto rv = register_type<AnimationTrackImpl>(velk);
     if (failed(rv)) {
         return rv;
     }
@@ -47,26 +47,6 @@ void AnimatorPlugin::pre_update(const IPlugin::PreUpdateInfo& info)
     if (auto* a = interface_cast<IAnimator>(animator_)) {
         a->tick(info.info);
     }
-    tick_transitions(info.info);
-}
-
-void AnimatorPlugin::register_transition(const ITransition::WeakPtr& transition)
-{
-    transitions_.push_back(transition);
-}
-
-void AnimatorPlugin::tick_transitions(const UpdateInfo& info)
-{
-    size_t write = 0;
-    for (size_t i = 0; i < transitions_.size(); ++i) {
-        auto tr = transitions_[i].lock();
-        if (!tr) {
-            continue;
-        }
-        tr->tick(info.dt);
-        transitions_[write++] = transitions_[i];
-    }
-    transitions_.resize(write);
 }
 
 } // namespace velk

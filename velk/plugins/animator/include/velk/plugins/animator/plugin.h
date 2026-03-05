@@ -6,8 +6,8 @@
 namespace velk {
 
 namespace ClassId {
-/** @brief Animation (keyframe-based, including simple tweens). */
-inline constexpr Uid Animation{"786c599c-2d55-4fb4-935e-a73d190af351"};
+/** @brief Animation track (keyframe-based, including simple tweens). */
+inline constexpr Uid AnimationTrack{"786c599c-2d55-4fb4-935e-a73d190af351"};
 /** @brief Animator that manages and ticks a set of animations. */
 inline constexpr Uid Animator{"3995b907-755d-4c3f-8595-323b25b3fb03"};
 /** @brief First-class implicit property transition. */

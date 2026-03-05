@@ -147,7 +147,7 @@ anim.get_elapsed();  // elapsed time
 anim.get_progress(); // normalized progress (0..1)
 ```
 
-The underlying `IAnimation` also exposes `duration`, `elapsed`, `progress`, and `state` as observable properties, so you can attach change handlers:
+The underlying `IAnimationTrack` also exposes `duration`, `elapsed`, `progress`, and `state` as observable properties, so you can attach change handlers:
 
 ```cpp
 auto ianim = anim.get_animation_interface();
@@ -393,9 +393,11 @@ flowchart LR
     end
 ```
 
-An `IAnimation` holds a list of `KeyframeEntry` values and a list of target properties. Each tick, the animation computes the current segment, applies the segment's easing function to get a progress value, and calls the registered interpolator to produce the intermediate value. The result is written to all targets via `copy_from`, which bypasses `set_data` (so installed transitions are not triggered). The animation then queues a deferred `on_changed` notification so listeners see the update.
+An `IAnimationTrack` holds a list of `KeyframeEntry` values and a list of target properties. Each tick, the animation computes the current segment, applies the segment's easing function to get a progress value, and calls the registered interpolator to produce the intermediate value. The result is written to all targets via `copy_from`, which bypasses `set_data` (so installed transitions are not triggered). The animation then queues a deferred `on_changed` notification so listeners see the update.
 
-The `IAnimator` manages a collection of `IAnimation` objects, ticking all playing animations each frame.
+Both `IAnimationTrack` (explicit keyframe animations) and `ITransition` (implicit property transitions) inherit from `IAnimation`, which defines the common contract: `tick()`, `add_target()`, `remove_target()`, `uninstall()`, and `set_transient()`.
+
+The `IAnimator` manages a collection of `IAnimation` objects (both tracks and transitions), ticking all of them each frame. The animator holds weak references; animations persist through their property installation.
 
 ### Implicit animations (transitions)
 
@@ -416,7 +418,7 @@ flowchart LR
     A["create_transition(prop, dur, ease)"] --> B[Create TransitionImpl]
     B --> C["install_extension()"]
     C --> D[TransitionImpl creates TransitionProxy]
-    D --> E["Register with plugin"]
+    D --> E["Register with default animator"]
 
     subgraph "Property value chain"
         direction LR
@@ -449,13 +451,13 @@ When user code calls `set_value`, the property calls `set_data` on the proxy. Th
 
 ```mermaid
 sequenceDiagram
-    participant Plugin as AnimatorPlugin
+    participant Animator as IAnimator (default)
     participant Transition as TransitionImpl
     participant Proxy as TransitionProxy
     participant Driver as TransitionDriver
     participant Listeners as on_changed
 
-    Plugin->>Transition: tick(dt)
+    Animator->>Transition: tick(dt)
     loop Each proxy
         Transition->>Driver: tick(dt, duration, easing, interpolator)
         Note over Driver: elapsed += dt<br/>t = elapsed / duration<br/>eased = easing(t)<br/>result = interpolate(from, target, eased)
@@ -464,7 +466,7 @@ sequenceDiagram
     end
 ```
 
-Each frame during `instance().update()`, the plugin ticks all registered transitions. The `TransitionImpl::tick` iterates its proxy children, passing its own duration and easing to each driver. Each driver advances its elapsed time, applies the easing function, and calls the interpolator to blend between "from" and "target". The interpolated result becomes both the display value and the inner value. The property's `on_changed` fires with the interpolated value.
+Each frame during `instance().update()`, the default animator ticks all managed animations, including transitions. Transitions register themselves with the default animator when first installed on a property. The `TransitionImpl::tick` iterates its proxy children, passing its own duration and easing to each driver. Each driver advances its elapsed time, applies the easing function, and calls the interpolator to blend between "from" and "target". The interpolated result becomes both the display value and the inner value. The property's `on_changed` fires with the interpolated value.
 
 If `set_value` is called again while animating, the animation retargets: the current display becomes the new "from" and the incoming value becomes the new "target", with elapsed reset to zero.
 

@@ -21,7 +21,7 @@ public:
     size_t count() const override;
 
 private:
-    vector<IAnimation::Ptr> animations_;
+    vector<IAnimation::WeakPtr> animations_;
 };
 
 } // namespace velk

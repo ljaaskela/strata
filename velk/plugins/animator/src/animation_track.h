@@ -1,8 +1,8 @@
-#ifndef VELK_ANIMATOR_ANIMATION_IMPL_H
-#define VELK_ANIMATOR_ANIMATION_IMPL_H
+#ifndef VELK_ANIMATOR_ANIMATION_TRACK_IMPL_H
+#define VELK_ANIMATOR_ANIMATION_TRACK_IMPL_H
 
 #include <velk/ext/object.h>
-#include <velk/plugins/animator/interface/intf_animation.h>
+#include <velk/plugins/animator/interface/intf_animation_track.h>
 #include <velk/plugins/animator/plugin.h>
 #include <velk/vector.h>
 
@@ -15,13 +15,22 @@ namespace velk {
  * keyframes during tick(), writing directly to all inners and firing on_changed
  * via each owner.
  */
-class AnimationImpl : public ext::Object<AnimationImpl, IAnimation, IAnyExtension>
+class AnimationTrackImpl : public ext::Object<AnimationTrackImpl, IAnimationTrack, IAnyExtension>
 {
 public:
-    VELK_CLASS_UID(ClassId::Animation);
+    VELK_CLASS_UID(ClassId::AnimationTrack);
 
-    // IAnimation
-    bool tick(const UpdateInfo& info) override;
+    ~AnimationTrackImpl();
+
+    // IAnimation (base)
+    ReturnValue tick(const UpdateInfo& info) override;
+    void add_target(const IProperty::Ptr& target) override;
+    void remove_target(const IProperty::Ptr& target) override;
+    void uninstall() override;
+    void set_transient(bool transient) override;
+    bool is_active() const override;
+
+    // IAnimationTrack
     void play() override;
     void pause() override;
     void stop() override;
@@ -29,8 +38,6 @@ public:
     void restart() override;
     void seek(float progress) override;
     void set_keyframes(array_view<KeyframeEntry> keyframes) override;
-    void add_target(const IProperty::Ptr& target) override;
-    void remove_target(const IProperty::Ptr& target) override;
 
     // IAnyExtension
     IAny::ConstPtr get_inner() const override;
@@ -52,11 +59,13 @@ private:
         IAny::Ptr inner;
     };
 
-    IAnimation::State* state();
-    void ensure_init(IAnimation::State& state);
-    void apply_at(IAnimation::State& s, float t);
+    IAnimationTrack::State* state();
+    const IAnimationTrack::State* state() const;
+    void ensure_init(IAnimationTrack::State& state);
+    void apply_at(IAnimationTrack::State& s);
+    void mark_finished(IAnimationTrack::State& s);
     void write_value(const IAny& value);
-    void notify_state(IAnimation::State& state);
+    void notify_state(IAnimationTrack::State& state);
     bool has_targets() const { return !targets_.empty(); }
 
     vector<TargetEntry> targets_;
@@ -65,8 +74,9 @@ private:
     IAny::Ptr result_;
     Uid typeUid_{};
     bool sorted_ = false;
+    bool transient_ = false;
 };
 
 } // namespace velk
 
-#endif // VELK_ANIMATOR_ANIMATION_IMPL_H
+#endif // VELK_ANIMATOR_ANIMATION_TRACK_IMPL_H
