@@ -1,7 +1,7 @@
 #ifndef VELK_ANIMATOR_PLUGIN_H
 #define VELK_ANIMATOR_PLUGIN_H
 
-#include "animation.h"
+#include "animation_track.h"
 #include "animator.h"
 #include "transition.h"
 
@@ -23,14 +23,10 @@ public:
     void pre_update(const IPlugin::PreUpdateInfo& info) override;
 
     IAnimator& get_default_animator() const override { return *animator_; }
-    void register_transition(const ITransition::WeakPtr& transition) override;
 
 private:
-    void tick_transitions(const UpdateInfo& info);
-
     IAnimator::Ptr animator_;
     IVelk* velk_ = nullptr;
-    vector<ITransition::WeakPtr> transitions_;
 };
 
 } // namespace velk

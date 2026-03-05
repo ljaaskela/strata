@@ -44,6 +44,13 @@ public:
     {
         return static_cast<typename T::State*>(get_property_state(T::UID));
     }
+
+    /** @brief Const type-safe state access. Safe because state is always mutable storage owned by the object. */
+    template <class T>
+    const typename T::State* get_property_state() const
+    {
+        return static_cast<const typename T::State*>(const_cast<IPropertyState*>(this)->get_property_state(T::UID));
+    }
 };
 
 namespace detail {
@@ -122,7 +129,7 @@ public:
 template <class T>
 detail::StateReader<T> IMetadata::read() const
 {
-    auto* state = const_cast<IMetadata*>(this)->template get_property_state<T>();
+    auto* state = this->template get_property_state<T>();
     return detail::StateReader<T>(state);
 }
 
