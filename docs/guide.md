@@ -32,6 +32,12 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Raw state pointer](#raw-state-pointer)
   - [Deferred property assignment](#deferred-property-assignment)
     - [Deferred write_state](#deferred-write_state)
+  - [Bindings](#bindings)
+    - [Property-to-property binding](#property-to-property-binding)
+    - [Function binding](#function-binding)
+    - [Deferred bindings](#deferred-bindings)
+    - [Rebinding and unbinding](#rebinding-and-unbinding)
+    - [Loop detection](#loop-detection)
 - [Attachments](#attachments)
   - [Adding and removing](#adding-and-removing)
   - [Finding attachments](#finding-attachments)
@@ -798,6 +804,124 @@ write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
 ```
 
 If the object is destroyed before `update()`, the queued callback is silently skipped.
+
+### Bindings
+
+Bindings connect properties so that a target property automatically reflects the value of a source property or a computed function result. While bound, the target is read-only: reads return the source value, and writes are rejected. When the source changes, the target's `on_changed` fires.
+
+```cpp
+#include <velk/api/binding.h>
+```
+
+#### Property-to-property binding
+
+`bind()` creates a binding and installs it on the target in one step. Returns a `Binding` wrapper that can be used to unbind later.
+
+```cpp
+auto width  = create_property<float>(100.f);
+auto source = create_property<float>(200.f);
+
+auto b = bind(width.get_property_interface(), source.get_property_interface());
+
+width.get_value();        // 200.f (reads from source)
+width.set_value(50.f);    // fails: property is read-only while bound
+
+source.set_value(300.f);
+width.get_value();        // 300.f (updated automatically)
+```
+
+Bindings propagate through chains. If A is bound to B and B is bound to C, changing C updates both B and A:
+
+```cpp
+auto a = create_property<int>(0);
+auto b = create_property<int>(0);
+auto c = create_property<int>(7);
+
+auto bB = bind(b.get_property_interface(), c.get_property_interface());
+auto bA = bind(a.get_property_interface(), b.get_property_interface());
+
+c.set_value(42);
+a.get_value();    // 42
+```
+
+#### Function binding
+
+Bind a property to a computed value. The function receives dependency property values as `FnArgs` and returns an `IAny::Ptr`. The result is cached and invalidated when any dependency changes.
+
+```cpp
+auto area   = create_property<float>(0.f);
+auto width  = create_property<float>(10.f);
+auto height = create_property<float>(5.f);
+
+Callback computeArea([](FnArgs args) -> IAny::Ptr {
+    float w = 0.f, h = 0.f;
+    if (auto v = Any<const float>(args[0])) w = v.get_value();
+    if (auto v = Any<const float>(args[1])) h = v.get_value();
+    return Any<float>(w * h).clone();
+});
+
+auto b = bind(area.get_property_interface(),
+              computeArea.operator const IFunction::ConstPtr(),
+              {width.get_property_interface(), height.get_property_interface()});
+
+area.get_value();         // 50.f
+width.set_value(20.f);
+area.get_value();         // 100.f
+```
+
+#### Deferred bindings
+
+Pass `Deferred` to `bind()` so that source changes queue a notification for the next `update()` instead of firing `on_changed` immediately. The target value is always readable (lazy evaluation), but listeners are batched. Multiple rapid source changes coalesce into a single notification.
+
+```cpp
+auto a = create_property<int>(0);
+auto b = create_property<int>(10);
+
+auto binding = bind(a.get_property_interface(), b.get_property_interface(), Deferred);
+
+b.set_value(1);
+b.set_value(2);
+b.set_value(3);
+// on_changed has not fired yet, but a.get_value() == 3
+
+instance().update();
+// on_changed fires once with value 3
+```
+
+#### Rebinding and unbinding
+
+`unbind()` removes the binding from the target. The target retains its last bound value and becomes writable again. The `Binding` object can be rebound to a different source afterward.
+
+```cpp
+auto a = create_property<int>(0);
+auto b = create_property<int>(42);
+auto c = create_property<int>(99);
+
+auto binding = bind(a.get_property_interface(), b.get_property_interface());
+a.get_value();            // 42
+
+binding.unbind();
+a.get_value();            // 42 (retained)
+a.set_value(0);           // succeeds
+
+binding.bind(c.get_property_interface(), Immediate);
+a.get_value();            // 99
+```
+
+For two-step construction, `create_binding()` creates an uninstalled `Binding` associated with a target. Call `bind()` on it later to configure the source and install:
+
+```cpp
+auto binding = create_binding(target.get_property_interface());
+binding.bind(source.get_property_interface(), Immediate);
+```
+
+#### Loop detection
+
+Circular bindings (A bound to B, B bound to A) are detected at evaluation time. When a loop is encountered, the recursive read falls back to the inner value instead of recursing infinitely. Notification loops are similarly guarded. This means circular bindings won't crash or hang, though the values in a loop are not well-defined.
+
+#### Type compatibility
+
+Bindings check type compatibility at installation time. If the source value's type is incompatible with the target property's type, `bind()` returns a null `Binding` and the property is left unchanged.
 
 ## Attachments
 
