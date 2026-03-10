@@ -326,8 +326,8 @@ public:
     /** @brief Returns true if the hierarchy is empty. */
     bool empty() const { return size() == 0; }
 
-    /** @brief Returns the underlying IHierarchy pointer. */
-    IHierarchy::Ptr get_hierarchy_interface() const { return as_ptr<IHierarchy>(); }
+    /** @brief Implicit conversion to IHierarchy::Ptr. */
+    operator IHierarchy::Ptr() const { return as_ptr<IHierarchy>(); }
 
 private:
     IHierarchy* intf() const

@@ -697,7 +697,7 @@ TEST_F(AnimatorPluginTest, KeyframeArrayProperty)
     ASSERT_NE(nullptr, anim);
 
     auto prop = create_property<float>(0.f);
-    auto* pi = interface_cast<IPropertyInternal>(prop.get_property_interface().get());
+    auto* pi = interface_cast<IPropertyInternal>(IProperty::Ptr(prop).get());
     pi->install_extension(
         interface_pointer_cast<IAnyExtension>(interface_pointer_cast<IAnimationTrack>(obj)));
 

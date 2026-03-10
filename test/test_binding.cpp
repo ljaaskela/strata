@@ -16,7 +16,7 @@ TEST(Binding, PropertyToPropertyReadsSource)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
 
     EXPECT_EQ(a.get_value(), 42);
@@ -29,7 +29,7 @@ TEST(Binding, WritesToBoundPropertyFail)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
 
     auto result = a.set_value(99);
@@ -45,7 +45,7 @@ TEST(Binding, SourceChangeFiresTargetOnChanged)
     auto a = create_property<int>(0);
     auto b = create_property<int>(10);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
 
     int callCount = 0;
@@ -73,7 +73,7 @@ TEST(Binding, UnbindRetainsValueAndAllowsWrites)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 
@@ -113,9 +113,9 @@ TEST(Binding, FunctionBindingComputesFromDeps)
         return Any<int>(bVal + cVal).clone();
     });
 
-    auto binding = ::velk::bind(a.get_property_interface(),
-                                fn.operator const IFunction::ConstPtr(),
-                                {b.get_property_interface(), c.get_property_interface()});
+    auto binding = ::velk::bind(a,
+                                fn,
+                                {b, c});
     ASSERT_TRUE(binding);
 
     EXPECT_EQ(a.get_value(), 30);
@@ -147,9 +147,9 @@ TEST(Binding, ChainedBindings)
     auto b = create_property<int>(0);
     auto c = create_property<int>(7);
 
-    auto bindB = ::velk::bind(b.get_property_interface(), c.get_property_interface());
+    auto bindB = ::velk::bind(b, c);
     ASSERT_TRUE(bindB);
-    auto bindA = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto bindA = ::velk::bind(a, b);
     ASSERT_TRUE(bindA);
 
     EXPECT_EQ(b.get_value(), 7);
@@ -167,9 +167,9 @@ TEST(Binding, LoopDetection)
     auto a = create_property<int>(1);
     auto b = create_property<int>(2);
 
-    auto bindA = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto bindA = ::velk::bind(a, b);
     ASSERT_TRUE(bindA);
-    auto bindB = ::velk::bind(b.get_property_interface(), a.get_property_interface());
+    auto bindB = ::velk::bind(b, a);
     ASSERT_TRUE(bindB);
 
     // Reading should not hang; should get a value (the loop is broken by returning Fail
@@ -189,7 +189,7 @@ TEST(Binding, TypeIncompatibilityReturnsNull)
     auto b = create_property<float>(3.14f);
 
     // int and float are different types in velk
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     // If types are incompatible, binding should fail
     // Note: int and float may or may not be compatible depending on type registry.
     // This test verifies the type check path exists.
@@ -208,7 +208,7 @@ TEST(Binding, IntrospectionPropertyBinding)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
 
     EXPECT_TRUE(binding.get_source_property());
@@ -229,7 +229,7 @@ TEST(Binding, IntrospectionFunctionBinding)
     });
 
     auto binding = ::velk::bind(
-        a.get_property_interface(), fn.operator const IFunction::ConstPtr(), {b.get_property_interface()});
+        a, fn, {b});
     ASSERT_TRUE(binding);
 
     EXPECT_FALSE(binding.get_source_property());
@@ -252,7 +252,7 @@ TEST(Binding, BindNullSourceReturnsNull)
     auto a = create_property<int>(0);
     IProperty::ConstPtr nullSource;
 
-    auto binding = ::velk::bind(a.get_property_interface(), nullSource);
+    auto binding = ::velk::bind(a, nullSource);
     EXPECT_FALSE(binding);
 }
 
@@ -263,7 +263,7 @@ TEST(Binding, DeferredBindingDoesNotFireImmediately)
     auto a = create_property<int>(0);
     auto b = create_property<int>(10);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface(), Deferred);
+    auto binding = ::velk::bind(a, b, Deferred);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 10);
 
@@ -294,7 +294,7 @@ TEST(Binding, DeferredBindingCoalescesChanges)
     auto a = create_property<int>(0);
     auto b = create_property<int>(0);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface(), Deferred);
+    auto binding = ::velk::bind(a, b, Deferred);
     ASSERT_TRUE(binding);
 
     int callCount = 0;
@@ -334,9 +334,9 @@ TEST(Binding, DeferredFunctionBinding)
         return Any<int>(v * 2).clone();
     });
 
-    auto binding = ::velk::bind(a.get_property_interface(),
-                                fn.operator const IFunction::ConstPtr(),
-                                {b.get_property_interface()},
+    auto binding = ::velk::bind(a,
+                                fn,
+                                {b},
                                 Deferred);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 10);
@@ -374,7 +374,7 @@ TEST(Binding, FunctionBindingUnbindRetainsValue)
     });
 
     auto binding = ::velk::bind(
-        a.get_property_interface(), fn.operator const IFunction::ConstPtr(), {b.get_property_interface()});
+        a, fn, {b});
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 30);
 
@@ -395,10 +395,10 @@ TEST(Binding, WrapperGetTarget)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
 
-    EXPECT_EQ(binding.get_target_property(), a.get_property_interface());
+    EXPECT_EQ(binding.get_target_property(), IProperty::Ptr(a));
 }
 
 // Binding wrapper: unbind clears the wrapper
@@ -409,7 +409,7 @@ TEST(Binding, WrapperUnbindAllowsRebind)
     auto b = create_property<int>(42);
     auto c = create_property<int>(99);
 
-    auto binding = ::velk::bind(a.get_property_interface(), b.get_property_interface());
+    auto binding = ::velk::bind(a, b);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 
@@ -423,6 +423,6 @@ TEST(Binding, WrapperUnbindAllowsRebind)
     EXPECT_FALSE(binding.unbind());
 
     // Can rebind to a different source
-    EXPECT_TRUE(binding.bind(c.get_property_interface(), Immediate));
+    EXPECT_TRUE(binding.bind(c, Immediate));
     EXPECT_EQ(a.get_value(), 99);
 }

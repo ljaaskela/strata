@@ -26,11 +26,6 @@ public:
     /** @brief Returns true if the underlying IFunction is valid. */
     operator bool() const { return fn_.operator bool(); }
 
-    /** @brief Returns the underlying IFunction pointer. */
-    IFunction::Ptr get_function_interface() { return fn_; }
-    /** @copydoc get_function_interface() */
-    IFunction::ConstPtr get_function_interface() const { return fn_; }
-
     /** @brief Invokes the function with no arguments (null-safe).
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
     IAny::Ptr invoke(InvokeType type = Immediate) const { return fn_ ? fn_->invoke({}, type) : nullptr; }

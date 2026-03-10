@@ -24,11 +24,6 @@ public:
     /** @brief Returns true if the underlying IEvent is valid. */
     operator bool() const { return event_.operator bool(); }
 
-    /** @brief Returns the underlying IEvent pointer. */
-    IEvent::Ptr get_event_interface() { return event_; }
-    /** @copydoc get_event_interface() */
-    IEvent::ConstPtr get_event_interface() const { return event_; }
-
     /** @brief Adds a handler function for the event (null-safe). */
     ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const
     {

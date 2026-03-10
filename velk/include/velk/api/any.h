@@ -47,9 +47,6 @@ public:
     operator const IAny&() const noexcept { return *(any_.get()); }
     /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
-    /** @brief Returns the underlying const IAny pointer. */
-    const IAny* get_any_interface() const noexcept { return any_.get(); }
-
 protected:
     refcnt_ptr<IAny> any_;
 };
@@ -163,12 +160,6 @@ public:
     /** @brief Implicit conversion to a mutable IAny pointer (read-write only). */
     template <bool RW = IsReadWrite, detail::require<RW> = 0>
     operator IAny*() noexcept
-    {
-        return any_.get();
-    }
-    /** @brief Returns the underlying mutable IAny pointer (read-write only). */
-    template <bool RW = IsReadWrite, detail::require<RW> = 0>
-    IAny* get_any_interface() noexcept
     {
         return any_.get();
     }

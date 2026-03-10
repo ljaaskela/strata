@@ -35,10 +35,9 @@ public:
     /** @brief Returns true if the underlying binding is valid. */
     operator bool() const { return binding_.operator bool(); }
 
-    /** @brief Returns the underlying IBinding pointer. */
-    IBinding::Ptr get_binding_interface() { return binding_; }
-    /** @copydoc get_binding_interface() */
-    IBinding::ConstPtr get_binding_interface() const { return binding_; }
+    /** @brief Implicit conversion to IBinding::Ptr. */
+    operator IBinding::Ptr() { return binding_; }
+    operator const IBinding::ConstPtr() const { return binding_; }
 
     /** @brief Returns the target property this binding is installed on. */
     IProperty::Ptr get_target_property() const { return target_.lock(); }

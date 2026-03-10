@@ -169,7 +169,7 @@ Transition create_transition(Property<T> target, Duration duration, easing::Easi
 {
     // Ensure the plugin is loaded (registers TransitionImpl type)
     get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
-    auto tr = detail::transition(target.get_property_interface(), duration, ease);
+    auto tr = detail::transition(IProperty::Ptr(target), duration, ease);
     return tr ? Transition(tr) : Transition{};
 }
 

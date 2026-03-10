@@ -528,7 +528,7 @@ TEST_F(HierarchyTest, HierarchyClassId)
 TEST_F(HierarchyTest, GetHierarchyInterface)
 {
     auto h = create_hierarchy();
-    auto iface = h.get_hierarchy_interface();
+    IHierarchy::Ptr iface = h;
     EXPECT_TRUE(iface);
 }
 

@@ -821,7 +821,7 @@ Bindings connect properties so that a target property automatically reflects the
 auto width  = create_property<float>(100.f);
 auto source = create_property<float>(200.f);
 
-auto b = bind(width.get_property_interface(), source.get_property_interface());
+auto b = bind(width, source);
 
 width.get_value();        // 200.f (reads from source)
 width.set_value(50.f);    // fails: property is read-only while bound
@@ -837,8 +837,8 @@ auto a = create_property<int>(0);
 auto b = create_property<int>(0);
 auto c = create_property<int>(7);
 
-auto bB = bind(b.get_property_interface(), c.get_property_interface());
-auto bA = bind(a.get_property_interface(), b.get_property_interface());
+auto bB = bind(b, c);
+auto bA = bind(a, b);
 
 c.set_value(42);
 a.get_value();    // 42
@@ -860,9 +860,7 @@ Callback computeArea([](FnArgs args) -> IAny::Ptr {
     return Any<float>(w * h).clone();
 });
 
-auto b = bind(area.get_property_interface(),
-              computeArea.operator const IFunction::ConstPtr(),
-              {width.get_property_interface(), height.get_property_interface()});
+auto b = bind(area, computeArea, {width, height});
 
 area.get_value();         // 50.f
 width.set_value(20.f);
@@ -877,7 +875,7 @@ Pass `Deferred` to `bind()` so that source changes queue a notification for the 
 auto a = create_property<int>(0);
 auto b = create_property<int>(10);
 
-auto binding = bind(a.get_property_interface(), b.get_property_interface(), Deferred);
+auto binding = bind(a, b, Deferred);
 
 b.set_value(1);
 b.set_value(2);
@@ -897,22 +895,22 @@ auto a = create_property<int>(0);
 auto b = create_property<int>(42);
 auto c = create_property<int>(99);
 
-auto binding = bind(a.get_property_interface(), b.get_property_interface());
+auto binding = bind(a, b);
 a.get_value();            // 42
 
 binding.unbind();
 a.get_value();            // 42 (retained)
 a.set_value(0);           // succeeds
 
-binding.bind(c.get_property_interface(), Immediate);
+binding.bind(c, Immediate);
 a.get_value();            // 99
 ```
 
 For two-step construction, `create_binding()` creates an uninstalled `Binding` associated with a target. Call `bind()` on it later to configure the source and install:
 
 ```cpp
-auto binding = create_binding(target.get_property_interface());
-binding.bind(source.get_property_interface(), Immediate);
+auto binding = create_binding(target);
+binding.bind(source, Immediate);
 ```
 
 #### Loop detection
