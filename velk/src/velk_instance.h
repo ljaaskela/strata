@@ -10,7 +10,6 @@
 #include <velk/interface/intf_velk.h>
 
 #include <mutex>
-#include <vector>
 
 namespace velk {
 
@@ -58,7 +57,7 @@ public:
 
 private:
     /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
-    void flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const;
+    void flush_deferred_properties(vector<DeferredPropertySet>& propSets) const;
 
     mutable RawHive<ObjectStorage>
         metadata_hive_;                 ///< Pool allocator for ObjectStorage instances (destroyed last).
@@ -67,8 +66,8 @@ private:
     TypeRegistry type_registry_;        ///< Registry of class factories.
     PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
     mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
-    mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
-    mutable std::vector<DeferredPropertySet>
+    mutable vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
+    mutable vector<DeferredPropertySet>
         deferred_property_queue_; ///< Property sets queued for the next update() call.
 };
 

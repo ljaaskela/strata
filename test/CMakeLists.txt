@@ -23,6 +23,7 @@ add_executable(tests
     test_any.cpp
     test_animation.cpp
     test_array_property.cpp
+    test_binding.cpp
     test_property.cpp
     test_future.cpp
     test_function.cpp

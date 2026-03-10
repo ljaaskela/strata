@@ -4,8 +4,9 @@
 #include <velk/ext/refcounted_dispatch.h>
 #include <velk/interface/intf_object_storage.h>
 
+#include <velk/vector.h>
+
 #include <memory>
-#include <vector>
 
 namespace velk {
 
@@ -63,7 +64,7 @@ private:
 
     /// Lazily populated cache: [0, attachment_end_) = attachments (idx == SIZE_MAX),
     ///                         [attachment_end_, size()) = metadata instances.
-    mutable std::vector<std::pair<size_t, IInterface::Ptr>> instances_;
+    mutable vector<std::pair<size_t, IInterface::Ptr>> instances_;
     mutable uint32_t attachment_end_{0}; ///< Boundary between attachments and metadata entries.
 
     /** @brief Finds a static member by name and kind, creating its runtime instance if needed. */

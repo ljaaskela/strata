@@ -3,10 +3,10 @@
 
 #include <velk/ext/object.h>
 #include <velk/interface/intf_hierarchy.h>
+#include <velk/vector.h>
 
 #include <shared_mutex>
 #include <unordered_map>
-#include <vector>
 
 namespace velk {
 
@@ -44,17 +44,17 @@ private:
     {
         IObject::Ptr object;                // Owning reference to the node's object.
         IObject* parent = nullptr;          // Raw backlink (non-owning); null for root.
-        std::vector<IObject::Ptr> children; // Ordered child list.
+        vector<IObject::Ptr> children;      // Ordered child list.
     };
 
     // Recursively erases obj and all descendants from entries_, collecting them in removed.
-    void remove_recursive(IObject* obj, std::vector<IObject::Ptr>& removed);
+    void remove_recursive(IObject* obj, vector<IObject::Ptr>& removed);
     // Collects all entry objects into out (unordered). Used before clear/set_root.
-    void collect_all(std::vector<IObject::Ptr>& out) const;
+    void collect_all(vector<IObject::Ptr>& out) const;
     // Returns the owning Ptr of obj's parent, or null. Caller must hold a lock.
     IObject::Ptr lookup_parent(IObject* obj) const;
     // Fires on_hierarchy_left on each removed object that implements IHierarchyAware.
-    void notify_left(const std::vector<IObject::Ptr>& removed);
+    void notify_left(const vector<IObject::Ptr>& removed);
     // Fires on_changing or on_changed if handlers exist. Invoked outside the lock.
     void fire_event(string_view name, HierarchyChange change);
 

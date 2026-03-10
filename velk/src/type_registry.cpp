@@ -1,6 +1,7 @@
 #include "type_registry.h"
 
 #include "array_property.h"
+#include "binding.h"
 #include "event.h"
 #include "function.h"
 #include "future.h"
@@ -29,6 +30,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ObjectHive>();
     ITypeRegistry::register_type<RawHiveImpl>();
     ITypeRegistry::register_type<HierarchyImpl>();
+    ITypeRegistry::register_type<BindingImpl>();
 
     ITypeRegistry::register_type<ext::AnyValue<float>>();
     ITypeRegistry::register_type<ext::AnyValue<double>>();

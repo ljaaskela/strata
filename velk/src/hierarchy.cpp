@@ -20,7 +20,7 @@ void HierarchyImpl::fire_event(string_view name, HierarchyChange change)
 
 // Gathers owning pointers to every node. Used before clear() or set_root() to
 // keep objects alive for post-mutation IHierarchyAware notifications.
-void HierarchyImpl::collect_all(std::vector<IObject::Ptr>& out) const
+void HierarchyImpl::collect_all(vector<IObject::Ptr>& out) const
 {
     out.reserve(entries_.size());
     for (auto& [_, entry] : entries_) {
@@ -60,7 +60,7 @@ ReturnValue HierarchyImpl::set_root(const IObject::Ptr& root)
 
     fire_event("on_changing", {HierarchyChange::Type::SetRoot, {}, {}, root});
 
-    std::vector<IObject::Ptr> removed;
+    vector<IObject::Ptr> removed;
     {
         std::lock_guard lock(mutex_);
         collect_all(removed);
@@ -190,7 +190,7 @@ ReturnValue HierarchyImpl::remove(const IObject::Ptr& object)
 
     fire_event("on_changing", {HierarchyChange::Type::Remove, {}, parent_obj, object});
 
-    std::vector<IObject::Ptr> removed;
+    vector<IObject::Ptr> removed;
     {
         std::lock_guard lock(mutex_);
         auto it = entries_.find(object.get());
@@ -313,7 +313,7 @@ void HierarchyImpl::clear()
 {
     fire_event("on_changing", {HierarchyChange::Type::Clear});
 
-    std::vector<IObject::Ptr> removed;
+    vector<IObject::Ptr> removed;
     {
         std::lock_guard lock(mutex_);
         collect_all(removed);
@@ -410,14 +410,14 @@ void HierarchyImpl::for_each_child(const IObject::Ptr& object, void* context, Ch
     }
     // Snapshot children under shared lock, then iterate outside the lock
     // so the visitor can safely mutate the hierarchy.
-    std::vector<IObject::Ptr> snapshot;
+    vector<IObject::Ptr> snapshot;
     {
         std::shared_lock lock(mutex_);
         auto it = entries_.find(object.get());
         if (it == entries_.end()) {
             return;
         }
-        snapshot.assign(it->second.children.begin(), it->second.children.end());
+        snapshot = vector<IObject::Ptr>(it->second.children.begin(), it->second.children.end());
     }
     for (auto& child : snapshot) {
         if (!visitor(context, child)) {
@@ -445,7 +445,7 @@ size_t HierarchyImpl::size() const
 
 // DFS removal: erases the entry, takes ownership of its children, then recurses.
 // Collected objects are kept alive in removed for post-mutation notifications.
-void HierarchyImpl::remove_recursive(IObject* obj, std::vector<IObject::Ptr>& removed)
+void HierarchyImpl::remove_recursive(IObject* obj, vector<IObject::Ptr>& removed)
 {
     auto it = entries_.find(obj);
     if (it == entries_.end()) {
@@ -461,7 +461,7 @@ void HierarchyImpl::remove_recursive(IObject* obj, std::vector<IObject::Ptr>& re
 
 // Notifies each removed object via IHierarchyAware::on_hierarchy_left.
 // Called outside the lock so callbacks can safely interact with the hierarchy.
-void HierarchyImpl::notify_left(const std::vector<IObject::Ptr>& removed)
+void HierarchyImpl::notify_left(const vector<IObject::Ptr>& removed)
 {
     auto self = get_self<IHierarchy>();
     for (auto& obj : removed) {

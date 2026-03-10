@@ -88,7 +88,7 @@ void VelkInstance::queue_deferred_property(DeferredPropertySet task) const
     deferred_property_queue_.push_back(std::move(task));
 }
 
-void VelkInstance::flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const
+void VelkInstance::flush_deferred_properties(vector<DeferredPropertySet>& propSets) const
 {
     // Coalesce property sets: walk backwards, lock each weak_ptr once, keep last-write-wins.
     // Entries with null value are notification-only (value already written via set_value_silent).
@@ -97,41 +97,43 @@ void VelkInstance::flush_deferred_properties(std::vector<DeferredPropertySet>& p
         IPropertyInternal::Ptr property;
         IAny* value; // null = notification-only (value already applied)
     };
-    std::vector<CoalescedEntry> unique;
+    vector<CoalescedEntry> unique;
     unique.reserve(propSets.size()); // Assume we have mostly unique properties
-    for (auto it = propSets.rbegin(); it != propSets.rend(); ++it) {
-        auto locked = it->property.lock();
+    for (size_t i = propSets.size(); i > 0; --i) {
+        auto& entry = propSets[i - 1];
+        auto locked = entry.property.lock();
         if (!locked) {
             continue;
         }
         bool found = false;
         for (auto& u : unique) {
-            if (u.property == locked) {
+            if (u.property.get() == locked.get()) {
                 // If existing entry is notification-only but this one has a value,
                 // upgrade to the value entry (last-write-wins for value entries).
-                if (!u.value && it->value) {
-                    u.value = it->value.get();
+                if (!u.value && entry.value) {
+                    u.value = entry.value.get();
                 }
                 found = true;
                 break;
             }
         }
         if (!found) {
-            unique.push_back({std::move(locked), it->value.get()});
+            unique.emplace_back(CoalescedEntry{std::move(locked), entry.value.get()});
         }
     }
     // First pass: apply all values silently in original queue order, collect those needing notification.
-    std::vector<IPropertyInternal*> notify;
+    vector<IPropertyInternal*> notify;
     notify.reserve(unique.size()); // Assume that values mostly change
-    for (auto it = unique.rbegin(); it != unique.rend(); ++it) {
-        if (it->value) {
+    for (size_t i = unique.size(); i > 0; --i) {
+        auto& u = unique[i - 1];
+        if (u.value) {
             // Standard deferred write: apply value and notify if changed.
-            if (it->property->set_value_silent(*it->value) == ReturnValue::Success) {
-                notify.push_back(it->property.get());
+            if (u.property->set_value_silent(*u.value) == ReturnValue::Success) {
+                notify.push_back(u.property.get());
             }
         } else {
             // Notification-only: value was already written, just fire on_changed.
-            notify.push_back(it->property.get());
+            notify.push_back(u.property.get());
         }
     }
     // Second pass: fire on_changed for all properties that changed.
@@ -147,8 +149,8 @@ void VelkInstance::update(Duration time) const
 
     // Swap the queues under lock, then invoke outside the lock.
     // Tasks queued during invocation (by deferred handlers) will be picked up at the next update().
-    std::vector<DeferredTask> tasks;
-    std::vector<DeferredPropertySet> propSets;
+    vector<DeferredTask> tasks;
+    vector<DeferredPropertySet> propSets;
     {
         std::lock_guard lock(deferred_mutex_);
         tasks.swap(deferred_queue_);

@@ -388,6 +388,28 @@ public:
         return typed_data() + idx;
     }
 
+    /** @brief Inserts @p value by move before the element at @p pos (non-trivial types only). */
+    template <bool NT = !trivial, std::enable_if_t<NT, int> = 0>
+    T* insert(const T* pos, T&& value)
+    {
+        size_t idx = static_cast<size_t>(pos - typed_data());
+        assert(idx <= size_);
+        T tmp(std::move(value));
+        ensure_capacity(size_ + 1);
+        T* d = typed_data();
+        if (size_ > idx) {
+            new (d + size_) T(std::move(d[size_ - 1]));
+            for (size_t i = size_ - 1; i > idx; --i) {
+                d[i] = std::move(d[i - 1]);
+            }
+            d[idx] = std::move(tmp);
+        } else {
+            new (d + idx) T(std::move(tmp));
+        }
+        ++size_;
+        return typed_data() + idx;
+    }
+
     /**
      * @brief Inserts elements from range [@p first, @p last) before @p pos.
      * @return Pointer to the first inserted element.
