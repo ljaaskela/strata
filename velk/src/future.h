@@ -5,11 +5,11 @@
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_future.h>
 #include <velk/interface/types.h>
+#include <velk/vector.h>
 
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
-#include <vector>
 
 namespace velk {
 
@@ -52,7 +52,7 @@ private:
     mutable std::condition_variable cv_;
     std::atomic<bool> ready_{false};
     IAny::Ptr result_;
-    std::vector<Continuation> pending_continuations_;
+    vector<Continuation> pending_continuations_;
 };
 
 } // namespace velk

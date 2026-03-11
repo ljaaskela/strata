@@ -89,11 +89,14 @@ Animation create_tween(IAnimator& animator, Property<T> target, T from, T to, Du
 {
     Any<T> fromAny(from);
     Any<T> toAny(to);
-    auto anim = detail::tween(target, fromAny, toAny, duration, ease);
-    if (anim) {
-        animator.add(anim);
-        anim->play();
-        return Animation(anim);
+    if (fromAny && toAny) {
+        auto anim =
+            detail::tween(target, *fromAny.get_any_interface(), *toAny.get_any_interface(), duration, ease);
+        if (anim) {
+            animator.add(anim);
+            anim->play();
+            return Animation(anim);
+        }
     }
     return {};
 }
@@ -105,10 +108,12 @@ Animation create_tween(IAnimator& animator, T from, T to, Duration duration,
 {
     Any<T> fromAny(from);
     Any<T> toAny(to);
-    auto anim = detail::tween(fromAny, toAny, duration, ease);
-    if (anim) {
-        animator.add(anim);
-        return Animation(anim);
+    if (fromAny && toAny) {
+        auto anim = detail::tween(*fromAny.get_any_interface(), *toAny.get_any_interface(), duration, ease);
+        if (anim) {
+            animator.add(anim);
+            return Animation(anim);
+        }
     }
     return {};
 }
@@ -169,7 +174,7 @@ Transition create_transition(Property<T> target, Duration duration, easing::Easi
 {
     // Ensure the plugin is loaded (registers TransitionImpl type)
     get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
-    auto tr = detail::transition(target.get_property_interface(), duration, ease);
+    auto tr = detail::transition(IProperty::Ptr(target), duration, ease);
     return tr ? Transition(tr) : Transition{};
 }
 

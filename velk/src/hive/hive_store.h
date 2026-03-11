@@ -4,7 +4,7 @@
 #include <velk/ext/core_object.h>
 #include <velk/interface/hive/intf_hive_store.h>
 
-#include <vector>
+#include <velk/vector.h>
 
 namespace velk {
 
@@ -35,7 +35,7 @@ private:
         bool operator<(const HiveEntry& o) const { return uid < o.uid; }
     };
 
-    std::vector<HiveEntry> hives_;
+    vector<HiveEntry> hives_;
 };
 
 } // namespace velk

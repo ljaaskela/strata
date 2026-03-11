@@ -138,7 +138,7 @@ public:
     template <class T>
     void add_target(Property<T> target)
     {
-        add_target(target.get_property_interface());
+        add_target(IProperty::Ptr(target));
     }
 
     /** @brief Removes this animation from a property target. */
@@ -153,7 +153,7 @@ public:
     template <class T>
     void remove_target(Property<T> target)
     {
-        remove_target(target.get_property_interface());
+        remove_target(IProperty::Ptr(target));
     }
 
     /** @brief Detaches from all property targets and releases the handle. */
@@ -187,8 +187,7 @@ public:
             for (auto& kf : keyframes) {
                 Any<T> val(kf.value);
                 if (val) {
-                    entries.push_back(
-                        {kf.time, val.get_any_interface()->template get_self<IAny>(), kf.easing});
+                    entries.push_back({kf.time, IAny::Ptr(val), kf.easing});
                 }
             }
             a->set_keyframes(entries);

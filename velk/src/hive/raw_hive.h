@@ -9,7 +9,8 @@
 #include <cstddef>
 #include <memory>
 #include <shared_mutex>
-#include <vector>
+
+#include <velk/vector.h>
 
 namespace velk {
 
@@ -77,7 +78,7 @@ private:
     size_t slot_align_{0};
     size_t live_count_{0};
     RawHivePage* current_page_{nullptr};
-    std::vector<std::unique_ptr<RawHivePage>> pages_;
+    vector<std::unique_ptr<RawHivePage>> pages_;
     HivePageCapacity capacity_;
 };
 

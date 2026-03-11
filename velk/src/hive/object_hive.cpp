@@ -388,7 +388,7 @@ void ObjectHive::clear()
 
     // Collect all active objects under the lock, then unref outside it.
     // unref() may trigger hive_destroy which re-acquires the lock to reclaim slots.
-    std::vector<IObject*> to_unref;
+    vector<IObject*> to_unref;
 
     {
         std::lock_guard<std::shared_mutex> lock(mutex_);

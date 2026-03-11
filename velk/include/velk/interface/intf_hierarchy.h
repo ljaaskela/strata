@@ -9,41 +9,6 @@ namespace velk {
 
 class IHierarchy;
 
-/** @brief Lightweight handle binding an object to its hierarchy. */
-struct HierarchyNode
-{
-    IObject::Ptr object;            ///< The object this node represents.
-    weak_ptr<IHierarchy> hierarchy; ///< Weak reference to the owning hierarchy.
-};
-
-/** @brief Describes a hierarchy mutation for on_changing/on_changed events. */
-struct HierarchyChange
-{
-    enum class Type : uint8_t
-    {
-        SetRoot, ///< Root is being set. child = new root.
-        Add,     ///< Child appended. parent, child set.
-        Insert,  ///< Child inserted at index. parent, child, index set.
-        Remove,  ///< Subtree removed. parent, child set. child is subtree root.
-        Replace, ///< In-place replacement. parent, child (new), old_child set.
-        Clear    ///< All objects removed.
-    };
-
-    Type type{};
-    weak_ptr<IHierarchy> hierarchy; ///< The hierarchy that fired this event.
-    IObject::Ptr parent;
-    IObject::Ptr child;
-    IObject::Ptr old_child;
-    size_t index{};
-
-    friend bool operator==(const HierarchyChange& a, const HierarchyChange& b)
-    {
-        return a.type == b.type && a.hierarchy.lock() == b.hierarchy.lock() && a.parent == b.parent &&
-               a.child == b.child && a.old_child == b.old_child && a.index == b.index;
-    }
-    friend bool operator!=(const HierarchyChange& a, const HierarchyChange& b) { return !(a == b); }
-};
-
 /**
  * @brief Manages a single-root tree of IObject references.
  *
@@ -82,9 +47,6 @@ public:
     /** @brief Returns the root object, or null if none set. */
     virtual IObject::Ptr root() const = 0;
 
-    /** @brief Returns a snapshot of the given object's position in the hierarchy. */
-    virtual HierarchyNode node_of(const IObject::Ptr& object) const = 0;
-
     /** @brief Returns the parent of the given object, or null if root or not in hierarchy. */
     virtual IObject::Ptr parent_of(const IObject::Ptr& object) const = 0;
 
@@ -111,7 +73,46 @@ public:
 
     /** @brief Returns the total number of objects in this hierarchy (including root). */
     virtual size_t size() const = 0;
+
+    /** @brief Returns a snapshot of the given object's position in the hierarchy. */
+    struct Node
+    {
+        IObject::Ptr object;        ///< The object this node represents.
+        weak_ptr<IHierarchy> hierarchy; ///< Weak reference to the owning hierarchy.
+    };
+    virtual Node node_of(const IObject::Ptr& object) const = 0;
 };
+
+/** @brief Describes a hierarchy mutation for on_changing/on_changed events. */
+struct HierarchyChange
+{
+    enum class Type : uint8_t
+    {
+        SetRoot, ///< Root is being set. child = new root.
+        Add,     ///< Child appended. parent, child set.
+        Insert,  ///< Child inserted at index. parent, child, index set.
+        Remove,  ///< Subtree removed. parent, child set. child is subtree root.
+        Replace, ///< In-place replacement. parent, child (new), old_child set.
+        Clear    ///< All objects removed.
+    };
+
+    Type type{};
+    weak_ptr<IHierarchy> hierarchy; ///< The hierarchy that fired this event.
+    IObject::Ptr parent;
+    IObject::Ptr child;
+    IObject::Ptr old_child;
+    size_t index{};
+
+    friend bool operator==(const HierarchyChange& a, const HierarchyChange& b)
+    {
+        return a.type == b.type && a.hierarchy.lock() == b.hierarchy.lock() && a.parent == b.parent &&
+               a.child == b.child && a.old_child == b.old_child && a.index == b.index;
+    }
+    friend bool operator!=(const HierarchyChange& a, const HierarchyChange& b) { return !(a == b); }
+};
+
+/** @brief Backward-compatible alias. */
+using HierarchyNode = IHierarchy::Node;
 
 /**
  * @brief Optional interface for objects that want to be notified about hierarchy changes.

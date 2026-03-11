@@ -259,11 +259,13 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
             b->strong.store(1, std::memory_order_relaxed);
             b->weak.store(1, std::memory_order_relaxed);
             b->set_ptr(nullptr);
+            b->set_external_tag();
             b->destroy = nullptr;
             return b;
         }
         auto* b = new external_control_block;
         b->strong.store(1, std::memory_order_relaxed);
+        b->set_external_tag();
         return b;
     }
     auto* pool = get_pool_ptr();

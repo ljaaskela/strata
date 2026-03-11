@@ -64,7 +64,7 @@ void EventImpl::invoke_handlers(FnArgs args) const
     // Clone args once, share ownership across all deferred tasks
     auto clonedArgs = ::velk::make_shared<DeferredArgs>(args);
 
-    std::vector<DeferredTask> tasks;
+    vector<DeferredTask> tasks;
     tasks.reserve(deferred.size());
     for (const auto& h : deferred) {
         tasks.push_back({h, clonedArgs});

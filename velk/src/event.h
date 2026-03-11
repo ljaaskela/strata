@@ -4,8 +4,7 @@
 #include "function.h"
 
 #include <velk/interface/types.h>
-
-#include <vector>
+#include <velk/vector.h>
 
 namespace velk {
 
@@ -51,7 +50,7 @@ private:
     void* owned_context_{};
     IFunction::ContextDeleter* context_deleter_{};
     /// Partitioned handler list: [0, deferred_begin_) = immediate, [deferred_begin_, size()) = deferred.
-    mutable std::vector<IFunction::ConstPtr> handlers_;
+    mutable vector<IFunction::ConstPtr> handlers_;
     mutable uint32_t deferred_begin_{};
 };
 

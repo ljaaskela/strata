@@ -5,7 +5,7 @@
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_type_registry.h>
 
-#include <vector>
+#include <velk/vector.h>
 
 namespace velk {
 
@@ -58,8 +58,8 @@ private:
         bool operator<(const InterpolatorEntry& o) const { return typeUid < o.typeUid; }
     };
 
-    std::vector<Entry> types_;                     ///< Sorted registry of class factories.
-    std::vector<InterpolatorEntry> interpolators_; ///< Sorted registry of interpolator functions.
+    vector<Entry> types_;                     ///< Sorted registry of class factories.
+    vector<InterpolatorEntry> interpolators_; ///< Sorted registry of interpolator functions.
     Uid current_owner_;                            ///< Owner context for type registration.
     ILog& log_;
 };

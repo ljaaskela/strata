@@ -32,12 +32,6 @@ public:
     /** @brief Returns true if the underlying IProperty is valid. */
     operator bool() const { return prop_.operator bool(); }
 
-    /** @brief Returns the underlying IProperty pointer. */
-    const IProperty::Ptr get_property_interface() { return prop_; }
-
-    /** @copydoc get_property_interface() */
-    const IProperty::ConstPtr get_property_interface() const { return prop_; }
-
     /** @brief Subscribes @p fn to be called when the property value changes. */
     void add_on_changed(const IFunction::ConstPtr& fn)
     {

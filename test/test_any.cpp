@@ -40,8 +40,8 @@ TEST(Any, CopySemanticsShareUnderlying)
 TEST(Any, ConstAnyReadOnly)
 {
     Any<float> a(5.f);
-    const IAny* raw = a.get_any_interface();
-    Any<const float> ca(raw);
+    IAny::ConstPtr ptr = a;
+    Any<const float> ca(ptr);
     EXPECT_TRUE(ca);
     EXPECT_FLOAT_EQ(ca.get_value(), 5.f);
 }
@@ -98,9 +98,9 @@ TEST(AnyValue, SetSameValueReturnsNothingToDo)
 TEST(Any, TypeMismatchProducesInvalidWrapper)
 {
     Any<float> a(1.f);
-    const IAny* raw = a.get_any_interface();
     // Try to wrap as int — should produce an invalid (null) Any
-    Any<const int> bad(raw);
+    IAny::ConstPtr ptr = a;
+    Any<const int> bad(ptr);
     EXPECT_FALSE(bad);
 }
 
