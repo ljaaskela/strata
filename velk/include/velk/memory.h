@@ -76,12 +76,13 @@ struct control_block
         return false;
     }
 
-    /** @brief Sets the stored pointer. Asserts that the value is aligned (tag bits clear). */
+    /** @brief Sets the stored pointer, preserving tag bits. Asserts alignment. */
     void set_ptr(void* p)
     {
         assert((reinterpret_cast<uintptr_t>(p) & tag_mask) == 0 &&
                "control_block::set_ptr: unaligned pointer");
-        ptr_ = p;
+        auto tags = reinterpret_cast<uintptr_t>(ptr_) & tag_mask;
+        ptr_ = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(p) | tags);
     }
 
     /** @brief Returns the stored pointer with tag bits masked off. */
@@ -284,12 +285,11 @@ protected:
             "incorrect IInterface detection. Move T's full definition before any "
             "shared_ptr<T>/weak_ptr<T> member declarations.");
 #ifdef _DEBUG
-        // Runtime mismatch detection: the non-IInterface path uses external_control_block
-        // (24 bytes) but IInterface types allocate regular control_block (16 bytes).
-        // A mismatch here means is_interface was incorrectly evaluated (incomplete type).
+        //    Runtime mismatch detection: the non-IInterface path uses external_control_block
+        //    (24 bytes) but IInterface types allocate regular control_block (16 bytes).
+        //    A mismatch here means is_interface was incorrectly evaluated (incomplete type).
         if (block_) {
-            constexpr bool is_interface_now = std::is_convertible_v<mutable_t*, IInterface*>;
-            assert(is_interface == is_interface_now &&
+            assert(is_interface != block_->is_external() &&
                    "shared_ptr/weak_ptr<T>: is_interface mismatch, T was likely incomplete "
                    "when the template was instantiated");
         }
