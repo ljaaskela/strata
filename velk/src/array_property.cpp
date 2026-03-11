@@ -95,7 +95,9 @@ bool ArrayPropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
     if (!extension) {
         return false;
     }
-    extension->set_inner(data_, IInterface::WeakPtr(get_self<IInterface>()));
+    if (!extension->set_inner(data_, IInterface::WeakPtr(get_self<IInterface>()))) {
+        return false;
+    }
     set_any(interface_pointer_cast<IAny>(extension));
     return true;
 }

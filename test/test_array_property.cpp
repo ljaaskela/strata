@@ -154,8 +154,8 @@ TEST_F(ArrayPropertyTest, ReadOnlyRejectsSetAt)
     ASSERT_NE(ap, nullptr);
 
     Any<int32_t> val(99);
-    EXPECT_EQ(ap->set_at(0, val), ReturnValue::ReadOnly);
-    EXPECT_EQ(ap->push_back(val), ReturnValue::ReadOnly);
+    EXPECT_EQ(ap->set_at(0, *val.get_any_interface()), ReturnValue::ReadOnly);
+    EXPECT_EQ(ap->push_back(*val.get_any_interface()), ReturnValue::ReadOnly);
     EXPECT_EQ(ap->erase_at(0), ReturnValue::ReadOnly);
 }
 
@@ -182,7 +182,7 @@ TEST_F(ArrayPropertyTest, SetAtOutOfBounds)
     ASSERT_NE(ap, nullptr);
 
     Any<float> val(1.f);
-    EXPECT_EQ(ap->set_at(0, val), ReturnValue::InvalidArgument);
+    EXPECT_EQ(ap->set_at(0, *val.get_any_interface()), ReturnValue::InvalidArgument);
 }
 
 TEST_F(ArrayPropertyTest, EraseAtOutOfBounds)

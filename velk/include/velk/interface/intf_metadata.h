@@ -244,7 +244,7 @@ inline ReturnValue invoke_event(const IInterface* o, string_view name, const IAn
 template <class... Args, detail::require_any_args<Args...> = 0>
 IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... args)
 {
-    const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
+    const IAny* ptrs[] = {args.get_any_interface()...};
     auto* meta = interface_cast<IMetadata>(o);
     return meta ? invoke_function(meta->get_function(name), FnArgs{ptrs, sizeof...(Args)}) : nullptr;
 }
@@ -256,7 +256,7 @@ namespace detail {
 template <class Tuple, size_t... Is>
 FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
 {
-    ((ptrs[Is] = static_cast<const IAny*>(std::get<Is>(tup))), ...);
+    ((ptrs[Is] = std::get<Is>(tup).get_any_interface()), ...);
     return {ptrs, sizeof...(Is)};
 }
 

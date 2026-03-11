@@ -26,11 +26,6 @@ public:
     /** @brief Returns true if the underlying IFunction is valid. */
     operator bool() const { return fn_.operator bool(); }
 
-    /** @brief Returns the underlying IFunction pointer. */
-    IFunction::Ptr get_function_interface() { return fn_; }
-    /** @copydoc get_function_interface() */
-    IFunction::ConstPtr get_function_interface() const { return fn_; }
-
     /** @brief Invokes the function with no arguments (null-safe).
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
     IAny::Ptr invoke(InvokeType type = Immediate) const { return fn_ ? fn_->invoke({}, type) : nullptr; }
@@ -57,7 +52,7 @@ private:
 template <class... Args, detail::require_any_args<Args...> = 0>
 IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
-    const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
+    const IAny* ptrs[] = {args.get_any_interface()...};
     return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Args)}) : nullptr;
 }
 
@@ -68,7 +63,7 @@ namespace detail {
 template <class FnPtr, class Tuple, size_t... Is>
 IAny::Ptr invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequence<Is...>)
 {
-    const IAny* ptrs[] = {static_cast<const IAny*>(std::get<Is>(tup))...};
+    const IAny* ptrs[] = {std::get<Is>(tup).get_any_interface()...};
     return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Is)}) : nullptr;
 }
 

@@ -150,7 +150,7 @@ public:
     ReturnValue set_value(const T& value)
     {
         auto* internal = interface_cast<IFutureInternal>(future_);
-        return internal ? internal->set_result(Any<const T>(value)) : ReturnValue::Fail;
+        return internal ? internal->set_result(Any<const T>(value).get_any_interface()) : ReturnValue::Fail;
     }
 
     /**

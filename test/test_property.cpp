@@ -67,11 +67,11 @@ TEST(Property, SetSameValueReturnsNothingToDo)
 {
     auto p = create_property<int>(5);
 
-    auto iprop = p.get_property_interface();
+    IProperty::Ptr iprop = p;
     ASSERT_TRUE(iprop);
 
     Any<int> val(5);
-    auto result = iprop->set_value(val);
+    auto result = iprop->set_value(*val.get_any_interface());
     EXPECT_EQ(result, ReturnValue::NothingToDo);
 }
 
@@ -127,7 +127,8 @@ TEST(Property, ConstructReadOnlySetFails)
     EXPECT_EQ(p.get_value(), 42);
 
     // Can still create a "ReadWrite" Property<T> using the interface, but writes should still fail.
-    Property<int> pp(p.get_property_interface());
+    IProperty::Ptr iprop = p;
+    Property<int> pp(iprop);
     EXPECT_TRUE(pp);
     EXPECT_EQ(pp.set_value(1), ReturnValue::ReadOnly);
 }

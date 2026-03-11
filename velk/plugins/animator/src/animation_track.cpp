@@ -287,7 +287,7 @@ IAny::ConstPtr AnimationTrackImpl::get_inner() const
     return targets_.empty() ? nullptr : targets_[0].inner;
 }
 
-void AnimationTrackImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+bool AnimationTrackImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     // First target entry: initialize display/result/interpolator
     if (targets_.empty() && inner) {
@@ -301,6 +301,7 @@ void AnimationTrackImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& o
         }
     }
     targets_.push_back({owner, std::move(inner)});
+    return true;
 }
 
 IAny::Ptr AnimationTrackImpl::take_inner(IInterface& owner)

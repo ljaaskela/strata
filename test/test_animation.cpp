@@ -697,7 +697,7 @@ TEST_F(AnimatorPluginTest, KeyframeArrayProperty)
     ASSERT_NE(nullptr, anim);
 
     auto prop = create_property<float>(0.f);
-    auto* pi = interface_cast<IPropertyInternal>(prop.get_property_interface().get());
+    auto* pi = interface_cast<IPropertyInternal>(IProperty::Ptr(prop).get());
     pi->install_extension(
         interface_pointer_cast<IAnyExtension>(interface_pointer_cast<IAnimationTrack>(obj)));
 
@@ -738,7 +738,7 @@ TEST_F(AnimatorPluginTest, KeyframeArrayPropertyReadOnly)
     ASSERT_NE(nullptr, ap);
 
     Any<KeyframeEntry> val(KeyframeEntry{});
-    EXPECT_EQ(ap->push_back(val), ReturnValue::ReadOnly);
+    EXPECT_EQ(ap->push_back(*val.get_any_interface()), ReturnValue::ReadOnly);
     EXPECT_EQ(ap->erase_at(0), ReturnValue::ReadOnly);
 }
 

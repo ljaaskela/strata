@@ -114,13 +114,13 @@ void TransitionDriver::clear()
 // TransitionProxy
 // ============================================================================
 
-void TransitionProxy::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+bool TransitionProxy::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     owner_ = owner;
     inner_ = std::move(inner);
 
     if (!inner_) {
-        return;
+        return true;
     }
 
     // Resolve interpolator from the inner's compatible type
@@ -131,6 +131,7 @@ void TransitionProxy::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owne
 
     driver.init(*inner_);
     pending_ = inner_->clone();
+    return true;
 }
 
 IAny::Ptr TransitionProxy::take_inner(IInterface&)
@@ -341,7 +342,7 @@ IAny::ConstPtr TransitionImpl::get_inner() const
     return installed_proxy_ ? installed_proxy_->get_inner() : nullptr;
 }
 
-void TransitionImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+bool TransitionImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     // The property calls set_inner during install_extension, before putting us
     // at the head of the chain. We create a proxy, initialize it directly with
@@ -353,6 +354,7 @@ void TransitionImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner
 
     children_.push_back(std::move(child));
     ensure_registered();
+    return true;
 }
 
 IAny::Ptr TransitionImpl::take_inner(IInterface& owner)

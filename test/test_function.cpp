@@ -32,7 +32,7 @@ TEST(FnArgs, IndexOutOfBoundsReturnsNullptr)
 TEST(FnArgs, IndexInBoundsReturnsPointer)
 {
     Any<int> a(42);
-    const IAny* ptrs[] = {a};
+    const IAny* ptrs[] = {a.get_any_interface()};
     FnArgs args{ptrs, 1};
     EXPECT_NE(args[0], nullptr);
     EXPECT_EQ(args[1], nullptr);
@@ -42,7 +42,7 @@ TEST(FnArgs, Iteration)
 {
     Any<int> a(1);
     Any<float> b(2.f);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     FnArgs args{ptrs, 2};
 
     int count = 0;
@@ -81,7 +81,7 @@ TEST(Callback, InvokeWithArgs)
     });
 
     Any<float> arg(3.14f);
-    const IAny* ptrs[] = {arg};
+    const IAny* ptrs[] = {arg.get_any_interface()};
     fn.invoke(FnArgs{ptrs, 1});
     EXPECT_FLOAT_EQ(received, 3.14f);
 }
@@ -145,7 +145,7 @@ TEST(FunctionContext, MatchingCountAccepts)
 {
     Any<int> a(1);
     Any<int> b(2);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     FnArgs args{ptrs, 2};
 
     FunctionContext ctx(args, 2);
@@ -156,7 +156,7 @@ TEST(FunctionContext, MatchingCountAccepts)
 TEST(FunctionContext, MismatchedCountRejects)
 {
     Any<int> a(1);
-    const IAny* ptrs[] = {a};
+    const IAny* ptrs[] = {a.get_any_interface()};
     FnArgs args{ptrs, 1};
 
     FunctionContext ctx(args, 2);
@@ -168,7 +168,7 @@ TEST(FunctionContext, ArgTypedAccess)
 {
     Any<float> a(3.14f);
     Any<int> b(42);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     FnArgs args{ptrs, 2};
 
     FunctionContext ctx(args, 2);
@@ -186,7 +186,7 @@ TEST(FunctionContext, ArgTypedAccess)
 TEST(FunctionContext, ArgOutOfRangeReturnsNull)
 {
     Any<int> a(1);
-    const IAny* ptrs[] = {a};
+    const IAny* ptrs[] = {a.get_any_interface()};
     FnArgs args{ptrs, 1};
 
     FunctionContext ctx(args, 1);
@@ -208,7 +208,7 @@ TEST(Callback, TypedLambdaTwoParams)
 
     Any<float> a(3.14f);
     Any<int> b(42);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     auto result = fn.invoke(FnArgs{ptrs, 2});
     EXPECT_EQ(result, nullptr);
     EXPECT_FLOAT_EQ(received_a, 3.14f);
@@ -222,7 +222,7 @@ TEST(Callback, TypedLambdaVoidReturn)
     Callback fn([&](float a) { received = a; });
 
     Any<float> a(2.5f);
-    const IAny* ptrs[] = {a};
+    const IAny* ptrs[] = {a.get_any_interface()};
     auto result = fn.invoke(FnArgs{ptrs, 1});
     EXPECT_EQ(result, nullptr);
     EXPECT_FLOAT_EQ(received, 2.5f);
@@ -233,7 +233,7 @@ TEST(Callback, TypedLambdaInsufficientArgs)
     Callback fn([](const float&, const int&) -> ReturnValue { return ReturnValue::Success; });
 
     Any<float> a(1.f);
-    const IAny* ptrs[] = {a};
+    const IAny* ptrs[] = {a.get_any_interface()};
     auto result = fn.invoke(FnArgs{ptrs, 1});
     EXPECT_EQ(result, nullptr);
 }
@@ -257,7 +257,7 @@ TEST(Callback, TypedLambdaExtraArgsIgnored)
 
     Any<float> a(1.5f);
     Any<int> b(99);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     auto result = fn.invoke(FnArgs{ptrs, 2});
     EXPECT_EQ(result, nullptr);
     EXPECT_FLOAT_EQ(received, 1.5f);
@@ -270,7 +270,7 @@ TEST(Callback, TypedLambdaTypeMismatchGetsDefault)
     Callback fn([&](int a) { received = a; });
 
     Any<float> a(3.14f); // float, not int
-    const IAny* ptrs[] = {a};
+    const IAny* ptrs[] = {a.get_any_interface()};
     auto result = fn.invoke(FnArgs{ptrs, 1});
     EXPECT_EQ(result, nullptr);
     EXPECT_EQ(received, 0); // default int
@@ -378,7 +378,7 @@ TEST(Event, AddHandlerWithTypedLambdaHelper)
 
     Any<float> a(3.14f);
     Any<int> b(42);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     event.invoke(FnArgs{ptrs, 2});
 
     EXPECT_FLOAT_EQ(received_a, 3.14f);

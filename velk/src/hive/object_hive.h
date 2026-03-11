@@ -11,7 +11,8 @@
 #include <cstdint>
 #include <memory>
 #include <shared_mutex>
-#include <vector>
+
+#include <velk/vector.h>
 
 namespace velk {
 
@@ -107,7 +108,7 @@ private:
     size_t slot_alignment_{0};
     size_t live_count_{0};
     HivePage* current_page_{nullptr}; ///< Hint: last page with free slots.
-    std::vector<std::unique_ptr<HivePage>> pages_;
+    vector<std::unique_ptr<HivePage>> pages_;
     HivePageCapacity capacity_;
 };
 

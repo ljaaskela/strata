@@ -41,7 +41,7 @@ public:
 
     // IAnyExtension
     IAny::ConstPtr get_inner() const override;
-    void set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner) override;
+    bool set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner) override;
     IAny::Ptr take_inner(IInterface& owner) override;
 
     // IAny overrides

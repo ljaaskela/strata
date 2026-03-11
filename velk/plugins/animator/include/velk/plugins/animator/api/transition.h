@@ -59,7 +59,7 @@ public:
     template <class T>
     void add_target(Property<T> target)
     {
-        add_target(target.get_property_interface());
+        add_target(IProperty::Ptr(target));
     }
 
     /** @brief Removes this transition from a property target. */
@@ -74,7 +74,7 @@ public:
     template <class T>
     void remove_target(Property<T> target)
     {
-        remove_target(target.get_property_interface());
+        remove_target(IProperty::Ptr(target));
     }
 
     /** @brief Detaches from all properties and releases the handle. */

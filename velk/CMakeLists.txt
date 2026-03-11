@@ -1,6 +1,8 @@
 add_library(velk SHARED
     src/array_property.cpp
     src/array_property.h
+    src/binding.cpp
+    src/binding.h
     src/property.cpp
     src/property.h
     src/event.cpp
@@ -32,6 +34,7 @@ add_library(velk SHARED
     src/velk.cpp
     include/velk/interface/intf_log.h
     include/velk/interface/intf_any.h
+    include/velk/interface/intf_binding.h
     include/velk/interface/intf_external_any.h
     include/velk/interface/intf_object.h
     include/velk/interface/intf_interface.h
@@ -54,6 +57,7 @@ add_library(velk SHARED
     include/velk/interface/member_desc.h
     include/velk/interface/types.h
     include/velk/api/any.h
+    include/velk/api/binding.h
     include/velk/api/callback.h
     include/velk/api/event.h
     include/velk/api/property.h

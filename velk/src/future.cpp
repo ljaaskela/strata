@@ -27,7 +27,7 @@ const IAny* FutureImpl::get_result() const
 
 ReturnValue FutureImpl::set_result(const IAny* result)
 {
-    std::vector<Continuation> continuations;
+    vector<Continuation> continuations;
     {
         std::lock_guard lock(mutex_);
         if (ready_.load(std::memory_order_relaxed)) {

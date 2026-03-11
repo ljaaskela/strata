@@ -37,21 +37,25 @@ protected:
             set_any_direct(any);
         }
     }
-    void set_any_direct(const IAny& any) noexcept { any_ = refcnt_ptr<IAny>(const_cast<IAny*>(&any)); }
-    void set_any_direct(const IAny::ConstPtr& any) noexcept { set_any_direct(*(any.get())); }
+    void set_any_direct(const IAny& any) noexcept
+    {
+        any_ = IAny::Ptr(const_cast<IAny*>(&any));
+    }
+    void set_any_direct(const IAny::ConstPtr& any) noexcept
+    {
+        any_ = IAny::Ptr(const_cast<IAny*>(any.get()), any.block());
+    }
+    void set_any_direct(const IAny::Ptr& any) noexcept { any_ = any; }
 
 public:
-    /** @brief Implicit conversion to a const IAny pointer. */
-    operator const IAny*() const noexcept { return any_.get(); }
-    /** @brief Returns a const reference to the underlying IAny. */
-    operator const IAny&() const noexcept { return *(any_.get()); }
+    /** @brief Returns the underlying IAny raw pointer (may be null). */
+    const IAny* get_any_interface() const noexcept { return any_.get(); }
+    /** @brief Returns a ref-counted const pointer to the underlying IAny. */
+    operator IAny::ConstPtr() const noexcept { return any_; }
     /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
-    /** @brief Returns the underlying const IAny pointer. */
-    const IAny* get_any_interface() const noexcept { return any_.get(); }
-
 protected:
-    refcnt_ptr<IAny> any_;
+    IAny::Ptr any_;
 };
 
 /** @brief Non-template storage for ArrayAny<T>. Compiled once regardless of T instantiations. */
@@ -82,8 +86,13 @@ protected:
 public:
     /** @brief Returns true if the wrapper holds a valid IArrayAny-backed IAny. */
     operator bool() const noexcept { return arr_.operator bool(); }
-    /** @brief Implicit conversion to const IAny pointer. */
-    operator const IAny*() const noexcept { return arr_ ? interface_cast<IAny>(arr_) : nullptr; }
+    /** @brief Returns the underlying IAny raw pointer (may be null). */
+    const IAny* get_any_interface() const noexcept { return arr_ ? interface_cast<IAny>(arr_) : nullptr; }
+    /** @brief Returns a ref-counted const pointer to the underlying IAny. */
+    operator IAny::ConstPtr() const noexcept
+    {
+        return arr_ ? interface_pointer_cast<IAny>(arr_) : IAny::ConstPtr{};
+    }
     /** @brief Returns the number of elements. */
     size_t size() const { return arr_ ? arr_->array_size() : 0; }
     /** @brief Returns true if the array is empty. */
@@ -141,36 +150,31 @@ public:
             set_any(*any, TYPE_UID);
         }
     }
-    /** @brief Move-constructs from an IAny rvalue. */
-    constexpr Any(IAny&& any) noexcept
-    {
-        if (is_compatible(any, TYPE_UID)) {
-            any_ = std::move(any);
-        }
-    }
     /** @brief Default-constructs an IAny of type T via Velk. */
     Any() noexcept { set_any_direct(instance().create_any(TYPE_UID)); }
     /** @brief Constructs an IAny of type T and initializes it with @p value. */
     Any(const T& value) noexcept
     {
         if (!is_compatible(any_, TYPE_UID)) {
-            auto any = instance().create_any(TYPE_UID);
-            any_.reset(any.get());
+            any_ = instance().create_any(TYPE_UID);
         }
         any_->set_data(&value, TYPE_SIZE, TYPE_UID);
     }
 
-    /** @brief Implicit conversion to a mutable IAny pointer (read-write only). */
-    template <bool RW = IsReadWrite, detail::require<RW> = 0>
-    operator IAny*() noexcept
-    {
-        return any_.get();
-    }
-    /** @brief Returns the underlying mutable IAny pointer (read-write only). */
+    using AnyStorage::get_any_interface;
+
+    /** @brief Returns the underlying mutable IAny raw pointer (read-write only, may be null). */
     template <bool RW = IsReadWrite, detail::require<RW> = 0>
     IAny* get_any_interface() noexcept
     {
         return any_.get();
+    }
+
+    /** @brief Returns a ref-counted mutable pointer to the underlying IAny (read-write only). */
+    template <bool RW = IsReadWrite, detail::require<RW> = 0>
+    operator IAny::Ptr() noexcept
+    {
+        return any_;
     }
 
     /** @brief Copies the value from @p other into the managed IAny (read-write only). */
