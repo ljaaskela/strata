@@ -311,7 +311,7 @@ TEST_F(ObjectTest, TypedFunctionInvoke)
     // Invoke typed function via IAny args
     Any<int> a(3);
     Any<int> b(7);
-    const IAny* ptrs[] = {a, b};
+    const IAny* ptrs[] = {a.get_any_interface(), b.get_any_interface()};
     FnArgs args{ptrs, 2};
     invoke_function(obj.get(), "add", args);
     EXPECT_EQ(raw->lastAddResult, 10);
@@ -489,7 +489,7 @@ TEST_F(ObjectTest, RPropSetValueReturnsReadOnly)
 
     // set_value on a read-only property should return ReadOnly
     Any<int> newVal(100);
-    EXPECT_EQ(prop->set_value(*static_cast<const IAny*>(newVal)), ReturnValue::ReadOnly);
+    EXPECT_EQ(prop->set_value(*newVal.get_any_interface()), ReturnValue::ReadOnly);
 
     // Value should be unchanged
     auto* iw = interface_cast<ITestWidget>(obj);

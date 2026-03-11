@@ -29,7 +29,7 @@ public:
     void clear() override;
 
     IObject::Ptr root() const override;
-    HierarchyNode node_of(const IObject::Ptr& object) const override;
+    Node node_of(const IObject::Ptr& object) const override;
     IObject::Ptr parent_of(const IObject::Ptr& object) const override;
     vector<IObject::Ptr> children_of(const IObject::Ptr& object) const override;
     IObject::Ptr child_at(const IObject::Ptr& object, size_t index) const override;

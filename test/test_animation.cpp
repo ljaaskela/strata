@@ -738,7 +738,7 @@ TEST_F(AnimatorPluginTest, KeyframeArrayPropertyReadOnly)
     ASSERT_NE(nullptr, ap);
 
     Any<KeyframeEntry> val(KeyframeEntry{});
-    EXPECT_EQ(ap->push_back(val), ReturnValue::ReadOnly);
+    EXPECT_EQ(ap->push_back(*val.get_any_interface()), ReturnValue::ReadOnly);
     EXPECT_EQ(ap->erase_at(0), ReturnValue::ReadOnly);
 }
 

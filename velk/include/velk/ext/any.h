@@ -544,7 +544,7 @@ template <class T>
 IAny::Ptr create_array_any_ref(vector<T>* ptr)
 {
     auto* obj = new ArrayAnyRef<T>(ptr);
-    return IAny::Ptr(static_cast<IAny*>(obj));
+    return IAny::Ptr(static_cast<IAny*>(obj), adopt_ref);
 }
 
 /** @brief Creates an AnyRef<T> wrapped in a shared_ptr, pointing to the given address. */
@@ -552,7 +552,7 @@ template <class T>
 IAny::Ptr create_any_ref(T* ptr)
 {
     auto* obj = new AnyRef<T>(ptr);
-    return IAny::Ptr(static_cast<IAny*>(obj));
+    return IAny::Ptr(static_cast<IAny*>(obj), adopt_ref);
 }
 
 } // namespace velk::ext

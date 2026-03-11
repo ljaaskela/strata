@@ -1,14 +1,13 @@
 #ifndef VELK_API_TRAITS_H
 #define VELK_API_TRAITS_H
 
+#include <velk/interface/intf_any.h>
 #include <velk/interface/intf_object.h>
 
 #include <tuple>
 #include <type_traits>
 
 namespace velk {
-
-class IAny; // forward declaration for convertibility checks
 
 /**
  * @brief Internal type traits and SFINAE helpers shared across the Velk API.
@@ -169,11 +168,11 @@ using decay_param_t = std::remove_const_t<std::decay_t<T>>;
  */
 template <class... Args>
 inline constexpr bool all_any_convertible_v =
-    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...);
+    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, IAny::ConstPtr> && ...);
 
 /**
  * @brief @c true when @c sizeof...(Args) >= 2 and no argument type is
- *        convertible to <tt>const IAny*</tt>.
+ *        convertible to @c IAny::ConstPtr.
  *
  * Used to select the @c invoke_function overload that wraps each argument
  * in @c Any<T> before invocation.
@@ -182,7 +181,7 @@ inline constexpr bool all_any_convertible_v =
  */
 template <class... Args>
 inline constexpr bool none_any_convertible_v =
-    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...);
+    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, IAny::ConstPtr> && ...);
 
 // SFINAE gate aliases
 

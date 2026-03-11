@@ -466,7 +466,7 @@ void demo_function_context(IObject::Ptr& widget)
         // Explicit IAny* args
         Any<float> arg0(3.f);
         Any<int> arg1(7);
-        const IAny* ptrs[] = {arg0, arg1};
+        const IAny* ptrs[] = {arg0.get_any_interface(), arg1.get_any_interface()};
         FnArgs fnArgs{ptrs, 2};
         FunctionContext ctx(fnArgs, 2);
         cout << "  arg_count = " << ctx.size() << endl;

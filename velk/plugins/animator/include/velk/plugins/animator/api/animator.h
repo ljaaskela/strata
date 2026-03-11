@@ -89,11 +89,14 @@ Animation create_tween(IAnimator& animator, Property<T> target, T from, T to, Du
 {
     Any<T> fromAny(from);
     Any<T> toAny(to);
-    auto anim = detail::tween(target, fromAny, toAny, duration, ease);
-    if (anim) {
-        animator.add(anim);
-        anim->play();
-        return Animation(anim);
+    if (fromAny && toAny) {
+        auto anim =
+            detail::tween(target, *fromAny.get_any_interface(), *toAny.get_any_interface(), duration, ease);
+        if (anim) {
+            animator.add(anim);
+            anim->play();
+            return Animation(anim);
+        }
     }
     return {};
 }
@@ -105,10 +108,12 @@ Animation create_tween(IAnimator& animator, T from, T to, Duration duration,
 {
     Any<T> fromAny(from);
     Any<T> toAny(to);
-    auto anim = detail::tween(fromAny, toAny, duration, ease);
-    if (anim) {
-        animator.add(anim);
-        return Animation(anim);
+    if (fromAny && toAny) {
+        auto anim = detail::tween(*fromAny.get_any_interface(), *toAny.get_any_interface(), duration, ease);
+        if (anim) {
+            animator.add(anim);
+            return Animation(anim);
+        }
     }
     return {};
 }

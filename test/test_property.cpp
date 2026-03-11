@@ -71,7 +71,7 @@ TEST(Property, SetSameValueReturnsNothingToDo)
     ASSERT_TRUE(iprop);
 
     Any<int> val(5);
-    auto result = iprop->set_value(val);
+    auto result = iprop->set_value(*val.get_any_interface());
     EXPECT_EQ(result, ReturnValue::NothingToDo);
 }
 

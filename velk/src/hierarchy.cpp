@@ -333,8 +333,8 @@ IObject::Ptr HierarchyImpl::root() const
     return root_;
 }
 
-// Returns a HierarchyNode snapshot binding the object to this hierarchy via weak_ptr.
-HierarchyNode HierarchyImpl::node_of(const IObject::Ptr& object) const
+// Returns a Node snapshot binding the object to this hierarchy via weak_ptr.
+IHierarchy::Node HierarchyImpl::node_of(const IObject::Ptr& object) const
 {
     if (!object) {
         return {};

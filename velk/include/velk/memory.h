@@ -275,6 +275,25 @@ protected:
     /** @brief Releases the weak ref on the block, using the correct deallocator for the block type. */
     void release_block()
     {
+        // Catch incomplete-type bug: if T was forward-declared when ptr_base<T> was
+        // instantiated, is_interface may have been computed as false even though T
+        // actually derives from IInterface. Re-evaluate now that T is complete.
+        static_assert(
+            is_interface == std::is_convertible_v<mutable_t*, IInterface*>,
+            "shared_ptr/weak_ptr<T>: T was incomplete when instantiated, causing "
+            "incorrect IInterface detection. Move T's full definition before any "
+            "shared_ptr<T>/weak_ptr<T> member declarations.");
+#ifdef _DEBUG
+        // Runtime mismatch detection: the non-IInterface path uses external_control_block
+        // (24 bytes) but IInterface types allocate regular control_block (16 bytes).
+        // A mismatch here means is_interface was incorrectly evaluated (incomplete type).
+        if (block_) {
+            constexpr bool is_interface_now = std::is_convertible_v<mutable_t*, IInterface*>;
+            assert(is_interface == is_interface_now &&
+                   "shared_ptr/weak_ptr<T>: is_interface mismatch, T was likely incomplete "
+                   "when the template was instantiated");
+        }
+#endif
         if constexpr (is_interface) {
             detail::weak_release_intrusive(block_);
         } else {
@@ -355,7 +374,7 @@ public:
     /**
      * @brief Constructs from a raw pointer.
      *
-     * For IInterface types: adopts the existing intrusive reference (no block).
+     * For IInterface types: increments the intrusive reference count.
      * For non-IInterface types: allocates an external_control_block with a
      * type-erased destructor.
      *
@@ -367,12 +386,26 @@ public:
             return;
         }
         ptr_ = p;
-        if constexpr (!is_interface) {
+        if constexpr (is_interface) {
+            this->mutable_ptr()->ref();
+        } else {
             auto* ecb = static_cast<external_control_block*>(detail::alloc_control_block(true));
             ecb->set_ptr(p);
             ecb->destroy = [](external_control_block* b) { delete static_cast<T*>(b->get_ptr()); };
             block_ = ecb;
         }
+    }
+
+    /**
+     * @brief Adopts an existing intrusive reference without incrementing.
+     *
+     * For IInterface types only. Used by factories that return pointers with
+     * refcount already set (e.g. from new or create()).
+     */
+    shared_ptr(T* p, adopt_ref_t)
+    {
+        static_assert(is_interface, "adopt_ref_t is only for IInterface types");
+        ptr_ = p;
     }
 
     /**
@@ -401,7 +434,9 @@ public:
 
     shared_ptr& operator=(const shared_ptr& o)
     {
-        shared_ptr(o).swap(*this);
+        if (o != *this) {
+            shared_ptr(o).swap(*this);
+        }
         return *this;
     }
 
@@ -413,7 +448,9 @@ public:
 
     shared_ptr& operator=(shared_ptr&& o) noexcept
     {
-        shared_ptr(std::move(o)).swap(*this);
+        if (o != *this) {
+            shared_ptr(std::move(o)).swap(*this);
+        }
         return *this;
     }
 
@@ -447,6 +484,12 @@ public:
         release();
         ptr_ = nullptr;
         block_ = nullptr;
+    }
+
+    /** @brief Releases the current pointer and manages a new one (adds a reference). */
+    void reset(T* p)
+    {
+        shared_ptr(p).swap(*this);
     }
 
     /**
