@@ -6,10 +6,15 @@
 
 namespace velk::detail {
 
-/** @brief Collects IProperty dependencies during binding evaluation. */
+/** @brief Collects IProperty dependencies during binding evaluation.
+ *  Stores raw pointers for fast diff against existing deps.
+ *  Ref-counted pointers are only acquired when deps actually change. */
 struct DependencyTracker
 {
-    vector<IProperty::ConstPtr> deps;
+    vector<const IProperty*> deps;
+
+    /** @brief Converts raw pointers to weak pointers. */
+    vector<IProperty::ConstWeakPtr> acquire() const;
 };
 
 /** @brief Records the property as a dependency if a tracker is active. */

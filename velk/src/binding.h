@@ -63,9 +63,9 @@ private:
     /** @brief Called when any source/dep changes. Fires target property's on_changed. */
     void on_source_changed();
 
-    IProperty::ConstPtr source_property_;
+    IProperty::ConstWeakPtr source_property_;
     IFunction::ConstPtr source_function_;
-    vector<IProperty::ConstPtr> deps_;
+    vector<IProperty::ConstWeakPtr> deps_;
     mutable IAny::Ptr cached_result_;
     mutable bool cache_valid_ = false;
     bool auto_track_ = false; ///< True if deps should be auto-detected on evaluate.

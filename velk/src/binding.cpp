@@ -57,7 +57,7 @@ BindingImpl::~BindingImpl()
 
 IProperty::ConstPtr BindingImpl::get_source_property() const
 {
-    return source_property_;
+    return source_property_.lock();
 }
 
 IFunction::ConstPtr BindingImpl::get_source_function() const
@@ -82,9 +82,13 @@ void BindingImpl::set_source_property(const IProperty::ConstPtr& source)
 void BindingImpl::set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps)
 {
     unsubscribe();
-    source_property_ = {};
+    source_property_ = IProperty::ConstWeakPtr();
     source_function_ = fn;
-    deps_ = std::move(deps);
+    deps_.clear();
+    deps_.reserve(deps.size());
+    for (auto& d : deps) {
+        deps_.emplace_back(d);
+    }
     auto_track_ = false;
     cache_valid_ = false;
     if (inner_) {
@@ -95,7 +99,7 @@ void BindingImpl::set_source_function(const IFunction::ConstPtr& fn, vector<IPro
 void BindingImpl::set_source_function(const IFunction::ConstPtr& fn)
 {
     unsubscribe();
-    source_property_ = {};
+    source_property_ = IProperty::ConstWeakPtr();
     source_function_ = fn;
     deps_.clear();
     auto_track_ = true;
@@ -187,8 +191,8 @@ IAny::Ptr BindingImpl::clone() const
 
 IAny::ConstPtr BindingImpl::evaluate() const
 {
-    if (source_property_) {
-        return source_property_->get_value();
+    if (auto source = source_property_.lock()) {
+        return source->get_value();
     }
     if (source_function_) {
         if (cache_valid_) {
@@ -204,9 +208,13 @@ IAny::ConstPtr BindingImpl::evaluate() const
         dep_values.reserve(deps_.size());
         dep_ptrs.reserve(deps_.size());
         for (auto& dep : deps_) {
-            auto val = dep ? dep->get_value() : nullptr;
-            dep_ptrs.push_back(val.get());
-            dep_values.push_back(std::move(val));
+            if (auto locked = dep.lock()) {
+                auto val = locked->get_value();
+                dep_ptrs.push_back(val.get());
+                dep_values.push_back(std::move(val));
+            } else {
+                dep_ptrs.push_back(nullptr);
+            }
         }
         FnArgs args{dep_ptrs.data(), dep_ptrs.size()};
         cached_result_ = source_function_->invoke(args);
@@ -219,9 +227,9 @@ IAny::ConstPtr BindingImpl::evaluate() const
 IAny::ConstPtr BindingImpl::evaluate_auto_track() const
 {
     // Evaluate with dependency tracking active.
-    // The function reads properties via get_value(), and the tracker
-    // records each one. We then diff against current deps and resubscribe
-    // if the set changed.
+    // The tracker records raw pointers (no ref-counting overhead).
+    // We diff raw pointers against current deps and only do the
+    // ref-counted conversion + resubscribe when deps actually changed.
     detail::TrackerScope scope;
 
     cached_result_ = source_function_->invoke({});
@@ -233,7 +241,7 @@ IAny::ConstPtr BindingImpl::evaluate_auto_track() const
     bool changed = (tracked.size() != deps_.size());
     if (!changed) {
         for (size_t i = 0; i < tracked.size(); ++i) {
-            if (tracked[i] != deps_[i]) {
+            if (tracked[i] != deps_[i].unsafe_get()) {
                 changed = true;
                 break;
             }
@@ -241,11 +249,12 @@ IAny::ConstPtr BindingImpl::evaluate_auto_track() const
     }
 
     if (changed) {
-        // Need to resubscribe. Cast away const since subscribe/unsubscribe
-        // manage internal state that's logically separate from the value.
+        // Convert raw pointers to ref-counted pointers and resubscribe.
+        // Safe because properties are kept alive by their owners; the binding
+        // function must not destroy properties it reads.
         auto* self = const_cast<BindingImpl*>(this);
         self->unsubscribe();
-        self->deps_ = std::move(tracked);
+        self->deps_ = scope.tracker.acquire();
         if (inner_) {
             self->subscribe();
         }
@@ -278,14 +287,14 @@ void BindingImpl::subscribe()
 
     ensure_handler();
 
-    if (source_property_) {
-        if (auto evt = source_property_->on_changed()) {
+    if (auto source = source_property_.lock()) {
+        if (auto evt = source->on_changed()) {
             evt->add_handler(handler_);
         }
     }
     for (auto& dep : deps_) {
-        if (dep) {
-            if (auto evt = dep->on_changed()) {
+        if (auto locked = dep.lock()) {
+            if (auto evt = locked->on_changed()) {
                 evt->add_handler(handler_);
             }
         }
@@ -299,14 +308,14 @@ void BindingImpl::unsubscribe()
         return;
     }
 
-    if (source_property_) {
-        if (auto evt = source_property_->on_changed()) {
+    if (auto source = source_property_.lock()) {
+        if (auto evt = source->on_changed()) {
             evt->remove_handler(handler_);
         }
     }
     for (auto& dep : deps_) {
-        if (dep) {
-            if (auto evt = dep->on_changed()) {
+        if (auto locked = dep.lock()) {
+            if (auto evt = locked->on_changed()) {
                 evt->remove_handler(handler_);
             }
         }

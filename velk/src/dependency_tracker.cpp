@@ -13,16 +13,24 @@ void record_dependency(const IProperty* prop)
         return;
     }
     // Avoid duplicates (small N, linear scan is fine)
-    for (auto& d : t->deps) {
-        if (d.get() == prop) {
+    for (auto* d : t->deps) {
+        if (d == prop) {
             return;
         }
     }
-    // Get a ref-counted pointer via the object's get_self + interface cast
-    const auto* obj = interface_cast<const IObject>(prop);
-    if (auto p = get_self<IProperty>(obj)) {
-        t->deps.push_back(p);
+    t->deps.push_back(prop);
+}
+
+vector<IProperty::ConstWeakPtr> DependencyTracker::acquire() const
+{
+    vector<IProperty::ConstWeakPtr> result;
+    result.reserve(deps.size());
+    for (auto* raw : deps) {
+        if (auto* obj = interface_cast<const IObject>(raw)) {
+            result.emplace_back(obj->get_self<IProperty>());
+        }
     }
+    return result;
 }
 
 DependencyTracker* push_tracker(DependencyTracker* tracker)
