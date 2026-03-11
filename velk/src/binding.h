@@ -54,6 +54,8 @@ private:
     IAny::ConstPtr evaluate() const;
     /** @brief Evaluates with auto-dependency tracking. Resubscribes if deps change. */
     IAny::ConstPtr evaluate_auto_track() const;
+    /** @brief Creates the handler function once (lazy). */
+    void ensure_handler();
     /** @brief Subscribes to source/dep on_changed events. */
     void subscribe();
     /** @brief Unsubscribes from all source/dep on_changed events. */

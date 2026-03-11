@@ -254,13 +254,11 @@ IAny::ConstPtr BindingImpl::evaluate_auto_track() const
     return cached_result_;
 }
 
-void BindingImpl::subscribe()
+void BindingImpl::ensure_handler()
 {
-    if (subscribed_) {
+    if (handler_) {
         return;
     }
-
-    // Create handler via the type registry, then bind a trampoline to this.
     auto fn = instance().create<IFunction>(ClassId::Function);
     if (auto* internal = interface_cast<IFunctionInternal>(fn)) {
         auto* trampoline = +[](void* ctx, FnArgs) -> IAny::Ptr {
@@ -270,6 +268,15 @@ void BindingImpl::subscribe()
         internal->bind(this, trampoline);
     }
     handler_ = fn;
+}
+
+void BindingImpl::subscribe()
+{
+    if (subscribed_) {
+        return;
+    }
+
+    ensure_handler();
 
     if (source_property_) {
         if (auto evt = source_property_->on_changed()) {
@@ -305,7 +312,6 @@ void BindingImpl::unsubscribe()
         }
     }
     subscribed_ = false;
-    handler_ = {};
 }
 
 void BindingImpl::on_source_changed()
