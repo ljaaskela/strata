@@ -1,5 +1,6 @@
 #include "binding.h"
 
+#include "dependency_tracker.h"
 #include "function.h"
 
 #include <velk/api/velk.h>
@@ -84,10 +85,22 @@ void BindingImpl::set_source_function(const IFunction::ConstPtr& fn, vector<IPro
     source_property_ = {};
     source_function_ = fn;
     deps_ = std::move(deps);
+    auto_track_ = false;
     cache_valid_ = false;
     if (inner_) {
         subscribe();
     }
+}
+
+void BindingImpl::set_source_function(const IFunction::ConstPtr& fn)
+{
+    unsubscribe();
+    source_property_ = {};
+    source_function_ = fn;
+    deps_.clear();
+    auto_track_ = true;
+    cache_valid_ = false;
+    // Don't subscribe yet; deps are discovered on first evaluate().
 }
 
 void BindingImpl::set_invoke_type(InvokeType type)
@@ -181,6 +194,11 @@ IAny::ConstPtr BindingImpl::evaluate() const
         if (cache_valid_) {
             return cached_result_;
         }
+
+        if (auto_track_) {
+            return evaluate_auto_track();
+        }
+
         vector<IAny::ConstPtr> dep_values;
         vector<const IAny*> dep_ptrs;
         dep_values.reserve(deps_.size());
@@ -196,6 +214,44 @@ IAny::ConstPtr BindingImpl::evaluate() const
         return cached_result_;
     }
     return nullptr;
+}
+
+IAny::ConstPtr BindingImpl::evaluate_auto_track() const
+{
+    // Evaluate with dependency tracking active.
+    // The function reads properties via get_value(), and the tracker
+    // records each one. We then diff against current deps and resubscribe
+    // if the set changed.
+    detail::TrackerScope scope;
+
+    cached_result_ = source_function_->invoke({});
+    cache_valid_ = true;
+
+    auto& tracked = scope.tracker.deps;
+
+    // Check if deps changed (different size or different pointers)
+    bool changed = (tracked.size() != deps_.size());
+    if (!changed) {
+        for (size_t i = 0; i < tracked.size(); ++i) {
+            if (tracked[i] != deps_[i]) {
+                changed = true;
+                break;
+            }
+        }
+    }
+
+    if (changed) {
+        // Need to resubscribe. Cast away const since subscribe/unsubscribe
+        // manage internal state that's logically separate from the value.
+        auto* self = const_cast<BindingImpl*>(this);
+        self->unsubscribe();
+        self->deps_ = std::move(tracked);
+        if (inner_) {
+            self->subscribe();
+        }
+    }
+
+    return cached_result_;
 }
 
 void BindingImpl::subscribe()

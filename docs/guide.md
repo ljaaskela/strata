@@ -35,6 +35,7 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
   - [Bindings](#bindings)
     - [Property-to-property binding](#property-to-property-binding)
     - [Function binding](#function-binding)
+    - [Auto-tracked binding](#auto-tracked-binding)
     - [Deferred bindings](#deferred-bindings)
     - [Rebinding and unbinding](#rebinding-and-unbinding)
     - [Loop detection](#loop-detection)
@@ -846,7 +847,7 @@ a.get_value();    // 42
 
 #### Function binding
 
-Bind a property to a computed value. The function receives dependency property values as `FnArgs` and returns an `IAny::Ptr`. The result is cached and invalidated when any dependency changes.
+Bind a property to a computed value with explicit dependencies. The function receives dependency values as `FnArgs` and returns the result. Dependencies are listed manually.
 
 ```cpp
 auto area   = create_property<float>(0.f);
@@ -866,6 +867,50 @@ area.get_value();         // 50.f
 width.set_value(20.f);
 area.get_value();         // 100.f
 ```
+
+#### Auto-tracked binding
+
+Bind a property to a function that reads its dependencies directly. Dependencies are discovered automatically during evaluation: every property read inside the function is recorded as a dependency. No explicit dependency list is needed.
+
+```cpp
+auto area   = create_property<float>(0.f);
+auto width  = create_property<float>(10.f);
+auto height = create_property<float>(5.f);
+
+auto b = bind(area, Callback([&]() -> float {
+    return width.get_value() * height.get_value();
+}));
+
+area.get_value();         // 50.f
+width.set_value(20.f);
+area.get_value();         // 100.f
+```
+
+The function can return any registered type directly (here `float`); the trampoline wraps it automatically.
+
+Dependencies are re-tracked on every evaluation, so conditional reads work naturally:
+
+```cpp
+auto result = create_property<int>(0);
+auto a = create_property<int>(10);
+auto b = create_property<int>(20);
+auto useA  = create_property<int>(1);
+
+bind(result, Callback([&]() -> int {
+    return useA.get_value() ? a.get_value() : b.get_value();
+}));
+
+result.get_value();       // 10 (reads useA and a)
+b.set_value(99);          // no effect, b is not a dependency
+result.get_value();       // still 10
+
+useA.set_value(0);        // triggers re-eval, now reads useA and b
+result.get_value();       // 99
+a.set_value(42);          // no effect, a is no longer a dependency
+result.get_value();       // still 99
+```
+
+Dependency tracking uses a thread-local pointer that is null when no binding is evaluating. The cost to normal (non-binding) property reads is a single null check.
 
 #### Deferred bindings
 

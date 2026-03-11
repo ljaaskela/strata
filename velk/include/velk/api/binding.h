@@ -103,6 +103,33 @@ public:
     }
 
     /**
+     * @brief Bind to a function with auto-detected dependencies.
+     *
+     * On first evaluation, the function is called with no arguments. Any property
+     * reads during evaluation are automatically recorded as dependencies. When any
+     * dependency changes, the cache is invalidated and deps are re-tracked.
+     *
+     * @param fn The function that computes the value (reads properties directly).
+     * @param type Type of the binding.
+     * @return true if binding was successfully installed.
+     */
+    bool bind(const IFunction::ConstPtr& fn, InvokeType type = Immediate)
+    {
+        unbind();
+        auto target = target_.lock();
+        if (auto* internal = get_internal(); internal && target && fn) {
+            internal->set_source_function(fn);
+            internal->set_invoke_type(type);
+            auto ext = interface_pointer_cast<IAnyExtension>(binding_);
+            if (auto pi = interface_cast<IPropertyInternal>(target); pi && ext) {
+                installed_ = pi->install_extension(ext);
+                return installed_;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @brief Bind the value of the target property to a computed function result.
      *
      * If already installed, unbinds first before rebinding.
@@ -184,6 +211,25 @@ inline Binding bind(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
 {
     auto b = create_binding(target);
     return b.bind(fn, vector<IProperty::ConstPtr>(deps.begin(), deps.end()), type) ? b : Binding{};
+}
+
+/**
+ * @brief Creates a function binding with auto-detected dependencies.
+ *
+ * The function reads properties directly (no FnArgs). Dependencies are
+ * discovered automatically during evaluation and re-tracked on each
+ * re-evaluation, so dynamic dependencies are supported.
+ *
+ * @param target The property to bind.
+ * @param fn The function that computes the value (reads properties directly).
+ * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
+ * @return The installed Binding, or a null Binding on failure.
+ */
+inline Binding bind(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
+                    InvokeType type = Immediate)
+{
+    auto b = create_binding(target);
+    return b.bind(fn, type) ? b : Binding{};
 }
 
 } // namespace velk

@@ -34,6 +34,7 @@ public:
     // IBindingInternal
     void set_source_property(const IProperty::ConstPtr& source) override;
     void set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps) override;
+    void set_source_function(const IFunction::ConstPtr& fn) override;
     void set_invoke_type(InvokeType type) override;
 
     // IAnyExtension overrides
@@ -51,6 +52,8 @@ public:
 private:
     /** @brief Evaluates the source value (property or function). Returns null on loop/error. */
     IAny::ConstPtr evaluate() const;
+    /** @brief Evaluates with auto-dependency tracking. Resubscribes if deps change. */
+    IAny::ConstPtr evaluate_auto_track() const;
     /** @brief Subscribes to source/dep on_changed events. */
     void subscribe();
     /** @brief Unsubscribes from all source/dep on_changed events. */
@@ -63,6 +66,7 @@ private:
     vector<IProperty::ConstPtr> deps_;
     mutable IAny::Ptr cached_result_;
     mutable bool cache_valid_ = false;
+    bool auto_track_ = false; ///< True if deps should be auto-detected on evaluate.
     IInterface::WeakPtr owner_;
     IFunction::Ptr handler_;
     InvokeType invoke_type_ = Immediate;

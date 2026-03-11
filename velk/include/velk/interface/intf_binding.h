@@ -35,6 +35,8 @@ public:
     virtual void set_source_property(const IProperty::ConstPtr& source) = 0;
     /** @brief Configures this binding to evaluate a function with explicit deps. */
     virtual void set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps) = 0;
+    /** @brief Configures this binding to evaluate a function with auto-detected deps. */
+    virtual void set_source_function(const IFunction::ConstPtr& fn) = 0;
     /**
      * @brief Sets how the binding propagates source changes to the target.
      *
