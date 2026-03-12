@@ -8,6 +8,7 @@
 #include <velk/interface/intf_velk.h>
 #include <velk/vector.h>
 
+#include <cassert>
 #include <cstring>
 #include <type_traits>
 
@@ -317,11 +318,21 @@ public:
     /** @brief Retargets this any to a different memory location. */
     void set_target(T* ptr) { ptr_ = ptr; }
 
-    const T& get_value() const override { return *ptr_; }
+    const T& get_value() const override
+    {
+        if (!ptr_) {
+            static const T sentinel{};
+            return sentinel;
+        }
+        return *ptr_;
+    }
 
     /** @brief Clones as an owned AnyValue<T> (snapshot of the referenced data). */
     IAny::Ptr clone() const override
     {
+        if (!ptr_) {
+            return nullptr;
+        }
         auto c = AnyValue<T>::get_factory().template create_instance<IAny>();
         return c && succeeded(c->copy_from(*this)) ? c : nullptr;
     }
@@ -509,8 +520,19 @@ public:
     }
 
 private:
-    vec_type& vec() { return *ptr_; }
-    const vec_type& vec() const { return *ptr_; }
+    vec_type& vec()
+    {
+        assert(ptr_ && "ArrayAnyRef: mutable access with null target");
+        return *ptr_;
+    }
+    const vec_type& vec() const
+    {
+        if (!ptr_) {
+            static const vec_type sentinel{};
+            return sentinel;
+        }
+        return *ptr_;
+    }
 
     vec_type* ptr_{};
 };
