@@ -37,7 +37,8 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Function binding](#function-binding)
     - [Auto-tracked binding](#auto-tracked-binding)
     - [Deferred bindings](#deferred-bindings)
-    - [Rebinding and unbinding](#rebinding-and-unbinding)
+    - [Multiple targets](#multiple-targets)
+    - [Removing bindings](#removing-bindings)
     - [Loop detection](#loop-detection)
 - [Attachments](#attachments)
   - [Adding and removing](#adding-and-removing)
@@ -816,13 +817,13 @@ Bindings connect properties so that a target property automatically reflects the
 
 #### Property-to-property binding
 
-`bind()` creates a binding and installs it on the target in one step. Returns a `Binding` wrapper that can be used to unbind later.
+`create_binding()` creates a binding and installs it on the target in one step. Returns a `Binding` wrapper that can be used to add/remove targets or remove the binding later.
 
 ```cpp
 auto width  = create_property<float>(100.f);
 auto source = create_property<float>(200.f);
 
-auto b = bind(width, source);
+auto b = create_binding(width, source);
 
 width.get_value();        // 200.f (reads from source)
 width.set_value(50.f);    // fails: property is read-only while bound
@@ -838,8 +839,8 @@ auto a = create_property<int>(0);
 auto b = create_property<int>(0);
 auto c = create_property<int>(7);
 
-auto bB = bind(b, c);
-auto bA = bind(a, b);
+auto bB = create_binding(b, c);
+auto bA = create_binding(a, b);
 
 c.set_value(42);
 a.get_value();    // 42
@@ -861,7 +862,7 @@ Callback computeArea([](FnArgs args) -> IAny::Ptr {
     return Any<float>(w * h).clone();
 });
 
-auto b = bind(area, computeArea, {width, height});
+auto b = create_binding(area, computeArea, {width, height});
 
 area.get_value();         // 50.f
 width.set_value(20.f);
@@ -877,7 +878,7 @@ auto area   = create_property<float>(0.f);
 auto width  = create_property<float>(10.f);
 auto height = create_property<float>(5.f);
 
-auto b = bind(area, Callback([&]() -> float {
+auto b = create_binding(area, Callback([&]() -> float {
     return width.get_value() * height.get_value();
 }));
 
@@ -896,7 +897,7 @@ auto a = create_property<int>(10);
 auto b = create_property<int>(20);
 auto useA  = create_property<int>(1);
 
-bind(result, Callback([&]() -> int {
+create_binding(result, Callback([&]() -> int {
     return useA.get_value() ? a.get_value() : b.get_value();
 }));
 
@@ -914,13 +915,13 @@ Dependency tracking uses a thread-local pointer that is null when no binding is 
 
 #### Deferred bindings
 
-Pass `Deferred` to `bind()` so that source changes queue a notification for the next `update()` instead of firing `on_changed` immediately. The target value is always readable (lazy evaluation), but listeners are batched. Multiple rapid source changes coalesce into a single notification.
+Pass `Deferred` to `create_binding()` so that source changes queue a notification for the next `update()` instead of firing `on_changed` immediately. The target value is always readable (lazy evaluation), but listeners are batched. Multiple rapid source changes coalesce into a single notification.
 
 ```cpp
 auto a = create_property<int>(0);
 auto b = create_property<int>(10);
 
-auto binding = bind(a, b, Deferred);
+auto binding = create_binding(a, b, Deferred);
 
 b.set_value(1);
 b.set_value(2);
@@ -931,31 +932,51 @@ instance().update();
 // on_changed fires once with value 3
 ```
 
-#### Rebinding and unbinding
+#### Multiple targets
 
-`unbind()` removes the binding from the target. The target retains its last bound value and becomes writable again. The `Binding` object can be rebound to a different source afterward.
+A single binding can be installed on multiple target properties. All targets read the same evaluated value. Create the binding with a source (no target), then add targets with `add_target()`:
+
+```cpp
+auto source = create_property<float>(100.f);
+auto a = create_property<float>(0.f);
+auto b = create_property<float>(0.f);
+
+auto binding = create_binding(source);
+binding.add_target(a);
+binding.add_target(b);
+
+a.get_value();            // 100.f
+b.get_value();            // 100.f
+
+source.set_value(200.f);
+a.get_value();            // 200.f
+b.get_value();            // 200.f
+```
+
+Remove individual targets with `remove_target()`. The removed target retains its last bound value and becomes writable again:
+
+```cpp
+binding.remove_target(a);
+a.get_value();            // 200.f (retained)
+a.set_value(0.f);         // succeeds
+
+b.get_value();            // still bound, reads from source
+```
+
+#### Removing bindings
+
+`remove()` uninstalls the binding from all targets and clears the `Binding` handle. Each target retains its last bound value and becomes writable again.
 
 ```cpp
 auto a = create_property<int>(0);
 auto b = create_property<int>(42);
-auto c = create_property<int>(99);
 
-auto binding = bind(a, b);
+auto binding = create_binding(a, b);
 a.get_value();            // 42
 
-binding.unbind();
+binding.remove();
 a.get_value();            // 42 (retained)
 a.set_value(0);           // succeeds
-
-binding.bind(c, Immediate);
-a.get_value();            // 99
-```
-
-For two-step construction, `create_binding()` creates an uninstalled `Binding` associated with a target. Call `bind()` on it later to configure the source and install:
-
-```cpp
-auto binding = create_binding(target);
-binding.bind(source, Immediate);
 ```
 
 #### Loop detection
@@ -964,7 +985,7 @@ Circular bindings (A bound to B, B bound to A) are detected at evaluation time. 
 
 #### Type compatibility
 
-Bindings check type compatibility at installation time. If the source value's type is incompatible with the target property's type, `bind()` returns a null `Binding` and the property is left unchanged.
+Bindings check type compatibility at installation time. If the source value's type is incompatible with the target property's type, `create_binding()` returns a null `Binding` and the property is left unchanged.
 
 ## Attachments
 
