@@ -311,7 +311,7 @@ IAny::Ptr interface_trampoline_impl(void* self, FnArgs args, R (Intf::*fn)(Args.
     } else if constexpr (std::is_same_v<R, IAny::Ptr>) {
         return (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
     } else {
-        return Any<R>((static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...)).clone();
+        return Any<R>((static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...));
     }
 }
 
@@ -498,7 +498,7 @@ struct FnRawBind
         } else if constexpr (std::is_same_v<R, IAny::Ptr>) {
             return (static_cast<Intf*>(self)->*fn)(args);
         } else {
-            return Any<R>((static_cast<Intf*>(self)->*fn)(args)).clone();
+            return Any<R>((static_cast<Intf*>(self)->*fn)(args));
         }
     }
     static IAny::Ptr trampoline(void* self, FnArgs args) { return call(self, args, Fn); }

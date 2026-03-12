@@ -3,6 +3,8 @@ add_library(velk SHARED
     src/array_property.h
     src/binding.cpp
     src/binding.h
+    src/dependency_tracker.cpp
+    src/dependency_tracker.h
     src/property.cpp
     src/property.h
     src/event.cpp

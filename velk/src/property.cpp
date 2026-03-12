@@ -1,5 +1,7 @@
 #include "property.h"
 
+#include "dependency_tracker.h"
+
 #include <velk/api/velk.h>
 #include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_external_any.h>
@@ -33,8 +35,10 @@ ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
 }
 const IAny::ConstPtr PropertyImpl::get_value() const
 {
+    detail::record_dependency(this);
     return data_;
 }
+
 bool PropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
     if (previous) {
@@ -63,6 +67,7 @@ bool PropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 }
 IAny::ConstPtr PropertyImpl::get_any() const
 {
+    detail::record_dependency(this);
     return data_;
 }
 ReturnValue PropertyImpl::set_value_silent(const IAny& from)
