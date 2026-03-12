@@ -197,6 +197,9 @@ ReturnValue HierarchyImpl::remove(const IObject::Ptr& object)
         if (it == entries_.end()) {
             return ReturnValue::NothingToDo;
         }
+        // Re-read parent under exclusive lock in case hierarchy was modified
+        // between the shared lock and here.
+        parent_obj = lookup_parent(object.get());
         if (object.get() == root_.get()) {
             collect_all(removed);
             root_ = {};
