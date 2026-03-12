@@ -2,7 +2,6 @@
 #define VELK_API_BINDING_H
 
 #include <velk/api/velk.h>
-#include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_binding.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
@@ -68,13 +67,9 @@ public:
             return false;
         }
         installed_ = false;
-        auto ext = interface_pointer_cast<IAnyExtension>(binding_);
-        if (!ext) {
-            return false;
-        }
         auto target = target_.lock();
         auto* internal = interface_cast<IPropertyInternal>(target);
-        return internal && internal->remove_extension(ext);
+        return internal && internal->remove_extension(binding_);
     }
 
     /**
@@ -93,9 +88,8 @@ public:
         if (auto* internal = get_internal(); internal && target && source) {
             internal->set_source_property(source);
             internal->set_invoke_type(type);
-            auto ext = interface_pointer_cast<IAnyExtension>(binding_);
-            if (auto pi = interface_cast<IPropertyInternal>(target); pi && ext) {
-                installed_ = pi->install_extension(ext);
+            if (auto pi = interface_cast<IPropertyInternal>(target)) {
+                installed_ = pi->install_extension(binding_);
                 return installed_;
             }
         }
@@ -120,9 +114,8 @@ public:
         if (auto* internal = get_internal(); internal && target && fn) {
             internal->set_source_function(fn);
             internal->set_invoke_type(type);
-            auto ext = interface_pointer_cast<IAnyExtension>(binding_);
-            if (auto pi = interface_cast<IPropertyInternal>(target); pi && ext) {
-                installed_ = pi->install_extension(ext);
+            if (auto pi = interface_cast<IPropertyInternal>(target)) {
+                installed_ = pi->install_extension(binding_);
                 return installed_;
             }
         }
@@ -146,9 +139,8 @@ public:
         if (auto* internal = get_internal(); internal && target && fn) {
             internal->set_source_function(fn, std::move(deps));
             internal->set_invoke_type(type);
-            auto ext = interface_pointer_cast<IAnyExtension>(binding_);
-            if (auto pi = interface_cast<IPropertyInternal>(target); pi && ext) {
-                installed_ = pi->install_extension(ext);
+            if (auto pi = interface_cast<IPropertyInternal>(target)) {
+                installed_ = pi->install_extension(binding_);
                 return installed_;
             }
         }
@@ -158,7 +150,6 @@ public:
 private:
     IBindingInternal* get_internal() { return interface_cast<IBindingInternal>(binding_); }
     const IBindingInternal* get_internal() const { return interface_cast<IBindingInternal>(binding_); }
-
     IBinding::Ptr binding_;
     IProperty::WeakPtr target_;
     bool installed_ = false;
@@ -186,8 +177,8 @@ inline Binding create_binding(const IProperty::Ptr& target)
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
  * @return The installed Binding, or a null Binding on failure.
  */
-inline Binding bind(const IProperty::Ptr& target, const IProperty::ConstPtr& source,
-                    InvokeType type = Immediate)
+inline Binding create_binding(const IProperty::Ptr& target, const IProperty::ConstPtr& source,
+                              InvokeType type = Immediate)
 {
     auto b = create_binding(target);
     return b.bind(source, type) ? b : Binding{};
@@ -206,8 +197,9 @@ inline Binding bind(const IProperty::Ptr& target, const IProperty::ConstPtr& sou
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
  * @return The installed Binding, or a null Binding on failure.
  */
-inline Binding bind(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
-                    std::initializer_list<IProperty::ConstPtr> deps, InvokeType type = Immediate)
+inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
+                              std::initializer_list<IProperty::ConstPtr> deps,
+                              InvokeType type = Immediate)
 {
     auto b = create_binding(target);
     return b.bind(fn, vector<IProperty::ConstPtr>(deps.begin(), deps.end()), type) ? b : Binding{};
@@ -225,8 +217,8 @@ inline Binding bind(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
  * @return The installed Binding, or a null Binding on failure.
  */
-inline Binding bind(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
-                    InvokeType type = Immediate)
+inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
+                              InvokeType type = Immediate)
 {
     auto b = create_binding(target);
     return b.bind(fn, type) ? b : Binding{};

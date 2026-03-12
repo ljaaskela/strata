@@ -16,7 +16,7 @@ TEST(Binding, PropertyToPropertyReadsSource)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
 
     EXPECT_EQ(a.get_value(), 42);
@@ -29,7 +29,7 @@ TEST(Binding, WritesToBoundPropertyFail)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
 
     auto result = a.set_value(99);
@@ -45,7 +45,7 @@ TEST(Binding, SourceChangeFiresTargetOnChanged)
     auto a = create_property<int>(0);
     auto b = create_property<int>(10);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
 
     int callCount = 0;
@@ -73,7 +73,7 @@ TEST(Binding, UnbindRetainsValueAndAllowsWrites)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 
@@ -113,7 +113,7 @@ TEST(Binding, FunctionBindingComputesFromDeps)
         return Any<int>(bVal + cVal);
     });
 
-    auto binding = ::velk::bind(a,
+    auto binding = ::velk::create_binding(a,
                                 fn,
                                 {b, c});
     ASSERT_TRUE(binding);
@@ -147,9 +147,9 @@ TEST(Binding, ChainedBindings)
     auto b = create_property<int>(0);
     auto c = create_property<int>(7);
 
-    auto bindB = ::velk::bind(b, c);
+    auto bindB = ::velk::create_binding(b, c);
     ASSERT_TRUE(bindB);
-    auto bindA = ::velk::bind(a, b);
+    auto bindA = ::velk::create_binding(a, b);
     ASSERT_TRUE(bindA);
 
     EXPECT_EQ(b.get_value(), 7);
@@ -167,9 +167,9 @@ TEST(Binding, LoopDetection)
     auto a = create_property<int>(1);
     auto b = create_property<int>(2);
 
-    auto bindA = ::velk::bind(a, b);
+    auto bindA = ::velk::create_binding(a, b);
     ASSERT_TRUE(bindA);
-    auto bindB = ::velk::bind(b, a);
+    auto bindB = ::velk::create_binding(b, a);
     ASSERT_TRUE(bindB);
 
     // Reading should not hang; should get a value (the loop is broken by returning Fail
@@ -189,7 +189,7 @@ TEST(Binding, TypeIncompatibilityReturnsNull)
     auto b = create_property<float>(3.14f);
 
     // int and float are different types in velk
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     // If types are incompatible, binding should fail
     // Note: int and float may or may not be compatible depending on type registry.
     // This test verifies the type check path exists.
@@ -208,7 +208,7 @@ TEST(Binding, IntrospectionPropertyBinding)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
 
     EXPECT_TRUE(binding.get_source_property());
@@ -228,7 +228,7 @@ TEST(Binding, IntrospectionFunctionBinding)
         return Any<int>(v * 2);
     });
 
-    auto binding = ::velk::bind(
+    auto binding = ::velk::create_binding(
         a, fn, {b});
     ASSERT_TRUE(binding);
 
@@ -252,7 +252,7 @@ TEST(Binding, BindNullSourceReturnsNull)
     auto a = create_property<int>(0);
     IProperty::ConstPtr nullSource;
 
-    auto binding = ::velk::bind(a, nullSource);
+    auto binding = ::velk::create_binding(a, nullSource);
     EXPECT_FALSE(binding);
 }
 
@@ -263,7 +263,7 @@ TEST(Binding, DeferredBindingDoesNotFireImmediately)
     auto a = create_property<int>(0);
     auto b = create_property<int>(10);
 
-    auto binding = ::velk::bind(a, b, Deferred);
+    auto binding = ::velk::create_binding(a, b, Deferred);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 10);
 
@@ -294,7 +294,7 @@ TEST(Binding, DeferredBindingCoalescesChanges)
     auto a = create_property<int>(0);
     auto b = create_property<int>(0);
 
-    auto binding = ::velk::bind(a, b, Deferred);
+    auto binding = ::velk::create_binding(a, b, Deferred);
     ASSERT_TRUE(binding);
 
     int callCount = 0;
@@ -334,7 +334,7 @@ TEST(Binding, DeferredFunctionBinding)
         return Any<int>(v * 2);
     });
 
-    auto binding = ::velk::bind(a,
+    auto binding = ::velk::create_binding(a,
                                 fn,
                                 {b},
                                 Deferred);
@@ -373,7 +373,7 @@ TEST(Binding, FunctionBindingUnbindRetainsValue)
         return Any<int>(v * 3);
     });
 
-    auto binding = ::velk::bind(
+    auto binding = ::velk::create_binding(
         a, fn, {b});
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 30);
@@ -395,7 +395,7 @@ TEST(Binding, WrapperGetTarget)
     auto a = create_property<int>(0);
     auto b = create_property<int>(42);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
 
     EXPECT_EQ(binding.get_target_property(), IProperty::Ptr(a));
@@ -409,7 +409,7 @@ TEST(Binding, WrapperUnbindAllowsRebind)
     auto b = create_property<int>(42);
     auto c = create_property<int>(99);
 
-    auto binding = ::velk::bind(a, b);
+    auto binding = ::velk::create_binding(a, b);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 
@@ -440,7 +440,7 @@ TEST(Binding, AutoTrackBasic)
         return b.get_value() + c.get_value();
     });
 
-    auto binding = ::velk::bind(a, fn);
+    auto binding = ::velk::create_binding(a, fn);
     ASSERT_TRUE(binding);
 
     // First read evaluates and discovers deps
@@ -464,7 +464,7 @@ TEST(Binding, AutoTrackFiresOnChanged)
         return b.get_value() * 2;
     });
 
-    auto binding = ::velk::bind(a, fn);
+    auto binding = ::velk::create_binding(a, fn);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 20);
 
@@ -492,7 +492,7 @@ TEST(Binding, AutoTrackDynamicDeps)
         return flag.get_value() == 0 ? b.get_value() : c.get_value();
     });
 
-    auto binding = ::velk::bind(a, fn);
+    auto binding = ::velk::create_binding(a, fn);
     ASSERT_TRUE(binding);
 
     // flag=0, so a reads b
@@ -528,7 +528,7 @@ TEST(Binding, AutoTrackUnbindRetainsValue)
         return b.get_value();
     });
 
-    auto binding = ::velk::bind(a, fn);
+    auto binding = ::velk::create_binding(a, fn);
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 

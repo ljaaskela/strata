@@ -1,6 +1,7 @@
 #ifndef VELK_INTF_BINDING_H
 #define VELK_INTF_BINDING_H
 
+#include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_function.h>
 #include <velk/interface/intf_property.h>
 #include <velk/vector.h>
@@ -14,7 +15,7 @@ namespace velk {
  * from a source property or computed function. This interface lets consumers
  * check if and how a property is bound.
  */
-class IBinding : public Interface<IBinding>
+class IBinding : public Interface<IBinding, IAnyExtension>
 {
 public:
     /** @brief Returns the source property, or null if this is a function binding. */
