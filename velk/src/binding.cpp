@@ -239,13 +239,41 @@ IFunction::ConstPtr BindingImpl::get_source_function() const
     return data_ ? data_->get_source_function() : nullptr;
 }
 
+bool BindingImpl::add_target(const IProperty::Ptr& target)
+{
+    auto* pi = interface_cast<IPropertyInternal>(target.get());
+    return pi && pi->install_extension(get_self<IAnyExtension>());
+}
+
+bool BindingImpl::remove_target(const IProperty::Ptr& target)
+{
+    auto* pi = interface_cast<IPropertyInternal>(target.get());
+    return pi && pi->remove_extension(get_self<IAnyExtension>());
+}
+
+void BindingImpl::uninstall()
+{
+    // Iterate a copy since remove_extension calls take_inner which modifies targets_.
+    auto targets = targets_;
+    for (auto& entry : targets) {
+        auto owner = entry.owner.lock();
+        if (!owner) {
+            continue;
+        }
+        auto* pi = interface_cast<IPropertyInternal>(owner);
+        if (pi) {
+            pi->remove_extension(get_self<IAnyExtension>());
+        }
+    }
+}
+
 // IBindingInternal
 
 void BindingImpl::set_source_property(const IProperty::ConstPtr& source)
 {
     unsubscribe();
     data_ = std::make_unique<PropertyBindingData>(source);
-    if (inner_) {
+    if (!targets_.empty()) {
         subscribe();
     }
 }
@@ -254,7 +282,7 @@ void BindingImpl::set_source_function(const IFunction::ConstPtr& fn, vector<IPro
 {
     unsubscribe();
     data_ = std::make_unique<FunctionBindingDataManual>(fn, std::move(deps));
-    if (inner_) {
+    if (!targets_.empty()) {
         subscribe();
     }
 }
@@ -273,28 +301,47 @@ void BindingImpl::set_invoke_type(InvokeType type)
 
 // IAnyExtension
 
+IAny::ConstPtr BindingImpl::get_inner() const
+{
+    return !targets_.empty() ? IAny::ConstPtr(targets_[0].inner) : nullptr;
+}
+
 bool BindingImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     auto source = evaluate();
     if (inner && source && !is_compatible(inner, source)) {
         return false;
     }
-    inner_ = std::move(inner);
-    owner_ = owner;
-    subscribe();
+    bool was_empty = targets_.empty();
+    targets_.push_back({owner, std::move(inner)});
+    if (was_empty && data_) {
+        subscribe();
+    }
     return true;
 }
 
 IAny::Ptr BindingImpl::take_inner(IInterface& owner)
 {
-    if (inner_) {
-        auto source = evaluate();
-        if (source) {
-            inner_->copy_from(*source);
+    for (size_t i = 0; i < targets_.size(); ++i) {
+        auto locked = targets_[i].owner.lock();
+        if (locked.get() == &owner) {
+            // Copy last evaluated value into inner so property retains it.
+            auto& inner = targets_[i].inner;
+            if (inner) {
+                auto source = evaluate();
+                if (source) {
+                    inner->copy_from(*source);
+                }
+            }
+            auto result = std::move(inner);
+            targets_.erase(targets_.begin() + i);
+            if (targets_.empty()) {
+                unsubscribe();
+            }
+            return result;
         }
     }
-    unsubscribe();
-    return std::move(inner_);
+    return nullptr;
 }
 
 // IAny overrides
@@ -302,28 +349,37 @@ IAny::Ptr BindingImpl::take_inner(IInterface& owner)
 array_view<Uid> BindingImpl::get_compatible_types() const
 {
     auto source = evaluate();
-    return source ? source->get_compatible_types()
-                  : (inner_ ? inner_->get_compatible_types() : array_view<Uid>{});
+    if (source) {
+        return source->get_compatible_types();
+    }
+    auto inner = first_inner();
+    return inner ? inner->get_compatible_types() : array_view<Uid>{};
 }
 
 size_t BindingImpl::get_data_size(Uid type) const
 {
     auto source = evaluate();
-    return source ? source->get_data_size(type) : (inner_ ? inner_->get_data_size(type) : 0);
+    if (source) {
+        return source->get_data_size(type);
+    }
+    auto inner = first_inner();
+    return inner ? inner->get_data_size(type) : 0;
 }
 
 ReturnValue BindingImpl::get_data(void* to, size_t toSize, Uid type) const
 {
     LoopGuard guard(this, tls_evaluating, tls_eval_depth);
     if (guard.looped) {
-        return inner_ ? inner_->get_data(to, toSize, type) : ReturnValue::Fail;
+        auto inner = first_inner();
+        return inner ? inner->get_data(to, toSize, type) : ReturnValue::Fail;
     }
 
     auto source = evaluate();
     if (source) {
         return source->get_data(to, toSize, type);
     }
-    return inner_ ? inner_->get_data(to, toSize, type) : ReturnValue::Fail;
+    auto inner = first_inner();
+    return inner ? inner->get_data(to, toSize, type) : ReturnValue::Fail;
 }
 
 ReturnValue BindingImpl::set_data(void const*, size_t, Uid)
@@ -339,7 +395,11 @@ ReturnValue BindingImpl::copy_from(const IAny&)
 IAny::Ptr BindingImpl::clone() const
 {
     auto source = evaluate();
-    return source ? source->clone() : (inner_ ? inner_->clone() : nullptr);
+    if (source) {
+        return source->clone();
+    }
+    auto inner = first_inner();
+    return inner ? inner->clone() : nullptr;
 }
 
 // Private
@@ -397,23 +457,30 @@ void BindingImpl::on_source_changed()
         data_->invalidate();
     }
 
-    auto owner = owner_.lock();
-    if (!owner) {
-        return;
-    }
+    auto self = get_self<IAnyExtension>();
+    const IAny* arg = interface_cast<IAny>(self);
 
-    if (invoke_type_ == Deferred) {
-        auto propWeak = IPropertyInternal::WeakPtr(interface_pointer_cast<IPropertyInternal>(owner));
-        instance().queue_deferred_property({std::move(propWeak), nullptr});
-        return;
-    }
+    for (auto& entry : targets_) {
+        auto owner = entry.owner.lock();
+        if (!owner) {
+            continue;
+        }
 
-    auto* prop = interface_cast<IProperty>(owner);
-    if (prop) {
-        auto self = get_self<IAnyExtension>();
-        const IAny* arg = interface_cast<IAny>(self);
-        invoke_event(prop->on_changed(), arg);
+        if (invoke_type_ == Deferred) {
+            auto propWeak = IPropertyInternal::WeakPtr(interface_pointer_cast<IPropertyInternal>(owner));
+            instance().queue_deferred_property({std::move(propWeak), nullptr});
+        } else {
+            auto* prop = interface_cast<IProperty>(owner);
+            if (prop) {
+                invoke_event(prop->on_changed(), arg);
+            }
+        }
     }
+}
+
+IAny::Ptr BindingImpl::first_inner() const
+{
+    return !targets_.empty() ? targets_[0].inner : nullptr;
 }
 
 } // namespace velk

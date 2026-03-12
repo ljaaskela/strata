@@ -1,9 +1,9 @@
 #ifndef VELK_API_BINDING_H
 #define VELK_API_BINDING_H
 
+#include <velk/api/property.h>
 #include <velk/api/velk.h>
 #include <velk/interface/intf_binding.h>
-#include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 #include <velk/vector.h>
 
@@ -12,21 +12,16 @@
 namespace velk {
 
 /**
- * @brief Lightweight wrapper around an installed binding and its target property.
+ * @brief Wrapper around an IBinding.
  *
- * A Binding has a 1:1 relationship with its target. Provides null-safe access
- * to binding introspection (source property/function) and an unbind() method
- * to remove the binding from the target.
+ * A Binding can be installed on one or more target properties via add_target().
+ * All targets read the same evaluated value from the binding's source.
  */
 class Binding
 {
 public:
-    /** @brief Wraps an existing binding and its target. */
-    explicit Binding(IBinding::Ptr binding, IProperty::Ptr target)
-        : binding_(std::move(binding)),
-          target_(target)
-    {
-    }
+    /** @brief Wraps an existing binding. */
+    explicit Binding(IBinding::Ptr binding) : binding_(std::move(binding)) {}
 
     /** @brief Constructs a null binding. */
     Binding() = default;
@@ -37,9 +32,6 @@ public:
     /** @brief Implicit conversion to IBinding::Ptr. */
     operator IBinding::Ptr() { return binding_; }
     operator const IBinding::ConstPtr() const { return binding_; }
-
-    /** @brief Returns the target property this binding is installed on. */
-    IProperty::Ptr get_target_property() const { return target_.lock(); }
 
     /** @brief Returns the source property, or null if this is a function binding. */
     IProperty::ConstPtr get_source_property() const
@@ -53,156 +45,98 @@ public:
         return binding_ ? binding_->get_source_function() : nullptr;
     }
 
-    /**
-     * @brief Removes this binding from the target property.
-     *
-     * On removal, the property retains the last bound value and writes become
-     * possible again.
-     *
-     * @return true if the binding was found and removed.
-     */
-    bool unbind()
+    /** @brief Installs this binding on a target property. Returns false on type mismatch. */
+    bool add_target(const IProperty::Ptr& target)
     {
-        if (!installed_) {
-            return false;
-        }
-        installed_ = false;
-        auto target = target_.lock();
-        auto* internal = interface_cast<IPropertyInternal>(target);
-        return internal && internal->remove_extension(binding_);
+        return binding_ && binding_->add_target(target);
     }
 
-    /**
-     * @brief Bind the value of the target property to the value of source.
-     *
-     * If already installed, unbinds first before rebinding.
-     *
-     * @param source The property to bind from.
-     * @param type Type of the binding.
-     * @return true if binding was successfully installed.
-     */
-    bool bind(const IProperty::ConstPtr& source, InvokeType type)
+    /** @brief Installs this binding on a typed property target. Returns false on type mismatch. */
+    template <class T>
+    bool add_target(Property<T> target)
     {
-        unbind();
-        auto target = target_.lock();
-        if (auto* internal = get_internal(); internal && target && source) {
-            internal->set_source_property(source);
-            internal->set_invoke_type(type);
-            if (auto pi = interface_cast<IPropertyInternal>(target)) {
-                installed_ = pi->install_extension(binding_);
-                return installed_;
-            }
-        }
-        return false;
+        return add_target(IProperty::Ptr(target));
     }
 
-    /**
-     * @brief Bind to a function with auto-detected dependencies.
-     *
-     * On first evaluation, the function is called with no arguments. Any property
-     * reads during evaluation are automatically recorded as dependencies. When any
-     * dependency changes, the cache is invalidated and deps are re-tracked.
-     *
-     * @param fn The function that computes the value (reads properties directly).
-     * @param type Type of the binding.
-     * @return true if binding was successfully installed.
-     */
-    bool bind(const IFunction::ConstPtr& fn, InvokeType type = Immediate)
+    /** @brief Removes this binding from a target property. Returns false if not installed. */
+    bool remove_target(const IProperty::Ptr& target)
     {
-        unbind();
-        auto target = target_.lock();
-        if (auto* internal = get_internal(); internal && target && fn) {
-            internal->set_source_function(fn);
-            internal->set_invoke_type(type);
-            if (auto pi = interface_cast<IPropertyInternal>(target)) {
-                installed_ = pi->install_extension(binding_);
-                return installed_;
-            }
-        }
-        return false;
+        return binding_ && binding_->remove_target(target);
     }
 
-    /**
-     * @brief Bind the value of the target property to a computed function result.
-     *
-     * If already installed, unbinds first before rebinding.
-     *
-     * @param fn The function that computes the value.
-     * @param deps Properties passed as arguments to the function.
-     * @param type Type of the binding.
-     * @return true if binding was successfully installed.
-     */
-    bool bind(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps, InvokeType type)
+    /** @brief Removes this binding from a typed property target. Returns false if not installed. */
+    template <class T>
+    bool remove_target(Property<T> target)
     {
-        unbind();
-        auto target = target_.lock();
-        if (auto* internal = get_internal(); internal && target && fn) {
-            internal->set_source_function(fn, std::move(deps));
-            internal->set_invoke_type(type);
-            if (auto pi = interface_cast<IPropertyInternal>(target)) {
-                installed_ = pi->install_extension(binding_);
-                return installed_;
-            }
+        return remove_target(IProperty::Ptr(target));
+    }
+
+    /** @brief Removes this binding from all targets and clears the handle. */
+    void remove()
+    {
+        if (binding_) {
+            binding_->uninstall();
         }
-        return false;
+        binding_ = {};
     }
 
 private:
     IBindingInternal* get_internal() { return interface_cast<IBindingInternal>(binding_); }
-    const IBindingInternal* get_internal() const { return interface_cast<IBindingInternal>(binding_); }
+
     IBinding::Ptr binding_;
-    IProperty::WeakPtr target_;
-    bool installed_ = false;
 };
 
 /**
- * @brief Creates a binding (not yet installed) associated with a target property.
- * @param target The target property to bind to.
- * @return The binding, or null if target is null.
+ * @brief Creates an unconfigured binding (no source, no targets).
  */
-inline Binding create_binding(const IProperty::Ptr& target)
+inline Binding create_binding()
 {
-    return target ? Binding(instance().create<IBinding>(ClassId::Binding), target) : Binding{};
+    return Binding(instance().create<IBinding>(ClassId::Binding));
 }
 
 /**
- * @brief Creates a property-to-property binding and installs it on the target.
+ * @brief Creates a property-to-property binding.
  *
- * While bound, reads from @p target return the source property's current value,
- * and writes to @p target are rejected. Source on_changed events propagate to
- * the target.
+ * While bound, reads from targets return the source property's current value,
+ * and writes to targets are rejected. Source on_changed events propagate to
+ * all targets.
  *
- * @param target The property to bind (must support IPropertyInternal).
  * @param source The source property whose value will be read.
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
- * @return The installed Binding, or a null Binding on failure.
+ * @return The binding (not yet installed on any target).
  */
-inline Binding create_binding(const IProperty::Ptr& target, const IProperty::ConstPtr& source,
-                              InvokeType type = Immediate)
+inline Binding create_binding(const IProperty::ConstPtr& source, InvokeType type = Immediate)
 {
-    auto b = create_binding(target);
-    return b.bind(source, type) ? b : Binding{};
+    auto b = create_binding();
+    if (auto* internal = interface_cast<IBindingInternal>(IBinding::Ptr(b))) {
+        internal->set_source_property(source);
+        internal->set_invoke_type(type);
+    }
+    return b;
 }
 
 /**
- * @brief Creates a function binding with explicit deps and installs it on the target.
+ * @brief Creates a function binding with explicit deps.
  *
  * The function is invoked with dependency values as FnArgs. The result is cached
  * and returned on reads. When any dependency changes, the cache is invalidated
- * and the target's on_changed fires.
+ * and the targets' on_changed fires.
  *
- * @param target The property to bind.
  * @param fn The function that computes the value.
  * @param deps Properties passed as arguments to the function.
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
- * @return The installed Binding, or a null Binding on failure.
+ * @return The binding (not yet installed on any target).
  */
-inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
+inline Binding create_binding(const IFunction::ConstPtr& fn,
                               std::initializer_list<IProperty::ConstPtr> deps,
                               InvokeType type = Immediate)
 {
-    auto b = create_binding(target);
-    return b.bind(fn, vector<IProperty::ConstPtr>(deps.begin(), deps.end()), type) ? b : Binding{};
+    auto b = create_binding();
+    if (auto* internal = interface_cast<IBindingInternal>(IBinding::Ptr(b))) {
+        internal->set_source_function(fn, vector<IProperty::ConstPtr>(deps.begin(), deps.end()));
+        internal->set_invoke_type(type);
+    }
+    return b;
 }
 
 /**
@@ -212,16 +146,46 @@ inline Binding create_binding(const IProperty::Ptr& target, const IFunction::Con
  * discovered automatically during evaluation and re-tracked on each
  * re-evaluation, so dynamic dependencies are supported.
  *
- * @param target The property to bind.
  * @param fn The function that computes the value (reads properties directly).
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
- * @return The installed Binding, or a null Binding on failure.
+ * @return The binding (not yet installed on any target).
  */
+inline Binding create_binding(const IFunction::ConstPtr& fn, InvokeType type = Immediate)
+{
+    auto b = create_binding();
+    if (auto* internal = interface_cast<IBindingInternal>(IBinding::Ptr(b))) {
+        internal->set_source_function(fn);
+        internal->set_invoke_type(type);
+    }
+    return b;
+}
+
+/** @brief Creates a property binding and installs it on a single target. */
+inline Binding create_binding(const IProperty::Ptr& target, const IProperty::ConstPtr& source,
+                              InvokeType type = Immediate)
+{
+    auto b = create_binding(source, type);
+    b.add_target(target);
+    return b;
+}
+
+/** @brief Creates a function binding with explicit deps and installs it on a single target. */
+inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
+                              std::initializer_list<IProperty::ConstPtr> deps,
+                              InvokeType type = Immediate)
+{
+    auto b = create_binding(fn, deps, type);
+    b.add_target(target);
+    return b;
+}
+
+/** @brief Creates an auto-tracked function binding and installs it on a single target. */
 inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
                               InvokeType type = Immediate)
 {
-    auto b = create_binding(target);
-    return b.bind(fn, type) ? b : Binding{};
+    auto b = create_binding(fn, type);
+    b.add_target(target);
+    return b;
 }
 
 } // namespace velk

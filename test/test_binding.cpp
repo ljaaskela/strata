@@ -77,8 +77,7 @@ TEST(Binding, UnbindRetainsValueAndAllowsWrites)
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 
-    bool removed = binding.unbind();
-    EXPECT_TRUE(removed);
+    binding.remove();
 
     // Should retain last bound value
     EXPECT_EQ(a.get_value(), 42);
@@ -237,23 +236,27 @@ TEST(Binding, IntrospectionFunctionBinding)
     EXPECT_EQ(a.get_value(), 20);
 }
 
-// Unbind on default-constructed Binding returns false
+// Remove on default-constructed Binding is a no-op (doesn't crash)
 
-TEST(Binding, UnbindWithNothingReturnsFalse)
+TEST(Binding, RemoveOnNullBindingIsNoOp)
 {
     ::velk::Binding nullBinding;
-    EXPECT_FALSE(nullBinding.unbind());
+    nullBinding.remove(); // should not crash
+    EXPECT_FALSE(nullBinding);
 }
 
-// Bind to null source returns null
+// Binding with null source still creates a valid binding object
 
-TEST(Binding, BindNullSourceReturnsNull)
+TEST(Binding, BindNullSourceCreatesBinding)
 {
     auto a = create_property<int>(0);
     IProperty::ConstPtr nullSource;
 
     auto binding = ::velk::create_binding(a, nullSource);
-    EXPECT_FALSE(binding);
+    // Binding object is valid even if source is null
+    EXPECT_TRUE(binding);
+    // Target retains its original value since source is null
+    EXPECT_EQ(a.get_value(), 0);
 }
 
 // Deferred binding: on_changed does not fire immediately
@@ -378,7 +381,7 @@ TEST(Binding, FunctionBindingUnbindRetainsValue)
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 30);
 
-    binding.unbind();
+    binding.remove();
 
     // Should retain the last computed value
     EXPECT_EQ(a.get_value(), 30);
@@ -388,43 +391,113 @@ TEST(Binding, FunctionBindingUnbindRetainsValue)
     EXPECT_EQ(a.get_value(), 99);
 }
 
-// Binding wrapper: get_target returns the target property
+// Multi-target: same binding on multiple properties
 
-TEST(Binding, WrapperGetTarget)
+TEST(Binding, MultiTargetSameValue)
 {
     auto a = create_property<int>(0);
-    auto b = create_property<int>(42);
+    auto b = create_property<int>(0);
+    auto source = create_property<int>(42);
 
-    auto binding = ::velk::create_binding(a, b);
+    auto binding = ::velk::create_binding(source);
     ASSERT_TRUE(binding);
+    binding.add_target(a);
+    binding.add_target(b);
 
-    EXPECT_EQ(binding.get_target_property(), IProperty::Ptr(a));
+    EXPECT_EQ(a.get_value(), 42);
+    EXPECT_EQ(b.get_value(), 42);
+
+    source.set_value(99);
+    EXPECT_EQ(a.get_value(), 99);
+    EXPECT_EQ(b.get_value(), 99);
 }
 
-// Binding wrapper: unbind clears the wrapper
+// Multi-target: remove one target, other keeps working
 
-TEST(Binding, WrapperUnbindAllowsRebind)
+TEST(Binding, MultiTargetRemoveOne)
 {
     auto a = create_property<int>(0);
-    auto b = create_property<int>(42);
-    auto c = create_property<int>(99);
+    auto b = create_property<int>(0);
+    auto source = create_property<int>(42);
 
-    auto binding = ::velk::create_binding(a, b);
-    ASSERT_TRUE(binding);
+    auto binding = ::velk::create_binding(source);
+    binding.add_target(a);
+    binding.add_target(b);
+
     EXPECT_EQ(a.get_value(), 42);
+    EXPECT_EQ(b.get_value(), 42);
 
-    EXPECT_TRUE(binding.unbind());
+    binding.remove_target(a);
 
-    // Binding is still valid, just not installed
-    EXPECT_TRUE(binding);
-    EXPECT_TRUE(binding.get_target_property());
+    // a should retain last value and accept writes
+    EXPECT_EQ(a.get_value(), 42);
+    EXPECT_TRUE(succeeded(a.set_value(0)));
+    EXPECT_EQ(a.get_value(), 0);
 
-    // Double unbind should return false
-    EXPECT_FALSE(binding.unbind());
+    // b should still be bound
+    source.set_value(99);
+    EXPECT_EQ(b.get_value(), 99);
+    EXPECT_EQ(a.get_value(), 0); // a is unbound, unaffected
+}
 
-    // Can rebind to a different source
-    EXPECT_TRUE(binding.bind(c, Immediate));
-    EXPECT_EQ(a.get_value(), 99);
+// Multi-target: on_changed fires on all targets
+
+TEST(Binding, MultiTargetOnChanged)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(0);
+    auto source = create_property<int>(10);
+
+    auto binding = ::velk::create_binding(source);
+    binding.add_target(a);
+    binding.add_target(b);
+
+    int countA = 0, countB = 0;
+    Callback handlerA([&](FnArgs) -> ReturnValue {
+        countA++;
+        return ReturnValue::Success;
+    });
+    Callback handlerB([&](FnArgs) -> ReturnValue {
+        countB++;
+        return ReturnValue::Success;
+    });
+    a.add_on_changed(handlerA);
+    b.add_on_changed(handlerB);
+
+    source.set_value(20);
+
+    EXPECT_EQ(countA, 1);
+    EXPECT_EQ(countB, 1);
+    EXPECT_EQ(a.get_value(), 20);
+    EXPECT_EQ(b.get_value(), 20);
+}
+
+// Multi-target: function binding shared across targets
+
+TEST(Binding, MultiTargetFunctionBinding)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(0);
+    auto x = create_property<int>(3);
+    auto y = create_property<int>(4);
+
+    Callback fn([](FnArgs args) -> IAny::Ptr {
+        int xv = 0, yv = 0;
+        if (auto v = Any<const int>(args[0])) xv = v.get_value();
+        if (auto v = Any<const int>(args[1])) yv = v.get_value();
+        return Any<int>(xv * yv);
+    });
+
+    auto binding = ::velk::create_binding(fn, {x, y});
+    binding.add_target(a);
+    binding.add_target(b);
+
+    EXPECT_EQ(a.get_value(), 12);
+    EXPECT_EQ(b.get_value(), 12);
+
+    x.set_value(10);
+    EXPECT_EQ(a.get_value(), 40);
+    EXPECT_EQ(b.get_value(), 40);
 }
 
 // Auto-tracked function binding: deps discovered automatically
@@ -532,7 +605,7 @@ TEST(Binding, AutoTrackUnbindRetainsValue)
     ASSERT_TRUE(binding);
     EXPECT_EQ(a.get_value(), 42);
 
-    binding.unbind();
+    binding.remove();
 
     // Retains last value
     EXPECT_EQ(a.get_value(), 42);

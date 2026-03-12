@@ -37,7 +37,8 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Function binding](#function-binding)
     - [Auto-tracked binding](#auto-tracked-binding)
     - [Deferred bindings](#deferred-bindings)
-    - [Rebinding and unbinding](#rebinding-and-unbinding)
+    - [Multiple targets](#multiple-targets)
+    - [Removing bindings](#removing-bindings)
     - [Loop detection](#loop-detection)
 - [Attachments](#attachments)
   - [Adding and removing](#adding-and-removing)
@@ -816,7 +817,7 @@ Bindings connect properties so that a target property automatically reflects the
 
 #### Property-to-property binding
 
-`create_binding()` creates a binding and installs it on the target in one step. Returns a `Binding` wrapper that can be used to unbind later.
+`create_binding()` creates a binding and installs it on the target in one step. Returns a `Binding` wrapper that can be used to add/remove targets or remove the binding later.
 
 ```cpp
 auto width  = create_property<float>(100.f);
@@ -931,31 +932,51 @@ instance().update();
 // on_changed fires once with value 3
 ```
 
-#### Rebinding and unbinding
+#### Multiple targets
 
-`unbind()` removes the binding from the target. The target retains its last bound value and becomes writable again. The `Binding` object can be rebound to a different source afterward.
+A single binding can be installed on multiple target properties. All targets read the same evaluated value. Create the binding with a source (no target), then add targets with `add_target()`:
+
+```cpp
+auto source = create_property<float>(100.f);
+auto a = create_property<float>(0.f);
+auto b = create_property<float>(0.f);
+
+auto binding = create_binding(source);
+binding.add_target(a);
+binding.add_target(b);
+
+a.get_value();            // 100.f
+b.get_value();            // 100.f
+
+source.set_value(200.f);
+a.get_value();            // 200.f
+b.get_value();            // 200.f
+```
+
+Remove individual targets with `remove_target()`. The removed target retains its last bound value and becomes writable again:
+
+```cpp
+binding.remove_target(a);
+a.get_value();            // 200.f (retained)
+a.set_value(0.f);         // succeeds
+
+b.get_value();            // still bound, reads from source
+```
+
+#### Removing bindings
+
+`remove()` uninstalls the binding from all targets and clears the `Binding` handle. Each target retains its last bound value and becomes writable again.
 
 ```cpp
 auto a = create_property<int>(0);
 auto b = create_property<int>(42);
-auto c = create_property<int>(99);
 
 auto binding = create_binding(a, b);
 a.get_value();            // 42
 
-binding.unbind();
+binding.remove();
 a.get_value();            // 42 (retained)
 a.set_value(0);           // succeeds
-
-binding.bind(c, Immediate);
-a.get_value();            // 99
-```
-
-For two-step construction, `create_binding()` creates an uninstalled `Binding` associated with a target. Call `bind()` on it later to configure the source and install:
-
-```cpp
-auto binding = create_binding(target);
-binding.bind(source, Immediate);
 ```
 
 #### Loop detection
