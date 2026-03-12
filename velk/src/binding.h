@@ -7,15 +7,46 @@
 #include <velk/interface/types.h>
 #include <velk/vector.h>
 
+#include <memory>
+
 namespace velk {
+
+/**
+ * @brief Mode-specific binding data. Subclassed for property vs function binding.
+ *
+ * BindingImpl delegates evaluate/subscribe/unsubscribe to the active data object.
+ * The data object is replaced when the binding mode changes.
+ */
+struct BindingData
+{
+    virtual ~BindingData() = default;
+
+    /** @brief Evaluates the source value. */
+    virtual IAny::ConstPtr evaluate() const = 0;
+
+    /** @brief Subscribes handler to source on_changed events. */
+    virtual void subscribe(const IFunction::Ptr& handler) = 0;
+
+    /** @brief Unsubscribes handler from source on_changed events. */
+    virtual void unsubscribe(const IFunction::Ptr& handler) = 0;
+
+    /** @brief Returns the source property, or null. */
+    virtual IProperty::ConstPtr get_source_property() const { return nullptr; }
+
+    /** @brief Returns the source function, or null. */
+    virtual IFunction::ConstPtr get_source_function() const { return nullptr; }
+
+    /** @brief Invalidates any cached result. */
+    virtual void invalidate() {}
+};
 
 /**
  * @brief IAnyExtension that intercepts property reads to return values from a
  *        source property or computed function result.
  *
- * Two modes:
- *   Property-to-property: get_data delegates to the source property's value.
- *   Function with deps:   get_data invokes the function with dep values, caches result.
+ * Mode-specific state (source property, function, deps, cache) is held in a
+ * BindingData subclass, keeping BindingImpl itself lightweight and allowing
+ * runtime mode switching.
  *
  * Writes (set_data/copy_from) return Fail while the binding is active.
  * Subscribes to source on_changed events and propagates them to the target property.
@@ -50,25 +81,13 @@ public:
     IAny::Ptr clone() const override;
 
 private:
-    /** @brief Evaluates the source value (property or function). Returns null on loop/error. */
     IAny::ConstPtr evaluate() const;
-    /** @brief Evaluates with auto-dependency tracking. Resubscribes if deps change. */
-    IAny::ConstPtr evaluate_auto_track() const;
-    /** @brief Creates the handler function once (lazy). */
     void ensure_handler();
-    /** @brief Subscribes to source/dep on_changed events. */
     void subscribe();
-    /** @brief Unsubscribes from all source/dep on_changed events. */
     void unsubscribe();
-    /** @brief Called when any source/dep changes. Fires target property's on_changed. */
     void on_source_changed();
 
-    IProperty::ConstWeakPtr source_property_;
-    IFunction::ConstPtr source_function_;
-    vector<IProperty::ConstWeakPtr> deps_;
-    mutable IAny::Ptr cached_result_;
-    mutable bool cache_valid_ = false;
-    bool auto_track_ = false; ///< True if deps should be auto-detected on evaluate.
+    std::unique_ptr<BindingData> data_;
     IInterface::WeakPtr owner_;
     IFunction::Ptr handler_;
     InvokeType invoke_type_ = Immediate;
