@@ -416,11 +416,22 @@ void BindingImpl::ensure_handler()
     }
     auto fn = instance().create<IFunction>(ClassId::Function);
     if (auto* internal = interface_cast<IFunctionInternal>(fn)) {
+        // Use a weak self-reference so the trampoline safely no-ops if the
+        // binding is destroyed while the handler is still registered on a
+        // source event (e.g. when dep weak_ptrs expired during unsubscribe).
+        using Weak = IInterface::WeakPtr;
+        auto* weak = new Weak(get_self<IInterface>());
         auto* trampoline = +[](void* ctx, FnArgs) -> IAny::Ptr {
-            static_cast<BindingImpl*>(ctx)->on_source_changed();
+            if (auto locked = static_cast<Weak*>(ctx)->lock()) {
+                auto* binding = static_cast<BindingImpl*>(interface_cast<IBindingInternal>(locked));
+                if (binding) {
+                    binding->on_source_changed();
+                }
+            }
             return nullptr;
         };
-        internal->bind(this, trampoline);
+        auto* deleter = +[](void* ctx) { delete static_cast<Weak*>(ctx); };
+        internal->set_owned_callback(weak, trampoline, deleter);
     }
     handler_ = fn;
 }
