@@ -7,6 +7,7 @@
 #include <velk/ext/metadata.h>
 #include <velk/interface/intf_object_storage.h>
 
+#include <atomic>
 #include <tuple>
 
 namespace velk::detail {
@@ -23,56 +24,77 @@ class ObjectStorageBase
 protected:
     ~ObjectStorageBase()
     {
-        if (storage_) {
-            instance().destroy_metadata_container(storage_);
+        auto* s = storage_.load(std::memory_order_relaxed);
+        if (s) {
+            instance().destroy_metadata_container(s);
         }
     }
 
     void ensure_storage(const ClassInfo& info, IInterface* owner) const
     {
-        if (!storage_) {
-            storage_ = instance().create_metadata_container(info, owner);
+        if (storage_.load(std::memory_order_acquire)) {
+            return;
+        }
+        auto* created = instance().create_metadata_container(info, owner);
+        IObjectStorage* expected = nullptr;
+        if (!storage_.compare_exchange_strong(expected, created, std::memory_order_release)) {
+            // Another thread won the race; destroy our duplicate.
+            instance().destroy_metadata_container(created);
         }
     }
 
+    IObjectStorage* stor() const { return storage_.load(std::memory_order_acquire); }
+
     IProperty::Ptr storage_get_property(string_view name, Resolve mode = Resolve::Create) const
     {
-        return storage_ ? storage_->get_property(name, mode) : nullptr;
+        auto* s = stor();
+        return s ? s->get_property(name, mode) : nullptr;
     }
     IEvent::Ptr storage_get_event(string_view name, Resolve mode = Resolve::Create) const
     {
-        return storage_ ? storage_->get_event(name, mode) : nullptr;
+        auto* s = stor();
+        return s ? s->get_event(name, mode) : nullptr;
     }
     IFunction::Ptr storage_get_function(string_view name, Resolve mode = Resolve::Create) const
     {
-        return storage_ ? storage_->get_function(name, mode) : nullptr;
+        auto* s = stor();
+        return s ? s->get_function(name, mode) : nullptr;
     }
     void storage_notify(MemberKind kind, Uid interfaceUid, Notification notification) const
     {
-        if (storage_) {
-            storage_->notify(kind, interfaceUid, notification);
+        auto* s = stor();
+        if (s) {
+            s->notify(kind, interfaceUid, notification);
         }
     }
 
     ReturnValue storage_add_attachment(const IInterface::Ptr& attachment) const
     {
-        return storage_ ? storage_->add_attachment(attachment) : ReturnValue::Fail;
+        auto* s = stor();
+        return s ? s->add_attachment(attachment) : ReturnValue::Fail;
     }
     ReturnValue storage_remove_attachment(const IInterface::Ptr& attachment) const
     {
-        return storage_ ? storage_->remove_attachment(attachment) : ReturnValue::Fail;
+        auto* s = stor();
+        return s ? s->remove_attachment(attachment) : ReturnValue::Fail;
     }
-    size_t storage_attachment_count() const { return storage_ ? storage_->attachment_count() : 0; }
+    size_t storage_attachment_count() const
+    {
+        auto* s = stor();
+        return s ? s->attachment_count() : 0;
+    }
     IInterface::Ptr storage_get_attachment(size_t index) const
     {
-        return storage_ ? storage_->get_attachment(index) : nullptr;
+        auto* s = stor();
+        return s ? s->get_attachment(index) : nullptr;
     }
     IInterface::Ptr storage_find_attachment(const AttachmentQuery& query, Resolve mode)
     {
-        return storage_ ? storage_->find_attachment(query, mode) : nullptr;
+        auto* s = stor();
+        return s ? s->find_attachment(query, mode) : nullptr;
     }
 
-    mutable IObjectStorage* storage_{};
+    mutable std::atomic<IObjectStorage*> storage_{};
 };
 
 } // namespace velk::detail
@@ -114,7 +136,7 @@ public: // IMetadata overrides
     array_view<MemberDesc> get_static_metadata() const override { return class_metadata; }
     IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const override
     {
-        if (mode == Resolve::Existing && !storage_) {
+        if (mode == Resolve::Existing && !stor()) {
             return {};
         }
         ensure_stor();
@@ -122,7 +144,7 @@ public: // IMetadata overrides
     }
     IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const override
     {
-        if (mode == Resolve::Existing && !storage_) {
+        if (mode == Resolve::Existing && !stor()) {
             return {};
         }
         ensure_stor();
@@ -130,7 +152,7 @@ public: // IMetadata overrides
     }
     IFunction::Ptr get_function(string_view name, Resolve mode = Resolve::Create) const override
     {
-        if (mode == Resolve::Existing && !storage_) {
+        if (mode == Resolve::Existing && !stor()) {
             return {};
         }
         ensure_stor();
@@ -158,7 +180,7 @@ public: // IObjectStorage overrides
     IInterface::Ptr get_attachment(size_t index) const override { return storage_get_attachment(index); }
     IInterface::Ptr find_attachment(const AttachmentQuery& query, Resolve mode) override
     {
-        if (mode == Resolve::Existing && !storage_) {
+        if (mode == Resolve::Existing && !stor()) {
             return {};
         }
         ensure_stor();
