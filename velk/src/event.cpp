@@ -53,24 +53,28 @@ array_view<IFunction::ConstPtr> EventImpl::deferred_handlers() const
 
 void EventImpl::invoke_handlers(FnArgs args) const
 {
-    // Ignoring all return values as different handlers might return different results
-    for (const auto& h : immediate_handlers()) {
-        h->invoke(args);
+    // Snapshot handlers: a handler may add/remove handlers on this event
+    // during invocation, which would invalidate iterators into handlers_.
+    auto snapshot = handlers_;
+    auto db = deferred_begin_;
+
+    for (size_t i = 0; i < db; ++i) {
+        snapshot[i]->invoke(args);
     }
-    auto deferred = deferred_handlers();
-    if (deferred.empty()) {
+
+    if (db >= snapshot.size()) {
         return;
     }
     // Clone args once, share ownership across all deferred tasks
     auto clonedArgs = ::velk::make_shared<DeferredArgs>(args);
 
     vector<DeferredTask> tasks;
-    tasks.reserve(deferred.size());
-    for (const auto& h : deferred) {
-        tasks.push_back({h, clonedArgs});
+    tasks.reserve(snapshot.size() - db);
+    for (size_t i = db; i < snapshot.size(); ++i) {
+        tasks.push_back({snapshot[i], clonedArgs});
     }
 
-    // Queue N tasks to instance for exececution at next instance().update().
+    // Queue N tasks to instance for execution at next instance().update().
     instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
 }
 
