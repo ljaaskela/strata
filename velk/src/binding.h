@@ -17,9 +17,10 @@ struct BindingData
     virtual IAny::ConstPtr evaluate() const = 0;
     virtual void subscribe(const IFunction::Ptr& handler) = 0;
     virtual void unsubscribe(const IFunction::Ptr& handler) = 0;
-    virtual IProperty::ConstPtr get_source_property() const { return nullptr; }
+    virtual IProperty::Ptr get_source_property() const { return nullptr; }
     virtual IFunction::ConstPtr get_source_function() const { return nullptr; }
     virtual void invalidate() {}
+    virtual ReturnValue write_to_source(const IAny& value) { (void)value; return ReturnValue::Fail; }
 };
 
 /**
@@ -41,17 +42,18 @@ public:
     ~BindingImpl();
 
     // IBinding
-    IProperty::ConstPtr get_source_property() const override;
+    IProperty::Ptr get_source_property() const override;
     IFunction::ConstPtr get_source_function() const override;
     bool add_target(const IProperty::Ptr& target) override;
     bool remove_target(const IProperty::Ptr& target) override;
     void uninstall() override;
 
     // IBindingInternal
-    void set_source_property(const IProperty::ConstPtr& source) override;
+    void set_source_property(const IProperty::Ptr& source) override;
     void set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps) override;
     void set_source_function(const IFunction::ConstPtr& fn) override;
     void set_invoke_type(InvokeType type) override;
+    void set_binding_mode(BindingMode mode) override;
 
     // IAnyExtension
     IAny::ConstPtr get_inner() const override;
@@ -78,6 +80,7 @@ private:
     void subscribe();
     void unsubscribe();
     void on_source_changed();
+    void queue_writeback(const IAny& value);
     IAny::Ptr first_inner() const;
 
     std::unique_ptr<BindingData> data_;
@@ -85,6 +88,8 @@ private:
     IFunction::Ptr handler_;
     InvokeType invoke_type_ = Immediate;
     bool subscribed_ = false;
+    BindingMode mode_ = BindingMode::OneWay;
+    bool pending_writeback_ = false;
 };
 
 } // namespace velk

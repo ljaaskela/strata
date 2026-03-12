@@ -49,9 +49,9 @@ struct LoopGuard
 // Property-to-property binding data. Holds a weak ref to the source property.
 struct PropertyBindingData final : BindingData
 {
-    IProperty::ConstWeakPtr source;
+    IProperty::WeakPtr source;
 
-    explicit PropertyBindingData(const IProperty::ConstPtr& src) : source(src) {}
+    explicit PropertyBindingData(const IProperty::Ptr& src) : source(src) {}
 
     IAny::ConstPtr evaluate() const override
     {
@@ -79,7 +79,15 @@ struct PropertyBindingData final : BindingData
         }
     }
 
-    IProperty::ConstPtr get_source_property() const override { return source.lock(); }
+    IProperty::Ptr get_source_property() const override { return source.lock(); }
+
+    ReturnValue write_to_source(const IAny& value) override
+    {
+        if (auto s = source.lock()) {
+            return s->set_value(value);
+        }
+        return ReturnValue::Fail;
+    }
 };
 
 // Helper: subscribe/unsubscribe a handler to/from a list of dependency properties.
@@ -229,7 +237,7 @@ BindingImpl::~BindingImpl()
 
 // IBinding
 
-IProperty::ConstPtr BindingImpl::get_source_property() const
+IProperty::Ptr BindingImpl::get_source_property() const
 {
     return data_ ? data_->get_source_property() : nullptr;
 }
@@ -269,7 +277,7 @@ void BindingImpl::uninstall()
 
 // IBindingInternal
 
-void BindingImpl::set_source_property(const IProperty::ConstPtr& source)
+void BindingImpl::set_source_property(const IProperty::Ptr& source)
 {
     unsubscribe();
     data_ = std::make_unique<PropertyBindingData>(source);
@@ -297,6 +305,11 @@ void BindingImpl::set_source_function(const IFunction::ConstPtr& fn)
 void BindingImpl::set_invoke_type(InvokeType type)
 {
     invoke_type_ = type;
+}
+
+void BindingImpl::set_binding_mode(BindingMode mode)
+{
+    mode_ = mode;
 }
 
 // IAnyExtension
@@ -382,14 +395,54 @@ ReturnValue BindingImpl::get_data(void* to, size_t toSize, Uid type) const
     return inner ? inner->get_data(to, toSize, type) : ReturnValue::Fail;
 }
 
-ReturnValue BindingImpl::set_data(void const*, size_t, Uid)
+ReturnValue BindingImpl::set_data(void const* from, size_t fromSize, Uid type)
 {
+    if (mode_ != BindingMode::TwoWay || !data_) {
+        return ReturnValue::Fail;
+    }
+    auto inner = first_inner();
+    if (!inner) {
+        return ReturnValue::Fail;
+    }
+    if (invoke_type_ == Deferred) {
+        // Deferred: write to inner so the target reads the new value immediately,
+        // and queue a write-back to the source for the next update().
+        auto rv = inner->set_data(from, fromSize, type);
+        if (succeeded(rv)) {
+            queue_writeback(*inner);
+            return ReturnValue::NothingToDo;
+        }
+        return rv;
+    }
+    // Immediate: forward to source now. Return NothingToDo so PropertyImpl
+    // skips its own on_changed fire; the source's on_changed propagates back.
+    auto temp = inner->clone();
+    if (temp && succeeded(temp->set_data(from, fromSize, type))) {
+        auto rv = data_->write_to_source(*temp);
+        return succeeded(rv) ? ReturnValue::NothingToDo : rv;
+    }
     return ReturnValue::Fail;
 }
 
-ReturnValue BindingImpl::copy_from(const IAny&)
+ReturnValue BindingImpl::copy_from(const IAny& other)
 {
-    return ReturnValue::Fail;
+    if (mode_ != BindingMode::TwoWay || !data_) {
+        return ReturnValue::Fail;
+    }
+    if (invoke_type_ == Deferred) {
+        auto inner = first_inner();
+        if (!inner) {
+            return ReturnValue::Fail;
+        }
+        auto rv = inner->copy_from(other);
+        if (succeeded(rv)) {
+            queue_writeback(*inner);
+            return ReturnValue::NothingToDo;
+        }
+        return rv;
+    }
+    auto rv = data_->write_to_source(other);
+    return succeeded(rv) ? ReturnValue::NothingToDo : rv;
 }
 
 IAny::Ptr BindingImpl::clone() const
@@ -406,6 +459,9 @@ IAny::Ptr BindingImpl::clone() const
 
 IAny::ConstPtr BindingImpl::evaluate() const
 {
+    if (pending_writeback_) {
+        return first_inner();
+    }
     return data_ ? data_->evaluate() : nullptr;
 }
 
@@ -457,12 +513,27 @@ void BindingImpl::unsubscribe()
     subscribed_ = false;
 }
 
+void BindingImpl::queue_writeback(const IAny& value)
+{
+    pending_writeback_ = true;
+    auto src = interface_pointer_cast<IPropertyInternal>(data_->get_source_property());
+    if (src) {
+        instance().queue_deferred_property({src, value.clone()});
+    }
+}
+
 void BindingImpl::on_source_changed()
 {
     LoopGuard guard(this, tls_notifying, tls_notify_depth);
     if (guard.looped) {
         return;
     }
+
+    // If this notification is the result of a deferred write-back, the targets
+    // already hold the correct value in their inner. Fire on_changed immediately
+    // instead of queuing another deferred round (which would require two update() calls).
+    bool from_writeback = pending_writeback_;
+    pending_writeback_ = false;
 
     if (data_) {
         data_->invalidate();
@@ -477,7 +548,7 @@ void BindingImpl::on_source_changed()
             continue;
         }
 
-        if (invoke_type_ == Deferred) {
+        if (invoke_type_ == Deferred && !from_writeback) {
             auto propWeak = IPropertyInternal::WeakPtr(interface_pointer_cast<IPropertyInternal>(owner));
             instance().queue_deferred_property({std::move(propWeak), nullptr});
         } else {

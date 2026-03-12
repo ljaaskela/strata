@@ -37,6 +37,7 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Function binding](#function-binding)
     - [Auto-tracked binding](#auto-tracked-binding)
     - [Deferred bindings](#deferred-bindings)
+    - [Two-way bindings](#two-way-bindings)
     - [Multiple targets](#multiple-targets)
     - [Removing bindings](#removing-bindings)
     - [Loop detection](#loop-detection)
@@ -809,7 +810,7 @@ If the object is destroyed before `update()`, the queued callback is silently sk
 
 ### Bindings
 
-Bindings connect properties so that a target property automatically reflects the value of a source property or a computed function result. While bound, the target is read-only: reads return the source value, and writes are rejected. When the source changes, the target's `on_changed` fires.
+Bindings connect properties so that a target property automatically reflects the value of a source property or a computed function result. By default (one-way), the target is read-only: reads return the source value, and writes are rejected. Two-way bindings forward writes from the target back to the source. When the source changes, the target's `on_changed` fires.
 
 ```cpp
 #include <velk/api/binding.h>
@@ -931,6 +932,38 @@ b.set_value(3);
 instance().update();
 // on_changed fires once with value 3
 ```
+
+#### Two-way bindings
+
+Pass `BindingMode::TwoWay` to `create_binding()` so that writes to the target are forwarded to the source property instead of being rejected. The source's `on_changed` then propagates the new value back to all targets.
+
+```cpp
+auto slider = create_property<float>(0.f);
+auto model  = create_property<float>(50.f);
+
+auto binding = create_binding(slider, model, Immediate, BindingMode::TwoWay);
+
+slider.get_value();       // 50.f (reads from model)
+slider.set_value(75.f);   // forwards to model
+model.get_value();        // 75.f
+```
+
+With `Deferred`, the write is applied locally to the target immediately but the source is not updated until `update()`. This means the target reads the new value right away, while the source still holds the old value until the next frame:
+
+```cpp
+auto binding = create_binding(slider, model, Deferred, BindingMode::TwoWay);
+
+slider.set_value(75.f);
+slider.get_value();       // 75.f (immediate)
+model.get_value();        // 50.f (unchanged until update)
+
+instance().update();
+model.get_value();        // 75.f (source updated)
+```
+
+If both sides change between updates, the result is undefined (either value may win).
+
+Two-way mode only applies to property-to-property bindings. Function bindings have no source property to write to, so writes are always rejected regardless of the mode.
 
 #### Multiple targets
 
