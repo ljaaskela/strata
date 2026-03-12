@@ -55,7 +55,7 @@ private:
     ReturnValue check_dependencies(const PluginInfo& info);
 
     vector<PluginEntry> plugins_;        ///< Sorted registry of loaded plugins.
-    vector<IPlugin*> update_plugins_;    ///< Plugins that opted into update notifications.
+    vector<IPlugin::Ptr> update_plugins_; ///< Plugins that opted into update notifications.
     mutable UpdateInfo update_timestamps_;    ///< Absolute timestamps for init, first update, last update.
     mutable bool last_update_was_explicit_{}; ///< Whether previous update used explicit time.
     ILog& log_;

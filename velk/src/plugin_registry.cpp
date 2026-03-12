@@ -59,10 +59,11 @@ ReturnValue PluginRegistry::check_dependencies(const PluginInfo& info)
 
 ReturnValue PluginRegistry::load_plugin(const IPlugin::Ptr& plugin)
 {
-    if (!plugin) {
+    auto* obj = interface_cast<IObject>(plugin);
+    if (!obj) {
         return ReturnValue::InvalidArgument;
     }
-    Uid id = interface_cast<IObject>(plugin.get())->get_class_uid();
+    Uid id = obj->get_class_uid();
     PluginEntry key{id, {}};
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == id) {
@@ -86,7 +87,7 @@ ReturnValue PluginRegistry::load_plugin(const IPlugin::Ptr& plugin)
     }
 
     if (config.enableUpdate) {
-        update_plugins_.push_back(plugin.get());
+        update_plugins_.push_back(plugin);
     }
     return ReturnValue::Success;
 }
@@ -194,11 +195,10 @@ ReturnValue PluginRegistry::unload_plugin(Uid pluginId)
         }
     }
 
-    IPlugin* raw = it->plugin.get();
     it->plugin->shutdown(velk_);
 
     // Remove from update cache.
-    auto uit = std::find(update_plugins_.begin(), update_plugins_.end(), raw);
+    auto uit = std::find(update_plugins_.begin(), update_plugins_.end(), it->plugin);
     if (uit != update_plugins_.end()) {
         update_plugins_.erase(uit);
     }
@@ -277,7 +277,7 @@ UpdateInfo PluginRegistry::pre_update_plugins(Duration time) const
 
     // Snapshot: plugins may load/unload other plugins during callbacks.
     auto plugins = update_plugins_;
-    for (auto* plugin : plugins) {
+    for (auto& plugin : plugins) {
         plugin->pre_update({info});
     }
 
@@ -287,7 +287,7 @@ UpdateInfo PluginRegistry::pre_update_plugins(Duration time) const
 void PluginRegistry::post_update_plugins(const IPlugin::PostUpdateInfo& info) const
 {
     auto plugins = update_plugins_;
-    for (auto* plugin : plugins) {
+    for (auto& plugin : plugins) {
         plugin->post_update(info);
     }
 }
