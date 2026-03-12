@@ -631,6 +631,9 @@ public:
      * Checks whether the strong count has dropped to zero.
      */
     bool expired() const { return !block_ || block_->strong.load(std::memory_order_acquire) == 0; }
+
+    /** @brief Returns the raw pointer for identity comparison. May be dangling if expired. */
+    T* unsafe_get() const { return ptr_; }
 };
 
 /**

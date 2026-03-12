@@ -42,7 +42,7 @@ struct typed_trampoline
             return invoke_typed_impl<Callable, ArgsTuple>(fn, args, std::make_index_sequence<Arity>{});
         } else {
             auto result = invoke_typed_impl<Callable, ArgsTuple>(fn, args, std::make_index_sequence<Arity>{});
-            return Any<R>(result).clone();
+            return Any<R>(result);
         }
     }
 

@@ -78,19 +78,19 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~9 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~11 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property get** | 1 virtual call + `memcpy` | ~10 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~12 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
-| **Function invoke** | 1 indirect call | ~14 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
-| **Typed-arg trampoline** | Arg extraction + indirect call | ~42 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
-| **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
-| **Event dispatch (immediate)** | Loop over handlers | ~11 ns | Iterates immediate handlers in-place; no allocations |
-| **Event dispatch (deferred)** | Clone + queue | ~122 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
-| **interface_cast** | Linear scan | ~4 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~553 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Function invoke** | 1 indirect call | ~13 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
+| **Typed-arg trampoline** | Arg extraction + indirect call | ~41 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
+| **Raw function invoke** | 1 indirect call | ~14 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
+| **Event dispatch (immediate)** | Loop over handlers | ~9 ns | Iterates immediate handlers in-place; no allocations |
+| **Event dispatch (deferred)** | Clone + queue | ~140 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~645 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 1 heap alloc + pool emplace | ~55 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
+| **Object creation** | 1 heap alloc + pool emplace | ~58 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 

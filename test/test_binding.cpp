@@ -110,7 +110,7 @@ TEST(Binding, FunctionBindingComputesFromDeps)
         if (auto v = Any<const int>(args[1])) {
             cVal = v.get_value();
         }
-        return Any<int>(bVal + cVal).clone();
+        return Any<int>(bVal + cVal);
     });
 
     auto binding = ::velk::bind(a,
@@ -225,7 +225,7 @@ TEST(Binding, IntrospectionFunctionBinding)
         if (auto a = Any<const int>(args[0])) {
             v = a.get_value();
         }
-        return Any<int>(v * 2).clone();
+        return Any<int>(v * 2);
     });
 
     auto binding = ::velk::bind(
@@ -331,7 +331,7 @@ TEST(Binding, DeferredFunctionBinding)
         if (auto a = Any<const int>(args[0])) {
             v = a.get_value();
         }
-        return Any<int>(v * 2).clone();
+        return Any<int>(v * 2);
     });
 
     auto binding = ::velk::bind(a,
@@ -370,7 +370,7 @@ TEST(Binding, FunctionBindingUnbindRetainsValue)
         if (auto a = Any<const int>(args[0])) {
             v = a.get_value();
         }
-        return Any<int>(v * 3).clone();
+        return Any<int>(v * 3);
     });
 
     auto binding = ::velk::bind(
@@ -424,5 +424,124 @@ TEST(Binding, WrapperUnbindAllowsRebind)
 
     // Can rebind to a different source
     EXPECT_TRUE(binding.bind(c, Immediate));
+    EXPECT_EQ(a.get_value(), 99);
+}
+
+// Auto-tracked function binding: deps discovered automatically
+
+TEST(Binding, AutoTrackBasic)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+    auto c = create_property<int>(20);
+
+    // fn reads b and c directly, returns int (auto-wrapped by typed_trampoline)
+    Callback fn([&]() -> int {
+        return b.get_value() + c.get_value();
+    });
+
+    auto binding = ::velk::bind(a, fn);
+    ASSERT_TRUE(binding);
+
+    // First read evaluates and discovers deps
+    EXPECT_EQ(a.get_value(), 30);
+
+    // Change b, verify a updates
+    b.set_value(5);
+    EXPECT_EQ(a.get_value(), 25);
+
+    // Change c, verify a updates
+    c.set_value(100);
+    EXPECT_EQ(a.get_value(), 105);
+}
+
+TEST(Binding, AutoTrackFiresOnChanged)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+
+    Callback fn([&]() -> int {
+        return b.get_value() * 2;
+    });
+
+    auto binding = ::velk::bind(a, fn);
+    ASSERT_TRUE(binding);
+    EXPECT_EQ(a.get_value(), 20);
+
+    int callCount = 0;
+    Callback handler([&](FnArgs) -> ReturnValue {
+        callCount++;
+        return ReturnValue::Success;
+    });
+    a.add_on_changed(handler);
+
+    b.set_value(7);
+    EXPECT_EQ(callCount, 1);
+    EXPECT_EQ(a.get_value(), 14);
+}
+
+TEST(Binding, AutoTrackDynamicDeps)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+    auto c = create_property<int>(20);
+    auto flag = create_property<int>(0);
+
+    // When flag is 0, read b; when flag is 1, read c
+    Callback fn([&]() -> int {
+        return flag.get_value() == 0 ? b.get_value() : c.get_value();
+    });
+
+    auto binding = ::velk::bind(a, fn);
+    ASSERT_TRUE(binding);
+
+    // flag=0, so a reads b
+    EXPECT_EQ(a.get_value(), 10);
+
+    // Changing c should NOT affect a (c is not a dep yet)
+    c.set_value(99);
+    EXPECT_EQ(a.get_value(), 10);
+
+    // Changing b should affect a
+    b.set_value(42);
+    EXPECT_EQ(a.get_value(), 42);
+
+    // Switch flag: now a should read c
+    flag.set_value(1);
+    EXPECT_EQ(a.get_value(), 99);
+
+    // Now changing b should NOT affect a (b is no longer a dep)
+    b.set_value(1000);
+    EXPECT_EQ(a.get_value(), 99);
+
+    // Changing c should affect a
+    c.set_value(77);
+    EXPECT_EQ(a.get_value(), 77);
+}
+
+TEST(Binding, AutoTrackUnbindRetainsValue)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(42);
+
+    Callback fn([&]() -> int {
+        return b.get_value();
+    });
+
+    auto binding = ::velk::bind(a, fn);
+    ASSERT_TRUE(binding);
+    EXPECT_EQ(a.get_value(), 42);
+
+    binding.unbind();
+
+    // Retains last value
+    EXPECT_EQ(a.get_value(), 42);
+
+    // Writes work again
+    EXPECT_TRUE(succeeded(a.set_value(99)));
+    EXPECT_EQ(a.get_value(), 99);
+
+    // Source changes no longer propagate
+    b.set_value(0);
     EXPECT_EQ(a.get_value(), 99);
 }
