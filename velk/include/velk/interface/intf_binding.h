@@ -8,6 +8,13 @@
 
 namespace velk {
 
+/** @brief Binding direction. */
+enum class BindingMode : uint8_t
+{
+    OneWay,
+    TwoWay
+};
+
 /**
  * @brief Interface for property bindings.
  *
@@ -19,7 +26,7 @@ class IBinding : public Interface<IBinding, IAnyExtension>
 {
 public:
     /** @brief Returns the source property, or null if this is a function binding. */
-    virtual IProperty::ConstPtr get_source_property() const = 0;
+    virtual IProperty::Ptr get_source_property() const = 0;
     /** @brief Returns the source function, or null if this is a property binding. */
     virtual IFunction::ConstPtr get_source_function() const = 0;
 
@@ -40,7 +47,7 @@ class IBindingInternal : public Interface<IBindingInternal, IBinding>
 {
 public:
     /** @brief Configures this binding to read from a source property. */
-    virtual void set_source_property(const IProperty::ConstPtr& source) = 0;
+    virtual void set_source_property(const IProperty::Ptr& source) = 0;
     /** @brief Configures this binding to evaluate a function with explicit deps. */
     virtual void set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps) = 0;
     /** @brief Configures this binding to evaluate a function with auto-detected deps. */
@@ -53,6 +60,14 @@ public:
      * intermediate changes into a single evaluation per frame.
      */
     virtual void set_invoke_type(InvokeType type) = 0;
+    /** @brief Sets the binding direction.
+     *
+     * OneWay (default): writes to targets are rejected.
+     * TwoWay: writes to targets are forwarded to the source property,
+     * and the source's on_changed propagates the new value back to all targets.
+     * Has no effect on function bindings.
+     */
+    virtual void set_binding_mode(BindingMode mode) = 0;
 };
 
 } // namespace velk

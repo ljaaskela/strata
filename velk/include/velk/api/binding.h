@@ -97,20 +97,24 @@ inline Binding create_binding()
 /**
  * @brief Creates a property-to-property binding.
  *
- * While bound, reads from targets return the source property's current value,
- * and writes to targets are rejected. Source on_changed events propagate to
- * all targets.
+ * While bound, reads from targets return the source property's current value.
+ * In OneWay mode (default), writes to targets are rejected.
+ * In TwoWay mode, writes to targets are forwarded to the source property,
+ * and the source's on_changed propagates the new value back to all targets.
  *
  * @param source The source property whose value will be read.
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
+ * @param mode OneWay (default) or TwoWay.
  * @return The binding (not yet installed on any target).
  */
-inline Binding create_binding(const IProperty::ConstPtr& source, InvokeType type = Immediate)
+inline Binding create_binding(const IProperty::Ptr& source, InvokeType type = Immediate,
+                              BindingMode mode = BindingMode::OneWay)
 {
     auto b = create_binding();
     if (auto* internal = interface_cast<IBindingInternal>(IBinding::Ptr(b))) {
         internal->set_source_property(source);
         internal->set_invoke_type(type);
+        internal->set_binding_mode(mode);
     }
     return b;
 }
@@ -161,10 +165,10 @@ inline Binding create_binding(const IFunction::ConstPtr& fn, InvokeType type = I
 }
 
 /** @brief Creates a property binding and installs it on a single target. */
-inline Binding create_binding(const IProperty::Ptr& target, const IProperty::ConstPtr& source,
-                              InvokeType type = Immediate)
+inline Binding create_binding(const IProperty::Ptr& target, const IProperty::Ptr& source,
+                              InvokeType type = Immediate, BindingMode mode = BindingMode::OneWay)
 {
-    auto b = create_binding(source, type);
+    auto b = create_binding(source, type, mode);
     b.add_target(target);
     return b;
 }

@@ -250,7 +250,7 @@ TEST(Binding, RemoveOnNullBindingIsNoOp)
 TEST(Binding, BindNullSourceCreatesBinding)
 {
     auto a = create_property<int>(0);
-    IProperty::ConstPtr nullSource;
+    IProperty::Ptr nullSource;
 
     auto binding = ::velk::create_binding(a, nullSource);
     // Binding object is valid even if source is null
@@ -617,4 +617,117 @@ TEST(Binding, AutoTrackUnbindRetainsValue)
     // Source changes no longer propagate
     b.set_value(0);
     EXPECT_EQ(a.get_value(), 99);
+}
+
+// Two-way binding: writes to target forward to source
+
+TEST(Binding, TwoWayWriteForwardsToSource)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+
+    auto binding = ::velk::create_binding(a, b, Immediate, BindingMode::TwoWay);
+    ASSERT_TRUE(binding);
+    EXPECT_EQ(a.get_value(), 10);
+
+    // Write to target forwards to source
+    EXPECT_TRUE(succeeded(a.set_value(42)));
+    EXPECT_EQ(b.get_value(), 42);
+    EXPECT_EQ(a.get_value(), 42);
+}
+
+// Two-way binding: source on_changed propagates back to all targets
+
+TEST(Binding, TwoWaySourceChangePropagates)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(0);
+    auto source = create_property<int>(10);
+
+    auto binding = ::velk::create_binding(source, Immediate, BindingMode::TwoWay);
+    ASSERT_TRUE(binding);
+    binding.add_target(a);
+    binding.add_target(b);
+
+    EXPECT_EQ(a.get_value(), 10);
+    EXPECT_EQ(b.get_value(), 10);
+
+    // Write through target a, source updates, propagates to b
+    EXPECT_TRUE(succeeded(a.set_value(77)));
+    EXPECT_EQ(source.get_value(), 77);
+    EXPECT_EQ(b.get_value(), 77);
+}
+
+// Two-way binding: one-way mode rejects writes
+
+TEST(Binding, OneWayRejectsWrites)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+
+    auto binding = ::velk::create_binding(a, b);
+    ASSERT_TRUE(binding);
+    EXPECT_EQ(a.get_value(), 10);
+
+    // Write to one-way bound target fails
+    EXPECT_TRUE(failed(a.set_value(42)));
+    EXPECT_EQ(a.get_value(), 10);
+    EXPECT_EQ(b.get_value(), 10);
+}
+
+// Two-way deferred: write forwards immediately, notification deferred
+
+TEST(Binding, TwoWayDeferredWriteDefersSourceUpdate)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+
+    auto binding = ::velk::create_binding(a, b, Deferred, BindingMode::TwoWay);
+    ASSERT_TRUE(binding);
+    EXPECT_EQ(a.get_value(), 10);
+
+    int callCount = 0;
+    Callback handler([&](FnArgs) -> ReturnValue {
+        ++callCount;
+        return ReturnValue::Success;
+    });
+    IProperty::Ptr(a)->on_changed()->add_handler(handler);
+
+    // Write to target: a is immediately 42, source b unchanged until update()
+    EXPECT_TRUE(succeeded(a.set_value(42)));
+    EXPECT_EQ(a.get_value(), 42);
+    EXPECT_EQ(b.get_value(), 10);
+
+    // No notifications yet
+    EXPECT_EQ(callCount, 0);
+
+    // update() writes back to source and propagates
+    instance().update();
+    EXPECT_EQ(b.get_value(), 42);
+    EXPECT_EQ(a.get_value(), 42);
+    EXPECT_EQ(callCount, 1);
+}
+
+// Two-way binding: function binding ignores two-way (writes still fail)
+
+TEST(Binding, TwoWayFunctionBindingStillRejectsWrites)
+{
+    auto a = create_property<int>(0);
+    auto b = create_property<int>(10);
+
+    Callback fn([](FnArgs args) -> IAny::Ptr {
+        int v = 0;
+        if (auto a = Any<const int>(args[0])) {
+            v = a.get_value();
+        }
+        return Any<int>(v * 2);
+    });
+
+    auto binding = ::velk::create_binding(a, fn, {b});
+    ASSERT_TRUE(binding);
+    EXPECT_EQ(a.get_value(), 20);
+
+    // Function bindings have no source property to write to
+    EXPECT_TRUE(failed(a.set_value(99)));
+    EXPECT_EQ(a.get_value(), 20);
 }
