@@ -1,6 +1,7 @@
 #ifndef VELK_INTF_BINDING_H
 #define VELK_INTF_BINDING_H
 
+#include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_function.h>
 #include <velk/interface/intf_property.h>
 #include <velk/vector.h>
@@ -8,25 +9,32 @@
 namespace velk {
 
 /**
- * @brief Introspection interface for property bindings.
+ * @brief Interface for property bindings.
  *
  * A binding is an IAnyExtension that intercepts property reads to return values
- * from a source property or computed function. This interface lets consumers
- * check if and how a property is bound.
+ * from a source property or computed function. It can be installed on multiple
+ * target properties; all targets read the same evaluated value.
  */
-class IBinding : public Interface<IBinding>
+class IBinding : public Interface<IBinding, IAnyExtension>
 {
 public:
     /** @brief Returns the source property, or null if this is a function binding. */
     virtual IProperty::ConstPtr get_source_property() const = 0;
     /** @brief Returns the source function, or null if this is a property binding. */
     virtual IFunction::ConstPtr get_source_function() const = 0;
+
+    /** @brief Installs this binding on a target property. Returns false on type mismatch. */
+    virtual bool add_target(const IProperty::Ptr& target) = 0;
+    /** @brief Removes this binding from a target property. Returns false if not installed. */
+    virtual bool remove_target(const IProperty::Ptr& target) = 0;
+    /** @brief Removes this binding from all target properties. */
+    virtual void uninstall() = 0;
 };
 
 /**
  * @brief Internal interface for configuring a binding's source.
  *
- * Used by the bind() API helpers to set up the binding after creation.
+ * Used by the API helpers to set up the binding after creation.
  */
 class IBindingInternal : public Interface<IBindingInternal, IBinding>
 {

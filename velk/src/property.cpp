@@ -130,7 +130,11 @@ bool PropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
 
     auto ext_as_any = interface_pointer_cast<IAny>(extension);
 
-    IInterface& self = static_cast<IPropertyInternal&>(*this);
+    // Use get_interface to get a consistent IInterface pointer that matches
+    // the one stored by install_extension (via get_self<IInterface>()).
+    // A direct static_cast would go through the IPropertyInternal chain,
+    // which yields a different IInterface sub-object than get_interface returns.
+    IInterface& self = *get_interface<IInterface>();
 
     // Case 1: extension is at the head of the chain
     if (data_ == ext_as_any) {

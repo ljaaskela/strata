@@ -110,7 +110,7 @@ bool ArrayPropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
 
     auto ext_as_any = interface_pointer_cast<IAny>(extension);
 
-    IInterface& self = static_cast<IPropertyInternal&>(*this);
+    IInterface& self = *get_interface<IInterface>();
 
     if (data_ == ext_as_any) {
         auto inner = extension->take_inner(self);
