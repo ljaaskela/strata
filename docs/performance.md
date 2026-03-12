@@ -85,7 +85,7 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 | **Function invoke** | 1 indirect call | ~13 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
 | **Typed-arg trampoline** | Arg extraction + indirect call | ~41 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
 | **Raw function invoke** | 1 indirect call | ~14 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
-| **Event dispatch (immediate)** | Loop over handlers | ~9 ns | Iterates immediate handlers in-place; no allocations |
+| **Event dispatch (immediate)** | Snapshot + loop | ~36 ns | Snapshots handler list, then iterates; safe against handler mutation during dispatch |
 | **Event dispatch (deferred)** | Clone + queue | ~140 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
 | **Metadata lookup (cold)** | Linear scan + alloc | ~645 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
@@ -118,7 +118,7 @@ For trivially-copyable state structs, the entire state can be snapshotted or res
 
 Handlers are stored in a single `std::vector` partitioned by invoke type: `[0, deferred_begin_)` for immediate, `[deferred_begin_, size())` for deferred.
 
-- **Immediate handlers**: Invoked in a simple loop. No allocations.
+- **Immediate handlers**: The handler list is snapshotted before iteration so that handlers can safely add/remove handlers on the same event during dispatch. The snapshot copies the `shared_ptr` vector, adding a ref-count bump per handler.
 - **Deferred handlers**: Args are cloned once into a `shared_ptr` (shared across all deferred handlers for that invocation), then queued as `DeferredTask` entries. Queue insertion takes a mutex lock. `instance().update()` swaps the queue under the lock and executes outside it, no nested locking.
 - **No handlers**: The handlers vector is empty, zero heap allocation.
 - **add_handler()**: Linear dedup scan before insertion, `O(H)` where H is handler count.

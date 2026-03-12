@@ -17,12 +17,13 @@ class LibraryHandle : NoCopy
 {
 public:
     LibraryHandle() = default;
-    ~LibraryHandle() = default;
+    ~LibraryHandle() { close(); }
 
     LibraryHandle(LibraryHandle&& o) noexcept : handle_(o.handle_) { o.handle_ = nullptr; }
     LibraryHandle& operator=(LibraryHandle&& o) noexcept
     {
         if (this != &o) {
+            close();
             handle_ = o.handle_;
             o.handle_ = nullptr;
         }
