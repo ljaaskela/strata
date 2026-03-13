@@ -236,26 +236,28 @@ p.remove_on_changed(handler);
 
 ### StateReader and StateWriter (direct state access)
 
+Prefer the free functions `read_state<T>()` / `write_state<T>()` over manually fetching `IMetadata` and calling `meta->read/write`. Only fall back to `meta->read<T>()` / `meta->write<T>()` when you already have an `IMetadata*` for other reasons. These accept both raw pointers and `shared_ptr`.
+
 ```cpp
-// Read state (zero-copy, no on_changed)
-auto reader = read_state<IMyWidget>(iw);  // or meta->read<IMyWidget>()
+// Read state (zero-copy, no on_changed) accepts raw pointer or shared_ptr
+auto reader = read_state<IMyWidget>(obj);   // obj is IObject::Ptr or raw pointer
 float w = reader->width;
 float h = reader->height;
 
 // Write state (fires on_changed for ALL properties of that interface on destruction)
 {
-    auto writer = write_state<IMyWidget>(iw); // or meta->write<IMyWidget>()
+    auto writer = write_state<IMyWidget>(obj);
     writer->width = 300.f;
     writer->height = 150.f;
 } // ~StateWriter fires on_changed here
 
 // Callback-based write (immediate)
-write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
+write_state<IMyWidget>(obj, [](IMyWidget::State& s) {
     s.width = 500.f;
 });
 
 // Callback-based write (deferred)
-write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
+write_state<IMyWidget>(obj, [](IMyWidget::State& s) {
     s.width = 700.f;
 }, Deferred);
 instance().update(); // apply
@@ -568,4 +570,145 @@ TEST_F(MyTest, ObjectWrapper)
     auto reader = obj.read_state<ITestWidget>();
     EXPECT_FLOAT_EQ(reader->width, 100.f);
 }
+```
+
+## 10. Plugins
+
+### Plugin class definition
+
+**Header** (`src/my_plugin.h`):
+
+```cpp
+#include <velk/ext/plugin.h>
+
+namespace mylib {
+
+class MyPlugin final : public velk::ext::Plugin<MyPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a0b1c2d3-e4f5-6789-abcd-ef0123456789");
+    VELK_PLUGIN_NAME("my_plugin");
+    VELK_PLUGIN_VERSION(1, 0, 0);
+
+    // Optional: declare dependencies
+    // VELK_PLUGIN_DEPS({SomeOtherPlugin::class_uid, velk::make_version(1, 0, 0)});
+
+    velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig& config) override;
+    velk::ReturnValue shutdown(velk::IVelk&) override;
+
+    // Optional: update hooks (requires config.enableUpdate = true)
+    // void pre_update(const IPlugin::PreUpdateInfo& info) override;
+    // void post_update(const IPlugin::PostUpdateInfo& info) override;
+};
+
+} // namespace mylib
+
+// MUST be outside any namespace
+VELK_PLUGIN(mylib::MyPlugin)
+```
+
+**Implementation** (`src/my_plugin.cpp`):
+
+```cpp
+#include "my_plugin.h"
+#include "widget_impl.h"  // ext::Object<WidgetImpl, IWidget>
+
+namespace mylib {
+
+velk::ReturnValue MyPlugin::initialize(velk::IVelk& velk, velk::PluginConfig& config)
+{
+    // Register types using the free function (takes IVelk&)
+    auto rv = ::velk::register_type<WidgetImpl>(velk);
+    if (velk::failed(rv)) {
+        return rv;
+    }
+
+    // Enable update hooks if needed
+    // config.enableUpdate = true;
+
+    return velk::ReturnValue::Success;
+}
+
+velk::ReturnValue MyPlugin::shutdown(velk::IVelk&)
+{
+    return velk::ReturnValue::Success;
+}
+
+} // namespace mylib
+```
+
+### Public constants header
+
+Expose stable UIDs for consumers (`include/mylib/plugin.h`):
+
+```cpp
+#ifndef MYLIB_PLUGIN_H
+#define MYLIB_PLUGIN_H
+
+#include <velk/common.h>
+
+namespace mylib {
+
+namespace ClassId {
+inline constexpr velk::Uid Widget{"11111111-2222-3333-4444-555555555555"};
+} // namespace ClassId
+
+namespace PluginId {
+inline constexpr velk::Uid MyPlugin{"a0b1c2d3-e4f5-6789-abcd-ef0123456789"};
+} // namespace PluginId
+
+} // namespace mylib
+
+#endif // MYLIB_PLUGIN_H
+```
+
+The implementation class must use `VELK_CLASS_UID` with the same UUID as the `ClassId` constant:
+
+```cpp
+class WidgetImpl : public velk::ext::Object<WidgetImpl, IWidget>
+{
+public:
+    VELK_CLASS_UID("11111111-2222-3333-4444-555555555555");
+    // ...
+};
+```
+
+### CMake setup
+
+```cmake
+add_library(my_plugin SHARED
+    src/my_plugin.h
+    src/my_plugin.cpp
+    src/widget_impl.h
+    include/mylib/intf_widget.h
+    include/mylib/plugin.h
+)
+
+target_link_libraries(my_plugin PRIVATE velk)
+
+target_include_directories(my_plugin
+    PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(my_plugin PRIVATE VELK_EXPORTS)
+```
+
+### Loading and using from an application
+
+```cpp
+#include <velk/api/velk.h>
+#include <mylib/intf_widget.h>
+#include <mylib/plugin.h>
+
+// Load the plugin DLL
+::velk::instance().plugin_registry().load_plugin_from_path("my_plugin.dll");
+
+// Create objects using the public ClassId constants
+auto obj = ::velk::instance().create<velk::IObject>(mylib::ClassId::Widget);
+auto* widget = velk::interface_cast<mylib::IWidget>(obj);
+
+// Lazy load (loads if not already loaded)
+auto& reg = ::velk::instance().plugin_registry();
+auto* plugin = reg.get_or_load_plugin(mylib::PluginId::MyPlugin);
 ```
