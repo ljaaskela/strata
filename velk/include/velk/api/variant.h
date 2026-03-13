@@ -22,6 +22,8 @@ public:
     Variant(IVariant::Ptr existing) : any_(std::move(existing)) {};
 
     explicit operator bool() const noexcept { return any_ != nullptr; }
+    bool operator==(const Variant& other) const noexcept { return any_ == other.any_; }
+    bool operator!=(const Variant& other) const noexcept { return any_ != other.any_; }
 
     /** @brief Implicit conversion to IVariant::Ptr. */
     operator IVariant::Ptr() noexcept { return any_; }
