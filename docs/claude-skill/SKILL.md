@@ -43,6 +43,7 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 - **State access**: prefer `read_state<T>(obj)` / `write_state<T>(obj)` free functions over `meta->read<T>()` / `meta->write<T>()`. These accept both raw pointers and `shared_ptr`
 - **StateWriter fires on_changed** when it destructs, so use RAII scoping
 - **Bindings** must be kept alive; when the `Binding` wrapper destructs, the binding is NOT automatically removed. Call `binding.remove()` to uninstall.
+- **ReturnValue chaining**: use `rv &= operation()` to chain operations; the first failure is preserved. All operations still execute (no short-circuiting)
 
 ## Plugin System
 

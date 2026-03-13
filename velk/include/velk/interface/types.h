@@ -89,6 +89,19 @@ inline constexpr bool failed(ReturnValue ret)
     return ret < 0;
 }
 
+/** @brief Combines two return values. If the left side already failed, keeps it; otherwise takes the right side. */
+inline constexpr ReturnValue operator&(ReturnValue a, ReturnValue b)
+{
+    return failed(a) ? a : b;
+}
+
+/** @brief Compound assignment: preserves the first failure across a chain of operations. */
+inline constexpr ReturnValue& operator&=(ReturnValue& a, ReturnValue b)
+{
+    if (!failed(a)) a = b;
+    return a;
+}
+
 } // namespace velk
 
 #endif
