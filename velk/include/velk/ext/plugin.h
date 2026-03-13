@@ -12,7 +12,7 @@ namespace velk::ext {
 #define VELK_PLUGIN_UID(str) VELK_CLASS_UID(str)
 
 /** @brief Declares a static constexpr plugin name. */
-#define VELK_PLUGIN_NAME(str) static constexpr string_view plugin_name{str};
+#define VELK_PLUGIN_NAME(str) static constexpr ::velk::string_view plugin_name{str};
 
 /** @brief Declares a static constexpr plugin version. */
 #define VELK_PLUGIN_VERSION(major, minor, patch) \
