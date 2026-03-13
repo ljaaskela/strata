@@ -52,6 +52,11 @@ IAny::Ptr VelkInstance::create_any(Uid type) const
     return interface_pointer_cast<IAny>(create(type));
 }
 
+IVariant::Ptr VelkInstance::create_variant() const
+{
+    return interface_pointer_cast<IVariant>(create(ClassId::Variant));
+}
+
 IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
 {
     auto property = interface_pointer_cast<IProperty>(create(ClassId::Property, flags));

@@ -10,6 +10,7 @@
 #include "hive/object_hive.h"
 #include "hive/raw_hive.h"
 #include "property.h"
+#include "variant.h"
 
 #include <velk/ext/any.h>
 #include <velk/interface/intf_log.h>
@@ -31,7 +32,9 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<RawHiveImpl>();
     ITypeRegistry::register_type<HierarchyImpl>();
     ITypeRegistry::register_type<BindingImpl>();
+    ITypeRegistry::register_type<VariantImpl>();
 
+    ITypeRegistry::register_type<ext::AnyValue<bool>>();
     ITypeRegistry::register_type<ext::AnyValue<float>>();
     ITypeRegistry::register_type<ext::AnyValue<double>>();
     ITypeRegistry::register_type<ext::AnyValue<uint8_t>>();
