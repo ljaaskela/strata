@@ -288,13 +288,10 @@ public:
     velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig&) override
     {
         auto rv = register_type<MyWidget>(velk);
-        if (failed(rv)) {
-            VELK_LOG(E, "Type registration failed [%s]", get_class_name());)
-        }
-        // Isntantiate SubPlugin
+        // Instantiate and load SubPlugin
         auto pluginInstance = velk::ext::make_object<SubPlugin, velk::IPlugin>();
-        // Load it to Velk
-        return velk.plugin_registry().load_plugin(pluginInstance);
+        rv &= velk.plugin_registry().load_plugin(pluginInstance);
+        return rv;
     }
 
     velk::ReturnValue shutdown(velk::IVelk& velk) override

@@ -618,15 +618,14 @@ namespace mylib {
 velk::ReturnValue MyPlugin::initialize(velk::IVelk& velk, velk::PluginConfig& config)
 {
     // Register types using the free function (takes IVelk&)
+    // Use &= to chain: first failure is preserved, all operations still execute
     auto rv = ::velk::register_type<WidgetImpl>(velk);
-    if (velk::failed(rv)) {
-        return rv;
-    }
+    rv &= ::velk::register_type<AnotherImpl>(velk);
 
     // Enable update hooks if needed
     // config.enableUpdate = true;
 
-    return velk::ReturnValue::Success;
+    return rv;
 }
 
 velk::ReturnValue MyPlugin::shutdown(velk::IVelk&)
