@@ -43,6 +43,8 @@ w->width().on_changed().add_handler([](){ /*...*/ });
 w->on_clicked().add_handler([]() { /*...*/ });
 velk::invoke_function(w->reset());
 ```
+Note: Claude Code skill for Velk usage can be found in `docs/claude-skill`. Copy the files under `.claude/skills/velk` to enable `/velk` command in Claude CLI.
+
 ---
 ## Table of contents
 
