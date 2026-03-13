@@ -27,12 +27,26 @@ detail::StateReader<T> read_state(U* object)
     return meta ? meta->template read<T>() : detail::StateReader<T>();
 }
 
+/** @brief Convenience free function: read-only access to T::State from a shared_ptr. */
+template <class T, class U>
+detail::StateReader<T> read_state(const shared_ptr<U>& object)
+{
+    return read_state<T>(object.get());
+}
+
 /** @brief Convenience free function: write access to T::State via IMetadata. */
 template <class T, class U>
 detail::StateWriter<T> write_state(U* object)
 {
     auto* meta = interface_cast<IMetadata>(object);
     return meta ? meta->template write<T>() : detail::StateWriter<T>();
+}
+
+/** @brief Convenience free function: write access to T::State from a shared_ptr. */
+template <class T, class U>
+detail::StateWriter<T> write_state(const shared_ptr<U>& object)
+{
+    return write_state<T>(object.get());
 }
 
 /**
@@ -83,6 +97,13 @@ void write_state(U* object, Fn&& fn, InvokeType type = Immediate)
     });
     DeferredTask task{cb, {}};
     instance().queue_deferred_tasks({&task, 1});
+}
+
+/** @brief Callback-based write access to T::State from a shared_ptr. */
+template <class T, class U, class Fn>
+void write_state(const shared_ptr<U>& object, Fn&& fn, InvokeType type = Immediate)
+{
+    write_state<T>(object.get(), std::forward<Fn>(fn), type);
 }
 
 } // namespace velk
