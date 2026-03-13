@@ -1,6 +1,6 @@
 ---
 name: velk
-description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path"
+description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path"
 ---
 
 # Velk Usage Guide
@@ -23,6 +23,7 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 | `RPROP` | `(RPROP, Type, name, default)` | `ConstProperty<Type>` | Read-only (write via state only) |
 | `ARR` | `(ARR, ElemType, name, ...)` | `ArrayProperty<ElemType>` | Read-write array |
 | `RARR` | `(RARR, ElemType, name, ...)` | `ConstArrayProperty<ElemType>` | Read-only array |
+| `PROP` | `(PROP, velk::Variant, name, {})` | `Property<Variant>` | Typeless property (any type at runtime) |
 | `EVT` | `(EVT, name)` | `Event` | Observable event |
 | `FN` | `(FN, RetType, name)` | `Function` | Typed function, zero args |
 | `FN` | `(FN, RetType, name, (T1, a1), ...)` | `Function` | Typed function with args |
@@ -38,6 +39,7 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 - **No DLL exports**: never export functions from the DLL. Use `instance()` as the single entry point
 - **FN overrides** use `fn_` prefix: `(FN, void, reset)` generates virtual `fn_reset()` to override
 - **FN_RAW overrides** have signature `IAny::Ptr fn_Name(FnArgs)`
+- **Variant properties**: property set is expensive (~96 ns same-type, ~154 ns type-change) due to `copy_from` cloning. For write-heavy code, prefer state struct access (`Variant::set<T>()` at ~9 ns). Property get returns an IAny pointer (~8 ns). Prefer typed `PROP` when the type is known at compile time
 - **Events** conventionally use `on_` prefix: `(EVT, on_clicked)`
 - **Deferred updates**: pass `Deferred` to `set_value()` or `write_state()`, then call `instance().update()` to flush
 - **State access**: prefer `read_state<T>(obj)` / `write_state<T>(obj)` free functions over `meta->read<T>()` / `meta->write<T>()`. These accept both raw pointers and `shared_ptr`

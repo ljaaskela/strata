@@ -21,6 +21,8 @@ add_library(velk SHARED
     include/velk/uid.h
     src/object_storage.cpp
     src/object_storage.h
+    src/variant.cpp
+    src/variant.h
     src/hierarchy.cpp
     src/hierarchy.h
     src/future.cpp
@@ -52,6 +54,7 @@ add_library(velk SHARED
     include/velk/interface/intf_type_registry.h
     include/velk/interface/intf_plugin.h
     include/velk/interface/intf_plugin_registry.h
+    include/velk/interface/intf_variant.h
     include/velk/interface/intf_velk.h
     include/velk/interface/intf_metadata.h
     include/velk/interface/intf_object_storage.h
@@ -72,6 +75,7 @@ add_library(velk SHARED
     include/velk/api/attachment.h
     include/velk/api/hierarchy.h
     include/velk/api/object.h
+    include/velk/api/variant.h
     include/velk/ext/any.h
     include/velk/ext/any_extension.h
     include/velk/ext/core_object.h

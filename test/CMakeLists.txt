@@ -38,6 +38,7 @@ add_executable(tests
     test_shared_ptr.cpp
     test_vector.cpp
     test_c_api.cpp
+    test_variant.cpp
 )
 
 target_link_libraries(tests PRIVATE velk velk_c GTest::gtest_main)
