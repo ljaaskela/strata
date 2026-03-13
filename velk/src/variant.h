@@ -4,7 +4,6 @@
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_variant.h>
 #include <velk/interface/types.h>
-#include <velk/vector.h>
 
 namespace velk {
 
@@ -32,11 +31,7 @@ public:
     bool can_convert_to(Uid type) const override;
 
 private:
-    void rebuild_compatible_cache(Uid current) const;
-
     IAny::Ptr stored_;
-    mutable vector<Uid> compatible_cache_;
-    mutable Uid cached_type_{};
 };
 
 } // namespace velk

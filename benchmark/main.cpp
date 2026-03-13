@@ -7,6 +7,7 @@
 #include <velk/api/hive/raw_hive.h>
 #include <velk/api/property.h>
 #include <velk/api/state.h>
+#include <velk/api/variant.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/interface/hive/intf_hive_store.h>
@@ -1212,3 +1213,151 @@ static void BM_HierarchyAddWithHandler(benchmark::State& state)
     }
 }
 BENCHMARK(BM_HierarchyAddWithHandler);
+
+// ---------------------------------------------------------------------------
+// Variant property interface + implementation
+// ---------------------------------------------------------------------------
+
+class IBenchVariant : public Interface<IBenchVariant>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, ::velk::Variant, value, {})
+    )
+};
+
+class BenchVariant : public ext::Object<BenchVariant, IBenchVariant>
+{
+};
+
+static void ensureVariantRegistered()
+{
+    static bool done = false;
+    if (!done) {
+        ensureRegistered();
+        instance().type_registry().register_type<BenchVariant>();
+        done = true;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Variant property get/set (same type)
+// ---------------------------------------------------------------------------
+
+static void BM_VariantGetSameType(benchmark::State& state)
+{
+    ensureVariantRegistered();
+    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto* iv = interface_cast<IBenchVariant>(obj);
+    auto prop = iv->value();
+    Any<float> initial(42.f);
+    prop.set_value(initial);
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(prop.get_value());
+    }
+}
+BENCHMARK(BM_VariantGetSameType);
+
+static void BM_VariantSetSameType(benchmark::State& state)
+{
+    ensureVariantRegistered();
+    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto* iv = interface_cast<IBenchVariant>(obj);
+    auto prop = iv->value();
+    Any<float> val(0.f);
+    prop.set_value(val);
+    float v = 0.f;
+    for (auto _ : state) {
+        val.set_value(v);
+        prop.set_value(val);
+        v += 1.f;
+    }
+}
+BENCHMARK(BM_VariantSetSameType);
+
+// ---------------------------------------------------------------------------
+// Variant property get with numeric conversion
+// ---------------------------------------------------------------------------
+
+static void BM_VariantGetConversion(benchmark::State& state)
+{
+    ensureVariantRegistered();
+    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto* iv = interface_cast<IBenchVariant>(obj);
+    auto prop = iv->value();
+    Any<float> initial(42.f);
+    prop.set_value(initial);
+    for (auto _ : state) {
+        auto any = prop.get_value();
+        double result{};
+        any->get_data(&result, sizeof(result), type_uid<double>());
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_VariantGetConversion);
+
+// ---------------------------------------------------------------------------
+// Variant property set with type change
+// ---------------------------------------------------------------------------
+
+static void BM_VariantSetTypeChange(benchmark::State& state)
+{
+    ensureVariantRegistered();
+    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto* iv = interface_cast<IBenchVariant>(obj);
+    auto prop = iv->value();
+    Any<float> fval(1.f);
+    Any<int32_t> ival(1);
+    float fv = 1.f;
+    int32_t iv2 = 1;
+    bool toggle = false;
+    for (auto _ : state) {
+        if (toggle) {
+            fval.set_value(fv);
+            prop.set_value(fval);
+            fv += 1.f;
+        } else {
+            ival.set_value(iv2);
+            prop.set_value(ival);
+            iv2 += 1;
+        }
+        toggle = !toggle;
+    }
+}
+BENCHMARK(BM_VariantSetTypeChange);
+
+// ---------------------------------------------------------------------------
+// Variant state struct read/write
+// ---------------------------------------------------------------------------
+
+static void BM_VariantStateRead(benchmark::State& state)
+{
+    ensureVariantRegistered();
+    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    {
+        auto writer = write_state<IBenchVariant>(obj);
+        writer->value.set<float>(42.f);
+    }
+    for (auto _ : state) {
+        auto reader = read_state<IBenchVariant>(obj);
+        benchmark::DoNotOptimize(reader->value.get<float>());
+    }
+}
+BENCHMARK(BM_VariantStateRead);
+
+static void BM_VariantStateWrite(benchmark::State& state)
+{
+    ensureVariantRegistered();
+    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    {
+        auto writer = write_state<IBenchVariant>(obj);
+        writer->value.set<float>(0.f);
+    }
+    float v = 0.f;
+    for (auto _ : state) {
+        auto writer = write_state<IBenchVariant>(obj);
+        writer->value.set<float>(v);
+        v += 1.f;
+    }
+}
+BENCHMARK(BM_VariantStateWrite);

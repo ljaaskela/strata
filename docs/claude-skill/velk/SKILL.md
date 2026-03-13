@@ -39,7 +39,7 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 - **No DLL exports**: never export functions from the DLL. Use `instance()` as the single entry point
 - **FN overrides** use `fn_` prefix: `(FN, void, reset)` generates virtual `fn_reset()` to override
 - **FN_RAW overrides** have signature `IAny::Ptr fn_Name(FnArgs)`
-- **Variant properties** cost more than typed properties (runtime type dispatch per read/write). Only use `velk::Variant` when the property must hold different types at runtime. Prefer `(PROP, float, value, 0.f)` over `(PROP, velk::Variant, value, {})` when the type is known
+- **Variant properties**: property set is expensive (~96 ns same-type, ~154 ns type-change) due to `copy_from` cloning. For write-heavy code, prefer state struct access (`Variant::set<T>()` at ~9 ns). Property get returns an IAny pointer (~8 ns). Prefer typed `PROP` when the type is known at compile time
 - **Events** conventionally use `on_` prefix: `(EVT, on_clicked)`
 - **Deferred updates**: pass `Deferred` to `set_value()` or `write_state()`, then call `instance().update()` to flush
 - **State access**: prefer `read_state<T>(obj)` / `write_state<T>(obj)` free functions over `meta->read<T>()` / `meta->write<T>()`. These accept both raw pointers and `shared_ptr`

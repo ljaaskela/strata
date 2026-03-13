@@ -94,6 +94,23 @@ const ConversionEntry* find_conversion(Uid from, Uid to)
     return nullptr;
 }
 
+// All 7 numeric types. Any numeric stored type is compatible with all of them.
+static const Uid g_all_numeric[] = {
+    type_uid<bool>(),     type_uid<int32_t>(),  type_uid<int64_t>(), type_uid<uint32_t>(),
+    type_uid<uint64_t>(), type_uid<float>(),    type_uid<double>()
+};
+static constexpr size_t g_num_numeric = sizeof(g_all_numeric) / sizeof(g_all_numeric[0]);
+
+bool is_numeric(Uid type)
+{
+    for (size_t i = 0; i < g_num_numeric; ++i) {
+        if (g_all_numeric[i] == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 Uid VariantImpl::stored_type() const
@@ -113,32 +130,8 @@ bool VariantImpl::can_convert_to(Uid type) const
     if (is_compatible(*stored_, type)) {
         return true;
     }
-    return find_conversion(stored_type(), type) != nullptr;
-}
-
-void VariantImpl::rebuild_compatible_cache(Uid current) const
-{
-    compatible_cache_.clear();
-    if (stored_) {
-        for (auto uid : stored_->get_compatible_types()) {
-            compatible_cache_.push_back(uid);
-        }
-    }
-    for (size_t i = 0; i < g_num_conversions; ++i) {
-        if (g_conversions[i].from == current) {
-            bool found = false;
-            for (auto uid : compatible_cache_) {
-                if (uid == g_conversions[i].to) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                compatible_cache_.push_back(g_conversions[i].to);
-            }
-        }
-    }
-    cached_type_ = current;
+    Uid from = stored_type();
+    return is_numeric(from) && is_numeric(type);
 }
 
 array_view<Uid> VariantImpl::get_compatible_types() const
@@ -147,10 +140,10 @@ array_view<Uid> VariantImpl::get_compatible_types() const
         return {};
     }
     Uid current = stored_type();
-    if (current != cached_type_) {
-        rebuild_compatible_cache(current);
+    if (is_numeric(current)) {
+        return {g_all_numeric, g_num_numeric};
     }
-    return {compatible_cache_.data(), compatible_cache_.size()};
+    return stored_->get_compatible_types();
 }
 
 size_t VariantImpl::get_data_size(Uid type) const
@@ -210,39 +203,47 @@ ReturnValue VariantImpl::set_data(const void* from, size_t fromSize, Uid type)
         return ReturnValue::Fail;
     }
     stored_ = std::move(any);
-    cached_type_ = {}; // Invalidate cache
     return ReturnValue::Success;
+}
+
+// Returns the primary stored type UID for any IAny (uses IVariant::stored_type if available,
+// otherwise falls back to get_compatible_types()[0]).
+static Uid primary_type(const IAny& any)
+{
+    if (auto* v = interface_cast<const IVariant>(&any)) {
+        return v->stored_type();
+    }
+    auto types = any.get_compatible_types();
+    return types.empty() ? Uid{} : types[0];
 }
 
 ReturnValue VariantImpl::copy_from(const IAny& other)
 {
-    // If stored_ exists and is compatible with the source's primary type, delegate for value comparison
-    if (stored_) {
-        auto other_types = other.get_compatible_types();
-        if (!other_types.empty()) {
-            Uid src_type = other_types[0];
-            if (is_compatible(*stored_, src_type)) {
-                return stored_->copy_from(other);
-            }
-        }
+    Uid src_type = primary_type(other);
+
+    // If stored_ exists and matches the source type, delegate for value comparison
+    if (stored_ && src_type != Uid{} && is_compatible(*stored_, src_type)) {
+        return stored_->copy_from(other);
     }
 
-    // Different type or no stored_
-    auto types = other.get_compatible_types();
-    if (types.empty()) {
+    // Empty source
+    if (src_type == Uid{}) {
         bool had = (stored_ != nullptr);
         stored_ = nullptr;
-        cached_type_ = {};
         return had ? ReturnValue::Success : ReturnValue::NothingToDo;
     }
 
     // If other is a Variant, create a typed any and copy through to avoid nesting
-    if (interface_cast<const IVariant>(&other)) {
-        Uid type = types[0];
+    if (auto* ov = interface_cast<const IVariant>(&other)) {
+        Uid type = ov->stored_type();
+        if (type == Uid{}) {
+            bool had = (stored_ != nullptr);
+            stored_ = nullptr;
+            return had ? ReturnValue::Success : ReturnValue::NothingToDo;
+        }
         auto any = instance().create_any(type);
         if (any && succeeded(any->copy_from(other))) {
             stored_ = std::move(any);
-            cached_type_ = {};
             return ReturnValue::Success;
         }
         return ReturnValue::Fail;
@@ -250,7 +251,6 @@ ReturnValue VariantImpl::copy_from(const IAny& other)
 
     // Regular IAny: clone it
     stored_ = other.clone();
-    cached_type_ = {};
     return stored_ ? ReturnValue::Success : ReturnValue::Fail;
 }
 

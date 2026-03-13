@@ -672,7 +672,7 @@ public:
 
 ### Variant properties
 
-Normal properties are statically typed: a `Property<float>` can only hold a `float`. Variant properties accept any type and convert between compatible types on read. Use them when a property must carry different types at runtime (e.g. node graph ports, generic data channels). They carry more overhead than typed properties since each read/write goes through an inner `IAny` with runtime type dispatch, so prefer typed properties when the type is known at compile time.
+Normal properties are statically typed: a `Property<float>` can only hold a `float`. Variant properties accept any type and convert between compatible types on read. Use them when a property must carry different types at runtime (e.g. node graph ports, generic data channels). The overhead compared to typed properties is modest: one extra virtual dispatch per read/write (the variant delegates to an inner typed `IAny`). Changing the stored type is more expensive since it allocates a new inner `IAny`. See [Variant property get/set](performance.md#variant-property-getset) for detailed cost analysis.
 
 Declare a variant property with `velk::Variant` as the type:
 
