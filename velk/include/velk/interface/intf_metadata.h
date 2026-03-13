@@ -6,6 +6,7 @@
 #include <velk/api/function.h>
 #include <velk/api/property.h>
 #include <velk/api/traits.h>
+#include <velk/api/variant.h>
 #include <velk/array_view.h>
 #include <velk/common.h>
 #include <velk/ext/any.h>
@@ -380,6 +381,7 @@ template <class State, auto Mem, uint32_t Flags = 0>
 struct PropBind
 {
     using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.
+    static constexpr bool is_variant = std::is_same_v<value_type, Variant>;
 
     /**
      * @brief Returns a pointer to a static AnyRef holding the default value.
@@ -397,14 +399,29 @@ struct PropBind
      * @brief Creates an AnyRef pointing into a live State struct.
      * @param base Pointer to the State struct instance (cast from void*).
      * @return Owning pointer to an AnyRef<value_type> targeting the member.
+     *
+     * For Variant members, initializes the Variant's any_ with a VariantImpl
+     * on first access and returns it directly (the property reads/writes through
+     * the same IAny that lives in the State struct).
      */
     static IAny::Ptr createRef(void* base)
     {
-        return ext::create_any_ref<value_type>(&(static_cast<State*>(base)->*Mem));
+        if constexpr (is_variant) {
+            auto& var = static_cast<State*>(base)->*Mem;
+            if (!var) {
+                var = std::move(instance().create_variant());
+            }
+            return var;
+        } else {
+            return ext::create_any_ref<value_type>(&(static_cast<State*>(base)->*Mem));
+        }
     }
 
     static constexpr PropertyKind kind{
-        type_uid<value_type>(), &getDefault, &createRef, Flags}; ///< Pre-built PropertyKind.
+        is_variant ? ClassId::Variant : type_uid<value_type>(),
+        is_variant ? nullptr : &getDefault,
+        &createRef,
+        Flags}; ///< Pre-built PropertyKind.
 };
 
 /**

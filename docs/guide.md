@@ -27,6 +27,7 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
 - [Properties](#properties)
   - [Change notifications](#change-notifications)
   - [Custom Any types](#custom-any-types)
+  - [Variant properties](#variant-properties)
   - [Direct state access](#direct-state-access)
     - [read_state / write_state](#read_state--write_state)
     - [Raw state pointer](#raw-state-pointer)
@@ -667,6 +668,95 @@ public:
     }
     IEvent::Ptr on_data_changed() const override { return onChanged_; }
 };
+```
+
+### Variant properties
+
+Normal properties are statically typed: a `Property<float>` can only hold a `float`. Variant properties accept any type and convert between compatible types on read. Use them when a property must carry different types at runtime (e.g. node graph ports, generic data channels). They carry more overhead than typed properties since each read/write goes through an inner `IAny` with runtime type dispatch, so prefer typed properties when the type is known at compile time.
+
+Declare a variant property with `velk::Variant` as the type:
+
+```cpp
+#include <velk/interface/intf_metadata.h>
+
+class IPort : public Interface<IPort>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, velk::Variant, value, {})
+    )
+};
+```
+
+The accessor returns `Property<Variant>`, which exposes the raw `IAny` backing. Write any typed value through an `Any<T>`, and read it back the same way:
+
+```cpp
+auto* port = interface_cast<IPort>(obj);
+
+// Write a float
+Any<float> fv(42.f);
+port->value().set_value(fv);
+
+// Read it back
+auto val = port->value().get_value();       // IAny::ConstPtr
+Any<const float> typed(val);
+float f = typed.get_value();                // 42.f
+
+// Write a different type (replaces the stored type)
+Any<string> sv(string("hello"));
+port->value().set_value(sv);
+```
+
+The variant supports built-in numeric conversions between `bool`, `int32_t`, `int64_t`, `uint32_t`, `uint64_t`, `float`, and `double`. Reading as a convertible type succeeds even when the stored type differs:
+
+```cpp
+Any<float> fv(3.14f);
+port->value().set_value(fv);
+
+// Read as double (implicit conversion)
+auto val = port->value().get_value();
+double d = 0.0;
+val->get_data(&d, sizeof(double), type_uid<double>());  // 3.14
+
+// Non-numeric conversions fail
+string s;
+val->get_data(&s, sizeof(string), type_uid<string>());  // Fail
+```
+
+#### State struct access
+
+The `Variant` class in the State struct holds the same `IAny::Ptr` that backs the property. Reads and writes through the state are reflected in the property and vice versa:
+
+```cpp
+// Write via property accessor
+Any<float> fv(42.f);
+port->value().set_value(fv);
+
+// Read via state struct
+auto reader = read_state<IPort>(port);
+float f = reader->value.get<float>();          // 42.f
+Uid type = reader->value.stored_type();        // type_uid<float>()
+bool ok = reader->value.can_convert_to(type_uid<double>());  // true
+
+// Write via state struct
+{
+    auto writer = write_state<IPort>(port);
+    writer->value.set<int32_t>(99);
+}  // ~StateWriter fires on_changed
+```
+
+#### IVariant interface
+
+For advanced introspection, cast the backing `IAny` to `IVariant`:
+
+```cpp
+#include <velk/interface/intf_variant.h>
+
+auto val = port->value().get_value();
+if (auto* v = interface_cast<IVariant>(val)) {
+    Uid stored = v->stored_type();
+    bool ok = v->can_convert_to(type_uid<int32_t>());
+}
 ```
 
 ### Direct state access

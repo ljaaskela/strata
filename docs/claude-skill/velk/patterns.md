@@ -505,7 +505,74 @@ arr.erase_at(1);
 arr.clear();
 ```
 
-## 9. Testing Patterns
+## 9. Variant Properties
+
+Variant properties hold any type at runtime with built-in numeric conversions. They cost more than typed properties (runtime type dispatch per access), so only use them when the type is not known at compile time.
+
+### Declaration
+
+```cpp
+class IPort : public Interface<IPort>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, velk::Variant, value, {})
+    )
+};
+```
+
+### Read/write via accessor
+
+```cpp
+auto* port = interface_cast<IPort>(obj);
+
+// Write a float
+Any<float> fv(42.f);
+port->value().set_value(fv);
+
+// Read back
+auto val = port->value().get_value();    // IAny::ConstPtr
+Any<const float> typed(val);
+float f = typed.get_value();             // 42.f
+
+// Write a different type (replaces stored type)
+Any<string> sv(string("hello"));
+port->value().set_value(sv);
+```
+
+### State struct access
+
+The `Variant` in the State struct shares the same backing `IAny` as the property:
+
+```cpp
+// Read via state
+auto reader = read_state<IPort>(port);
+float f = reader->value.get<float>();
+Uid type = reader->value.stored_type();
+bool ok = reader->value.can_convert_to(type_uid<double>());
+
+// Write via state (fires on_changed on scope exit)
+{
+    auto writer = write_state<IPort>(port);
+    writer->value.set<int32_t>(99);
+}
+```
+
+### Numeric conversions
+
+Variant converts between `bool`, `int32_t`, `int64_t`, `uint32_t`, `uint64_t`, `float`, `double`:
+
+```cpp
+Any<float> fv(3.14f);
+port->value().set_value(fv);
+
+// Read as double (succeeds via conversion)
+auto val = port->value().get_value();
+double d = 0.0;
+val->get_data(&d, sizeof(double), type_uid<double>());  // 3.14
+```
+
+## 10. Testing Patterns
 
 ```cpp
 #include <velk/api/velk.h>
@@ -572,7 +639,7 @@ TEST_F(MyTest, ObjectWrapper)
 }
 ```
 
-## 10. Plugins
+## 11. Plugins
 
 ### Plugin class definition
 
