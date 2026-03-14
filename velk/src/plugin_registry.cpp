@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <shared_mutex>
 
 namespace velk {
 
@@ -21,10 +22,20 @@ PluginRegistry::PluginRegistry(IVelk& velk, TypeRegistry& types)
       velk_(velk)
 {}
 
+IPlugin::Ptr PluginRegistry::find_unlocked(Uid pluginId) const
+{
+    PluginEntry key{pluginId, {}};
+    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+    if (it != plugins_.end() && it->uid == pluginId) {
+        return it->plugin;
+    }
+    return nullptr;
+}
+
 ReturnValue PluginRegistry::check_dependencies(const PluginInfo& info)
 {
     for (auto& dep : info.dependencies) {
-        auto plugin = find_plugin(dep.uid);
+        auto plugin = find_unlocked(dep.uid);
         if (!plugin) {
             detail::velk_log(log_,
                              LogLevel::Error,
@@ -64,30 +75,44 @@ ReturnValue PluginRegistry::load_plugin(const IPlugin::Ptr& plugin)
         return ReturnValue::InvalidArgument;
     }
     Uid id = obj->get_class_uid();
-    PluginEntry key{id, {}};
-    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
-    if (it != plugins_.end() && it->uid == id) {
-        return ReturnValue::NothingToDo; // Already there
-    }
-    if (auto rv = check_dependencies(plugin->get_plugin_info()); failed(rv)) {
-        return rv;
-    }
-    it = plugins_.insert(it, PluginEntry{id, plugin});
 
+    // Phase 1: check duplicate and dependencies under lock.
+    {
+        std::unique_lock lock(mutex_);
+        PluginEntry key{id, {}};
+        auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+        if (it != plugins_.end() && it->uid == id) {
+            return ReturnValue::NothingToDo;
+        }
+        if (auto rv = check_dependencies(plugin->get_plugin_info()); failed(rv)) {
+            return rv;
+        }
+    }
+
+    // Phase 2: initialize plugin outside lock (callback may call back into registries).
     PluginConfig config;
     types_.set_owner(id);
     ReturnValue rv = plugin->initialize(velk_, config);
     types_.set_owner(Uid{});
 
-    it->config = config;
-
     if (failed(rv)) {
-        plugins_.erase(it);
         return rv;
     }
 
-    if (config.enableUpdate) {
-        update_plugins_.push_back(plugin);
+    // Phase 3: insert entry under lock (re-check for duplicate from concurrent load).
+    {
+        std::unique_lock lock(mutex_);
+        PluginEntry key{id, {}};
+        auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+        if (it != plugins_.end() && it->uid == id) {
+            return ReturnValue::NothingToDo;
+        }
+        it = plugins_.insert(it, PluginEntry{id, plugin});
+        it->config = config;
+
+        if (config.enableUpdate) {
+            update_plugins_.push_back(plugin);
+        }
     }
     return ReturnValue::Success;
 }
@@ -133,18 +158,21 @@ ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
     }
 
     auto& info = *get_info();
-
-    // Check for duplicates and dependencies before instantiating.
     Uid id = info.uid();
-    PluginEntry key{id, {}};
-    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
-    if (it != plugins_.end() && it->uid == id) {
-        lib.close();
-        return ReturnValue::NothingToDo;
-    }
-    if (auto rv = check_dependencies(info); failed(rv)) {
-        lib.close();
-        return rv;
+
+    // Check for duplicates and dependencies under lock before instantiating.
+    {
+        std::shared_lock lock(mutex_);
+        PluginEntry key{id, {}};
+        auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+        if (it != plugins_.end() && it->uid == id) {
+            lib.close();
+            return ReturnValue::NothingToDo;
+        }
+        if (auto rv = check_dependencies(info); failed(rv)) {
+            lib.close();
+            return rv;
+        }
     }
 
     // Create the plugin instance via the factory (properly sets up control block).
@@ -156,9 +184,12 @@ ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
         return ReturnValue::Fail;
     }
 
+    // Delegate to load_plugin which handles its own locking.
     ReturnValue rv = load_plugin(plugin);
     if (succeeded(rv)) {
-        it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+        std::unique_lock lock(mutex_);
+        PluginEntry key{id, {}};
+        auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
         it->library = std::move(lib);
     } else {
         lib.close();
@@ -168,86 +199,116 @@ ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
 
 ReturnValue PluginRegistry::unload_plugin(Uid pluginId)
 {
-    PluginEntry key{pluginId, {}};
-    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
-    if (it == plugins_.end() || it->uid != pluginId) {
-        return ReturnValue::InvalidArgument;
-    }
+    IPlugin::Ptr plugin;
+    PluginConfig config;
+    LibraryHandle handle;
 
-    // Reject if any other loaded plugin depends on this one.
-    for (auto& pe : plugins_) {
-        if (pe.uid == pluginId) {
-            continue;
+    // Phase 1: find, check dependents, erase under lock.
+    {
+        std::unique_lock lock(mutex_);
+        PluginEntry key{pluginId, {}};
+        auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+        if (it == plugins_.end() || it->uid != pluginId) {
+            return ReturnValue::InvalidArgument;
         }
-        for (auto& dep : pe.plugin->get_dependencies()) {
-            if (dep.uid == pluginId) {
-                detail::velk_log(log_,
-                                 LogLevel::Error,
-                                 __FILE__,
-                                 __LINE__,
-                                 "Cannot unload plugin '%.*s': plugin '%.*s' depends on it",
-                                 static_cast<int>(it->plugin->get_name().size()),
-                                 it->plugin->get_name().data(),
-                                 static_cast<int>(pe.plugin->get_name().size()),
-                                 pe.plugin->get_name().data());
-                return ReturnValue::Fail;
+
+        // Reject if any other loaded plugin depends on this one.
+        for (auto& pe : plugins_) {
+            if (pe.uid == pluginId) {
+                continue;
+            }
+            for (auto& dep : pe.plugin->get_dependencies()) {
+                if (dep.uid == pluginId) {
+                    detail::velk_log(log_,
+                                     LogLevel::Error,
+                                     __FILE__,
+                                     __LINE__,
+                                     "Cannot unload plugin '%.*s': plugin '%.*s' depends on it",
+                                     static_cast<int>(it->plugin->get_name().size()),
+                                     it->plugin->get_name().data(),
+                                     static_cast<int>(pe.plugin->get_name().size()),
+                                     pe.plugin->get_name().data());
+                    return ReturnValue::Fail;
+                }
             }
         }
+
+        plugin = it->plugin;
+        config = it->config;
+        handle = std::move(it->library);
+
+        // Remove from update cache.
+        auto uit = std::find(update_plugins_.begin(), update_plugins_.end(), plugin);
+        if (uit != update_plugins_.end()) {
+            update_plugins_.erase(uit);
+        }
+
+        plugins_.erase(it);
     }
 
-    it->plugin->shutdown(velk_);
+    // Phase 2: shutdown and cleanup outside lock.
+    plugin->shutdown(velk_);
 
-    // Remove from update cache.
-    auto uit = std::find(update_plugins_.begin(), update_plugins_.end(), it->plugin);
-    if (uit != update_plugins_.end()) {
-        update_plugins_.erase(uit);
-    }
-
-    // Sweep types owned by this plugin unless it opted to retain them.
-    if (!it->config.retainTypesOnUnload) {
+    if (!config.retainTypesOnUnload) {
         types_.sweep_owner(pluginId);
     }
 
-    // Move library handle out before erasing so it can be freed after the plugin pointer is gone.
-    auto handle = std::move(it->library);
-    plugins_.erase(it);
+    // Release plugin before closing the library so the destructor runs
+    // while the DLL is still loaded.
+    plugin.reset();
     handle.close();
     return ReturnValue::Success;
 }
 
 IPlugin::Ptr PluginRegistry::find_plugin(Uid pluginId) const
 {
-    PluginEntry key{pluginId, {}};
-    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
-    if (it != plugins_.end() && it->uid == pluginId) {
-        return it->plugin;
-    }
-    return nullptr;
+    std::shared_lock lock(mutex_);
+    return find_unlocked(pluginId);
 }
 
 size_t PluginRegistry::plugin_count() const
 {
+    std::shared_lock lock(mutex_);
     return plugins_.size();
 }
 
 void PluginRegistry::shutdown_all()
 {
-    update_plugins_.clear();
+    {
+        std::unique_lock lock(mutex_);
+        update_plugins_.clear();
+    }
 
     // Unload plugins in reverse order so that dependents shut down before
     // their dependencies.
-    while (!plugins_.empty()) {
-        auto& entry = plugins_.back();
-        entry.plugin->shutdown(velk_);
+    for (;;) {
+        IPlugin::Ptr plugin;
+        PluginConfig config;
+        LibraryHandle handle;
+        Uid uid;
 
-        // Sweep types owned by this plugin unless it opted to retain them.
-        if (!entry.config.retainTypesOnUnload) {
-            types_.sweep_owner(entry.uid);
+        {
+            std::unique_lock lock(mutex_);
+            if (plugins_.empty()) {
+                break;
+            }
+            auto& entry = plugins_.back();
+            plugin = entry.plugin;
+            config = entry.config;
+            handle = std::move(entry.library);
+            uid = entry.uid;
+            plugins_.pop_back();
         }
 
-        // Move library handle out before erasing so it outlives the plugin pointer.
-        auto handle = std::move(entry.library);
-        plugins_.pop_back();
+        plugin->shutdown(velk_);
+
+        if (!config.retainTypesOnUnload) {
+            types_.sweep_owner(uid);
+        }
+
+        // Release plugin before closing the library so the destructor runs
+        // while the DLL is still loaded.
+        plugin.reset();
         handle.close();
     }
 }
@@ -275,8 +336,12 @@ UpdateInfo PluginRegistry::pre_update_plugins(Duration time) const
     info.dt = {t.dt.us ? current_us - t.dt.us : 0};
     t.dt.us = current_us;
 
-    // Snapshot: plugins may load/unload other plugins during callbacks.
-    auto plugins = update_plugins_;
+    // Snapshot under lock: plugins may load/unload other plugins during callbacks.
+    vector<IPlugin::Ptr> plugins;
+    {
+        std::shared_lock lock(mutex_);
+        plugins = update_plugins_;
+    }
     for (auto& plugin : plugins) {
         plugin->pre_update({info});
     }
@@ -286,7 +351,11 @@ UpdateInfo PluginRegistry::pre_update_plugins(Duration time) const
 
 void PluginRegistry::post_update_plugins(const IPlugin::PostUpdateInfo& info) const
 {
-    auto plugins = update_plugins_;
+    vector<IPlugin::Ptr> plugins;
+    {
+        std::shared_lock lock(mutex_);
+        plugins = update_plugins_;
+    }
     for (auto& plugin : plugins) {
         plugin->post_update(info);
     }

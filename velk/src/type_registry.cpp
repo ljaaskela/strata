@@ -18,6 +18,7 @@
 #include <velk/string.h>
 
 #include <algorithm>
+#include <shared_mutex>
 
 namespace velk {
 
@@ -66,6 +67,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
 
 const IObjectFactory* TypeRegistry::find(Uid uid) const
 {
+    std::shared_lock lock(mutex_);
     Entry key{uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == uid) {
@@ -84,6 +86,7 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
                      "Register %.*s",
                      static_cast<int>(info.name.size()),
                      info.name.data());
+    std::unique_lock lock(mutex_);
     Entry entry{info.uid, &factory, current_owner_};
     auto it = std::lower_bound(types_.begin(), types_.end(), entry);
     if (it != types_.end() && it->uid == info.uid) {
@@ -97,6 +100,7 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
 
 ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
 {
+    std::unique_lock lock(mutex_);
     Entry key{factory.get_class_info().uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == key.uid) {
@@ -134,11 +138,13 @@ const IObjectFactory* TypeRegistry::find_factory(Uid classUid) const
 
 void TypeRegistry::set_owner(Uid uid)
 {
+    std::unique_lock lock(mutex_);
     current_owner_ = uid;
 }
 
 void TypeRegistry::sweep_owner(Uid uid)
 {
+    std::unique_lock lock(mutex_);
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
     interpolators_.erase(std::remove_if(interpolators_.begin(),
@@ -149,6 +155,7 @@ void TypeRegistry::sweep_owner(Uid uid)
 
 ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)
 {
+    std::unique_lock lock(mutex_);
     InterpolatorEntry entry{typeUid, fn, current_owner_};
     auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), entry);
     if (it != interpolators_.end() && it->typeUid == typeUid) {
@@ -162,6 +169,7 @@ ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)
 
 ReturnValue TypeRegistry::unregister_interpolator(Uid typeUid)
 {
+    std::unique_lock lock(mutex_);
     InterpolatorEntry key{typeUid, nullptr, {}};
     auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), key);
     if (it != interpolators_.end() && it->typeUid == typeUid) {
@@ -173,6 +181,7 @@ ReturnValue TypeRegistry::unregister_interpolator(Uid typeUid)
 
 InterpolatorFn TypeRegistry::find_interpolator(Uid typeUid) const
 {
+    std::shared_lock lock(mutex_);
     InterpolatorEntry key{typeUid, nullptr, {}};
     auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), key);
     if (it != interpolators_.end() && it->typeUid == typeUid) {

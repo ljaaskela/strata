@@ -7,6 +7,8 @@
 
 #include <velk/vector.h>
 
+#include <shared_mutex>
+
 namespace velk {
 
 /**
@@ -70,6 +72,7 @@ private:
     vector<Entry> types_;                     ///< Sorted registry of class factories.
     vector<InterpolatorEntry> interpolators_; ///< Sorted registry of interpolator functions.
     Uid current_owner_;                            ///< Owner context for type registration.
+    mutable std::shared_mutex mutex_;              ///< Protects types_, interpolators_, current_owner_.
     ILog& log_;
 };
 

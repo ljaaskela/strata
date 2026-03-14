@@ -57,7 +57,7 @@ ReturnValue ObjectRefImpl::copy_from(const IAny& other)
         auto obj = ref->get_object();
         if (!obj) {
             // Clear our reference
-            bool had = (strong_ != nullptr || weak_.lock() != nullptr);
+            bool had = (strong_ != nullptr || !weak_.expired());
             strong_ = nullptr;
             weak_.reset();
             return had ? ReturnValue::Success : ReturnValue::NothingToDo;
@@ -141,8 +141,7 @@ ReturnValue ObjectRefImpl::set_owning(bool owning)
     if (owning) {
         // Switching to owning: need to lock the weak ref
         auto locked = weak_.lock();
-        if (!locked && weak_.lock()) {
-            // Weak ref existed but expired
+        if (!locked) {
             return ReturnValue::Fail;
         }
         strong_ = locked;

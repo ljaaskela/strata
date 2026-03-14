@@ -12,6 +12,8 @@
 
 #include <velk/vector.h>
 
+#include <shared_mutex>
+
 namespace velk {
 
 /**
@@ -53,11 +55,14 @@ private:
 
     /** @brief Checks that all dependencies declared in info are loaded. Logs and returns Fail if not. */
     ReturnValue check_dependencies(const PluginInfo& info);
+    /** @brief Finds a plugin without locking. Caller must hold mutex_. */
+    IPlugin::Ptr find_unlocked(Uid pluginId) const;
 
     vector<PluginEntry> plugins_;        ///< Sorted registry of loaded plugins.
     vector<IPlugin::Ptr> update_plugins_; ///< Plugins that opted into update notifications.
     mutable UpdateInfo update_timestamps_;    ///< Absolute timestamps for init, first update, last update.
     mutable bool last_update_was_explicit_{}; ///< Whether previous update used explicit time.
+    mutable std::shared_mutex mutex_;         ///< Protects plugins_ and update_plugins_.
     ILog& log_;
     TypeRegistry& types_;
     IVelk& velk_;
