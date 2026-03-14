@@ -92,7 +92,7 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 | **Event dispatch (immediate)** | Snapshot + loop | ~36 ns | Snapshots handler list, then iterates; safe against handler mutation during dispatch |
 | **Event dispatch (deferred)** | Clone + queue | ~140 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~645 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~578 ns | First `get_property()` call; allocates `ClassId::Property` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
 | **Object creation** | 1 heap alloc + pool emplace | ~58 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
 

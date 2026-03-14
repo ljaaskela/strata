@@ -1,6 +1,5 @@
 #include "velk_instance.h"
 
-#include "function.h"
 #include "hive/raw_hive.h"
 #include "object_storage.h"
 
@@ -40,50 +39,6 @@ IObjectStorage* VelkInstance::create_metadata_container(const ClassInfo& info, I
 void VelkInstance::destroy_metadata_container(IObjectStorage* storage) const
 {
     metadata_hive_.deallocate(static_cast<ObjectStorage*>(storage));
-}
-
-IInterface::Ptr VelkInstance::create(Uid uid, uint32_t flags) const
-{
-    return type_registry_.create(uid, flags);
-}
-
-IAny::Ptr VelkInstance::create_any(Uid type) const
-{
-    return interface_pointer_cast<IAny>(create(type));
-}
-
-IVariant::Ptr VelkInstance::create_variant() const
-{
-    return interface_pointer_cast<IVariant>(create(ClassId::Variant));
-}
-
-IObjectRef::Ptr VelkInstance::create_object_ref() const
-{
-    return interface_pointer_cast<IObjectRef>(create(ClassId::ObjectRef));
-}
-
-IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
-{
-    auto property = interface_pointer_cast<IProperty>(create(ClassId::Property, flags));
-    if (auto pi = interface_cast<IPropertyInternal>(property)) {
-        if (value && is_compatible(value, type)) {
-            if (pi->set_any(value)) {
-                return property;
-            }
-            detail::velk_log(get_logger(*this),
-                             LogLevel::Error,
-                             __FILE__,
-                             __LINE__,
-                             "Initial value is of incompatible type");
-        }
-        // Any was not specified for property instance, create new one
-        if (auto any = create_any(type)) {
-            if (pi->set_any(any)) {
-                return property;
-            }
-        }
-    }
-    return {};
 }
 
 void VelkInstance::queue_deferred_tasks(array_view<DeferredTask> tasks) const
@@ -181,34 +136,6 @@ void VelkInstance::update(Duration time) const
 
     // Post-update: Let plugins observe resolved state.
     plugin_registry_.post_update_plugins({info, tasks.size(), propSets.size()});
-}
-
-IFuture::Ptr VelkInstance::create_future() const
-{
-    return interface_pointer_cast<IFuture>(create(ClassId::Future));
-}
-
-IFunction::Ptr VelkInstance::create_callback(IFunction::CallableFn* fn) const
-{
-    auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
-    if (fn) {
-        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
-            internal->set_invoke_callback(fn);
-        }
-    }
-    return func;
-}
-
-IFunction::Ptr VelkInstance::create_owned_callback(void* context, IFunction::BoundFn* fn,
-                                                   IFunction::ContextDeleter* deleter) const
-{
-    auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
-    if (fn && deleter) {
-        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
-            internal->set_owned_callback(context, fn, deleter);
-        }
-    }
-    return func;
 }
 
 void VelkInstance::set_sink(const ILogSink::Ptr& sink)

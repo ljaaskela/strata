@@ -98,8 +98,7 @@ inline ObjectRef create_weak_object_ref()
 /** @brief Creates a non-owning (weak) ObjectRef that references @p obj. */
 inline ObjectRef create_weak_object_ref(const IObject::Ptr& obj)
 {
-    auto ref = create_object_ref();
-    ref.set(obj);
+    auto ref = create_object_ref(obj);
     ref.set_owning(false);
     return ref;
 }

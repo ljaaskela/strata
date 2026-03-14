@@ -2,6 +2,8 @@
 #define VELK_API_PROPERTY_H
 
 #include <velk/api/any.h>
+#include <velk/api/object_ref.h>
+#include <velk/api/variant.h>
 #include <velk/api/velk.h>
 #include <velk/common.h>
 #include <velk/interface/intf_array_property.h>

@@ -20,28 +20,35 @@ struct ClassInfo
 
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
-/** @brief Default property object implementation. */
+/** @brief Typed value container for object members. Declared via `(PROP, T, name, default)` in VELK_INTERFACE.
+ *  @see velk::Property (api/property.h) */
 inline constexpr Uid Property{"a66badbf-c750-4580-b035-b5446806d67e"};
-/** @brief Default function object implementation. */
+/** @brief Callable object that can be invoked with typed arguments. Declared via `(FN, name)` in VELK_INTERFACE.
+ *  @see velk::Function (api/function.h) */
 inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
-/** @brief Default event object implementation. */
+/** @brief Observable multicast delegate. Declared via `(EVT, name)` in VELK_INTERFACE.
+ *  @see velk::Event (api/event.h) */
 inline constexpr Uid Event{"e4a7b2c1-3d5f-48e9-a1c6-7b8d9e0f2a34"};
-/** @brief Default future object implementation. */
+/** @brief Promise/future pair for asynchronous results. Created via ITypeRegistry::create_future().
+ *  @see velk::Future (api/future.h) */
 inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
-/** @brief Default array property object implementation. */
+/** @brief Fixed-type, variable-length array property. Declared via `(ARR, T, name)` in VELK_INTERFACE.
+ *  @see velk::ArrayProperty (api/property.h) */
 inline constexpr Uid ArrayProperty{"f8e2a3b1-7c4d-49e6-8f1a-2b3c4d5e6f70"};
-/** @brief Default hierarchy object implementation. */
+/** @brief Single-root tree that manages parent/child relationships between objects.
+ *  @see velk::Hierarchy (api/hierarchy.h) */
 inline constexpr Uid Hierarchy{"b7d3e1a2-5f48-4c96-9e0a-1d2b3c4e5f67"};
-/** @brief Default binding object implementation. */
+/** @brief Reactive link that propagates value changes from a source property to one or more targets.
+ *  @see velk::Binding (api/binding.h) */
 inline constexpr Uid Binding{"c4e8f2a1-6b39-47d5-8e1c-3a9d5f7b2e04"};
-/** @brief Variant object implementation. */
+/** @brief Dynamically-typed value container. Declared via `(PROP, Variant, name, {})` in VELK_INTERFACE.
+ *  @see velk::Variant (api/variant.h) */
 inline constexpr Uid Variant{"e5f2a7b3-8c14-4d69-9e2f-3a1b5c6d7e80"};
-/** @brief Object reference implementation. */
+/** @brief Reference to another object, with optional owning semantics and interface constraints.
+ *  Declared via `(PROP, ObjectRef, name, {})` in VELK_INTERFACE.
+ *  @see velk::ObjectRef (api/object_ref.h) */
 inline constexpr Uid ObjectRef{"f3a1b5c6-d7e8-4f09-a2b3-c4d5e6f70189"};
 } // namespace ClassId
-
-class Variant;   // Defined in api/variant.h
-class ObjectRef; // Defined in api/object_ref.h
 
 /** @brief A duration in microseconds. */
 struct Duration

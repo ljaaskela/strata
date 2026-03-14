@@ -181,4 +181,73 @@ InterpolatorFn TypeRegistry::find_interpolator(Uid typeUid) const
     return nullptr;
 }
 
+IAny::Ptr TypeRegistry::create_any(Uid type) const
+{
+    return interface_pointer_cast<IAny>(create(type));
+}
+
+IVariant::Ptr TypeRegistry::create_variant() const
+{
+    static const auto& factory = VariantImpl::get_factory();
+    return interface_pointer_cast<IVariant>(factory.create_instance());
+}
+
+IObjectRef::Ptr TypeRegistry::create_object_ref() const
+{
+    static const auto& factory = ObjectRefImpl::get_factory();
+    return interface_pointer_cast<IObjectRef>(factory.create_instance());
+}
+
+IFuture::Ptr TypeRegistry::create_future() const
+{
+    static const auto& factory = FutureImpl::get_factory();
+    return interface_pointer_cast<IFuture>(factory.create_instance());
+}
+
+IFunction::Ptr TypeRegistry::create_callback(IFunction::CallableFn* fn) const
+{
+    static const auto& factory = FunctionImpl::get_factory();
+    auto func = interface_pointer_cast<IFunction>(factory.create_instance());
+    if (fn) {
+        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+            internal->set_invoke_callback(fn);
+        }
+    }
+    return func;
+}
+
+IFunction::Ptr TypeRegistry::create_owned_callback(void* context, IFunction::BoundFn* fn,
+                                                   IFunction::ContextDeleter* deleter) const
+{
+    static const auto& factory = FunctionImpl::get_factory();
+    auto func = interface_pointer_cast<IFunction>(factory.create_instance());
+    if (fn && deleter) {
+        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+            internal->set_owned_callback(context, fn, deleter);
+        }
+    }
+    return func;
+}
+
+IProperty::Ptr TypeRegistry::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
+{
+    static const auto& factory = PropertyImpl::get_factory();
+    auto property = interface_pointer_cast<IProperty>(factory.create_instance(flags));
+    if (auto pi = interface_cast<IPropertyInternal>(property)) {
+        if (value && is_compatible(value, type)) {
+            if (pi->set_any(value)) {
+                return property;
+            }
+            VELK_LOG(E, "Initial value is of incompatible type");
+        }
+        // Any was not specified for property instance, create new one
+        if (auto any = create_any(type)) {
+            if (pi->set_any(any)) {
+                return property;
+            }
+        }
+    }
+    return {};
+}
+
 } // namespace velk

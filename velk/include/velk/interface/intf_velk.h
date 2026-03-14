@@ -1,15 +1,11 @@
 #ifndef INTF_VELK_H
 #define INTF_VELK_H
 
-#include <velk/interface/intf_future.h>
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_plugin_registry.h>
-#include <velk/interface/intf_property.h>
 #include <velk/interface/intf_type_registry.h>
-#include <velk/interface/intf_object_ref.h>
-#include <velk/interface/intf_variant.h>
 #include <velk/interface/types.h>
 #include <velk/vector.h>
 #include <velk/velk_export.h>
@@ -123,23 +119,34 @@ public:
     virtual void destroy_metadata_container(IObjectStorage* storage) const = 0;
 
     /** @brief Creates an instance of a registered type by its UID. */
-    virtual IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const = 0;
+    IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const
+    {
+        return type_registry().create(uid, flags);
+    }
     /** @brief Creates a new IAny value container for the given type UID. */
-    virtual IAny::Ptr create_any(Uid type) const = 0;
+    IAny::Ptr create_any(Uid type) const { return type_registry().create_any(type); }
     /** @brief Creates a new Variant value container that can hold any type. */
-    virtual IVariant::Ptr create_variant() const = 0;
+    IVariant::Ptr create_variant() const { return type_registry().create_variant(); }
     /** @brief Creates a new ObjectRef value container for storing object references. */
-    virtual IObjectRef::Ptr create_object_ref() const = 0;
+    IObjectRef::Ptr create_object_ref() const { return type_registry().create_object_ref(); }
     /** @brief Creates a new property instance with the given type and optional initial value. */
-    virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value,
-                                           uint32_t flags = ObjectFlags::None) const = 0;
+    IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, uint32_t flags = ObjectFlags::None) const
+    {
+        return type_registry().create_property(type, value, flags);
+    }
     /** @brief Creates a new future/promise pair. */
-    virtual IFuture::Ptr create_future() const = 0;
+    IFuture::Ptr create_future() const { return type_registry().create_future(); }
     /** @brief Creates a callback-backed IFunction from a raw function pointer. */
-    virtual IFunction::Ptr create_callback(IFunction::CallableFn* fn) const = 0;
+    IFunction::Ptr create_callback(IFunction::CallableFn* fn) const
+    {
+        return type_registry().create_callback(fn);
+    }
     /** @brief Creates an owned-callback IFunction from a context, trampoline, and deleter. */
-    virtual IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
-                                                 IFunction::ContextDeleter* deleter) const = 0;
+    IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
+                                         IFunction::ContextDeleter* deleter) const
+    {
+        return type_registry().create_owned_callback(context, fn, deleter);
+    }
     /**
      * @brief Creates a property for type T with an optional initial value.
      * @tparam T The value type for the property.
