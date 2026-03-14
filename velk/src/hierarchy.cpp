@@ -202,7 +202,7 @@ ReturnValue HierarchyImpl::remove(const IObject::Ptr& object)
         parent_obj = lookup_parent(object.get());
         if (object.get() == root_.get()) {
             collect_all(removed);
-            root_ = {};
+            root_.reset();
             entries_.clear();
         } else {
             auto* parentPtr = it->second.parent;

@@ -163,7 +163,7 @@ Animation create_track(IAnimator& animator, detail::non_deduced_t<array_view<Key
  */
 inline IAnimator& default_animator()
 {
-    auto* ap = get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+    auto ap = ::velk::get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
     assert(ap);
     return ap->get_default_animator();
 }
@@ -173,7 +173,7 @@ template <class T>
 Transition create_transition(Property<T> target, Duration duration, easing::EasingFn ease = easing::linear)
 {
     // Ensure the plugin is loaded (registers TransitionImpl type)
-    get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+    ::velk::get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
     auto tr = detail::transition(IProperty::Ptr(target), duration, ease);
     return tr ? Transition(tr) : Transition{};
 }
@@ -181,7 +181,7 @@ Transition create_transition(Property<T> target, Duration duration, easing::Easi
 /** @brief Creates a targetless transition (use add_target to apply to properties). */
 inline Transition create_transition(Duration duration, easing::EasingFn ease = easing::linear)
 {
-    get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+    ::velk::get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
     auto obj = instance().create<IObject>(ClassId::Transition);
     auto tr = interface_pointer_cast<ITransition>(obj);
     if (tr) {

@@ -19,7 +19,7 @@ namespace velk::ext {
     static constexpr uint32_t plugin_version = ::velk::make_version(major, minor, patch);
 
 /** @brief Declares a static constexpr list of plugin dependencies. */
-#define VELK_PLUGIN_DEPS(...) static constexpr PluginDependency plugin_deps[] = {__VA_ARGS__};
+#define VELK_PLUGIN_DEPS(...) static constexpr ::velk::PluginDependency plugin_deps[] = {__VA_ARGS__};
 
 /**
  * @brief CRTP base for plugin implementations.

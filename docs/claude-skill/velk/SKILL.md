@@ -88,11 +88,11 @@ reg.load_plugin_from_path("my_plugin.dll");   // by path
 reg.load_plugin(pluginUid);                   // by registered UID
 reg.load_plugin(pluginPtr);                   // by IPlugin::Ptr
 
-auto* p = reg.find_plugin(pluginUid);         // nullptr if not loaded
-auto* p = reg.get_or_load_plugin(pluginUid);  // lazy load
+auto p = reg.find_plugin(pluginUid);         // IPlugin::Ptr, null if not loaded
+auto p = reg.get_or_load_plugin(pluginUid);  // IPlugin::Ptr, lazy load
 
 // Typed lazy load (casts to custom interface)
-auto* p = get_or_load_plugin<IMyPluginInterface>(PluginId::MyPlugin);
+auto p = get_or_load_plugin<IMyPluginInterface>(PluginId::MyPlugin); // IMyPluginInterface::Ptr
 ```
 
 ### Public header pattern

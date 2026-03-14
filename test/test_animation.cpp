@@ -162,8 +162,8 @@ protected:
 
 TEST_F(AnimatorPluginTest, LoadAnimatorPlugin)
 {
-    auto* plugin = instance().plugin_registry().find_plugin(PluginId::AnimatorPlugin);
-    EXPECT_NE(nullptr, plugin);
+    auto plugin = instance().plugin_registry().find_plugin(PluginId::AnimatorPlugin);
+    EXPECT_TRUE(plugin);
 
     // Double load returns NothingToDo
     EXPECT_EQ(ReturnValue::NothingToDo,
