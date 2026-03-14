@@ -1,6 +1,7 @@
 #ifndef INTF_VELK_H
 #define INTF_VELK_H
 
+#include <velk/duration.h>
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>

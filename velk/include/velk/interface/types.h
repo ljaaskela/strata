@@ -50,22 +50,6 @@ inline constexpr Uid Variant{"e5f2a7b3-8c14-4d69-9e2f-3a1b5c6d7e80"};
 inline constexpr Uid ObjectRef{"f3a1b5c6-d7e8-4f09-a2b3-c4d5e6f70189"};
 } // namespace ClassId
 
-/** @brief A duration in microseconds. */
-struct Duration
-{
-    int64_t us = 0; ///< Microseconds.
-
-    /** @brief Constructs a Duration from seconds. */
-    static constexpr Duration from_seconds(float s) { return {static_cast<int64_t>(s * 1'000'000.f)}; }
-    /** @brief Constructs a Duration from milliseconds. */
-    static constexpr Duration from_milliseconds(float ms) { return {static_cast<int64_t>(ms * 1'000.f)}; }
-
-    /** @brief Converts to seconds. */
-    constexpr float to_seconds() const { return static_cast<float>(us) / 1'000'000.f; }
-    /** @brief Converts to milliseconds. */
-    constexpr float to_milliseconds() const { return static_cast<float>(us) / 1'000.f; }
-};
-
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t
 {
