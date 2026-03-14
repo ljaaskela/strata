@@ -123,7 +123,7 @@ ReturnValue ObjectRefImpl::set_object(const IObject::Ptr& obj)
             return ReturnValue::NothingToDo;
         }
         strong_ = nullptr;
-        weak_ = {};
+        weak_.reset();
     }
     return ReturnValue::Success;
 }
