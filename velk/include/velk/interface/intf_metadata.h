@@ -6,6 +6,7 @@
 #include <velk/api/function.h>
 #include <velk/api/property.h>
 #include <velk/api/traits.h>
+#include <velk/api/object_ref.h>
 #include <velk/api/variant.h>
 #include <velk/array_view.h>
 #include <velk/common.h>
@@ -382,6 +383,7 @@ struct PropBind
 {
     using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.
     static constexpr bool is_variant = std::is_same_v<value_type, Variant>;
+    static constexpr bool is_object_ref = std::is_same_v<value_type, ObjectRef>;
 
     /**
      * @brief Returns a pointer to a static AnyRef holding the default value.
@@ -412,14 +414,29 @@ struct PropBind
                 var = std::move(instance().create_variant());
             }
             return var;
+        } else if constexpr (is_object_ref) {
+            auto& ref = static_cast<State*>(base)->*Mem;
+            if (!ref) {
+                ref = std::move(instance().create_object_ref());
+            }
+            return ref;
         } else {
             return ext::create_any_ref<value_type>(&(static_cast<State*>(base)->*Mem));
         }
     }
 
+    static constexpr Uid kindType()
+    {
+        if constexpr (is_variant) return ClassId::Variant;
+        else if constexpr (is_object_ref) return ClassId::ObjectRef;
+        else return type_uid<value_type>();
+    }
+
+    static constexpr bool hasDefault = !is_variant && !is_object_ref;
+
     static constexpr PropertyKind kind{
-        is_variant ? ClassId::Variant : type_uid<value_type>(),
-        is_variant ? nullptr : &getDefault,
+        kindType(),
+        hasDefault ? &getDefault : nullptr,
         &createRef,
         Flags}; ///< Pre-built PropertyKind.
 };

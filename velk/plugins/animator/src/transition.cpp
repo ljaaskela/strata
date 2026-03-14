@@ -266,7 +266,7 @@ bool TransitionImpl::is_active() const
 void TransitionImpl::ensure_registered()
 {
     if (!registered_) {
-        auto* ap = get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+        auto ap = ::velk::get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
         if (ap) {
             ap->get_default_animator().add(get_self<IAnimation>());
             registered_ = true;

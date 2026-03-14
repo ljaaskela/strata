@@ -632,6 +632,9 @@ public:
      */
     bool expired() const { return !block_ || block_->strong.load(std::memory_order_acquire) == 0; }
 
+    /** @brief Releases the observed pointer and resets to null. */
+    void reset() { release(); }
+
     /** @brief Returns the raw pointer for identity comparison. May be dangling if expired. */
     T* unsafe_get() const { return ptr_; }
 };

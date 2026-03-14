@@ -20,41 +20,35 @@ struct ClassInfo
 
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
-/** @brief Default property object implementation. */
+/** @brief Typed value container for object members. Declared via `(PROP, T, name, default)` in VELK_INTERFACE.
+ *  @see velk::Property (api/property.h) */
 inline constexpr Uid Property{"a66badbf-c750-4580-b035-b5446806d67e"};
-/** @brief Default function object implementation. */
+/** @brief Callable object that can be invoked with typed arguments. Declared via `(FN, name)` in VELK_INTERFACE.
+ *  @see velk::Function (api/function.h) */
 inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
-/** @brief Default event object implementation. */
+/** @brief Observable multicast delegate. Declared via `(EVT, name)` in VELK_INTERFACE.
+ *  @see velk::Event (api/event.h) */
 inline constexpr Uid Event{"e4a7b2c1-3d5f-48e9-a1c6-7b8d9e0f2a34"};
-/** @brief Default future object implementation. */
+/** @brief Promise/future pair for asynchronous results. Created via ITypeRegistry::create_future().
+ *  @see velk::Future (api/future.h) */
 inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
-/** @brief Default array property object implementation. */
+/** @brief Fixed-type, variable-length array property. Declared via `(ARR, T, name)` in VELK_INTERFACE.
+ *  @see velk::ArrayProperty (api/property.h) */
 inline constexpr Uid ArrayProperty{"f8e2a3b1-7c4d-49e6-8f1a-2b3c4d5e6f70"};
-/** @brief Default hierarchy object implementation. */
+/** @brief Single-root tree that manages parent/child relationships between objects.
+ *  @see velk::Hierarchy (api/hierarchy.h) */
 inline constexpr Uid Hierarchy{"b7d3e1a2-5f48-4c96-9e0a-1d2b3c4e5f67"};
-/** @brief Default binding object implementation. */
+/** @brief Reactive link that propagates value changes from a source property to one or more targets.
+ *  @see velk::Binding (api/binding.h) */
 inline constexpr Uid Binding{"c4e8f2a1-6b39-47d5-8e1c-3a9d5f7b2e04"};
-/** @brief Variant object implementation. */
+/** @brief Dynamically-typed value container. Declared via `(PROP, Variant, name, {})` in VELK_INTERFACE.
+ *  @see velk::Variant (api/variant.h) */
 inline constexpr Uid Variant{"e5f2a7b3-8c14-4d69-9e2f-3a1b5c6d7e80"};
+/** @brief Reference to another object, with optional owning semantics and interface constraints.
+ *  Declared via `(PROP, ObjectRef, name, {})` in VELK_INTERFACE.
+ *  @see velk::ObjectRef (api/object_ref.h) */
+inline constexpr Uid ObjectRef{"f3a1b5c6-d7e8-4f09-a2b3-c4d5e6f70189"};
 } // namespace ClassId
-
-class Variant; // Defined in api/variant.h
-
-/** @brief A duration in microseconds. */
-struct Duration
-{
-    int64_t us = 0; ///< Microseconds.
-
-    /** @brief Constructs a Duration from seconds. */
-    static constexpr Duration from_seconds(float s) { return {static_cast<int64_t>(s * 1'000'000.f)}; }
-    /** @brief Constructs a Duration from milliseconds. */
-    static constexpr Duration from_milliseconds(float ms) { return {static_cast<int64_t>(ms * 1'000.f)}; }
-
-    /** @brief Converts to seconds. */
-    constexpr float to_seconds() const { return static_cast<float>(us) / 1'000'000.f; }
-    /** @brief Converts to milliseconds. */
-    constexpr float to_milliseconds() const { return static_cast<float>(us) / 1'000.f; }
-};
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t
@@ -74,11 +68,12 @@ inline constexpr uint32_t ReadOnly = 1 << 0;    ///< Property rejects writes via
 inline constexpr uint32_t HiveManaged = 1 << 1; ///< Object is managed by a Hive.
 } // namespace ObjectFlags
 
-/** @brief Controls whether metadata lookups create instances on miss. */
+/** @brief Controls whether a lookup should create a new instances on miss.
+           Used by e.g. IMetadata and IObjectStorage lookup functions. */
 enum class Resolve : uint8_t
 {
-    Existing, ///< Return only an already-created instance; never allocate.
-    Create    ///< Create the instance on first access (default behavior).
+    Existing = 0, ///< Return only an already-created instance; never allocate.
+    Create        ///< Create the instance on first access (default behavior).
 };
 
 /** @brief Returns true if the return value indicates success (non-negative). */

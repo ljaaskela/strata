@@ -2,7 +2,11 @@
 #define VELK_INTF_TYPE_REGISTRY_H
 
 #include <velk/interface/intf_any.h>
+#include <velk/interface/intf_future.h>
 #include <velk/interface/intf_object_factory.h>
+#include <velk/interface/intf_object_ref.h>
+#include <velk/interface/intf_property.h>
+#include <velk/interface/intf_variant.h>
 #include <velk/interface/types.h>
 
 namespace velk {
@@ -34,6 +38,25 @@ public:
     virtual ReturnValue unregister_interpolator(Uid typeUid) = 0;
     /** @brief Finds the interpolator function for a given type UID, or nullptr if not registered. */
     virtual InterpolatorFn find_interpolator(Uid typeUid) const = 0;
+
+    /** @brief Creates an instance of a registered type by its UID. */
+    virtual IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const = 0;
+    /** @brief Creates a new IAny value container for the given type UID. */
+    virtual IAny::Ptr create_any(Uid type) const = 0;
+    /** @brief Creates a new Variant value container that can hold any type. */
+    virtual IVariant::Ptr create_variant() const = 0;
+    /** @brief Creates a new ObjectRef value container for storing object references. */
+    virtual IObjectRef::Ptr create_object_ref() const = 0;
+    /** @brief Creates a new property instance with the given type and optional initial value. */
+    virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value,
+                                           uint32_t flags = ObjectFlags::None) const = 0;
+    /** @brief Creates a new future/promise pair. */
+    virtual IFuture::Ptr create_future() const = 0;
+    /** @brief Creates a callback-backed IFunction from a raw function pointer. */
+    virtual IFunction::Ptr create_callback(IFunction::CallableFn* fn) const = 0;
+    /** @brief Creates an owned-callback IFunction from a context, trampoline, and deleter. */
+    virtual IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
+                                                 IFunction::ContextDeleter* deleter) const = 0;
 
     /**
      * @brief Registers an interpolator function for type T.

@@ -185,8 +185,8 @@ TEST_F(PluginTest, FindPlugin)
     auto& reg = velk_.plugin_registry();
 
     reg.load_plugin(plugin_);
-    EXPECT_EQ(plugin_.get(), reg.find_plugin<TestPlugin>());
-    EXPECT_EQ(nullptr, reg.find_plugin(Uid{"ffffffff-ffff-ffff-ffff-ffffffffffff"}));
+    EXPECT_EQ(plugin_.get(), reg.find_plugin<TestPlugin>().get());
+    EXPECT_FALSE(reg.find_plugin(Uid{"ffffffff-ffff-ffff-ffff-ffffffffffff"}));
 }
 
 TEST_F(PluginTest, PluginCount)
@@ -215,7 +215,7 @@ TEST_F(PluginTest, UnloadPlugin)
     reg.load_plugin(plugin_);
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<TestPlugin>());
     EXPECT_EQ(1, tp_->shutdownCount);
-    EXPECT_EQ(nullptr, reg.find_plugin<TestPlugin>());
+    EXPECT_FALSE(reg.find_plugin<TestPlugin>());
     EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
@@ -272,7 +272,7 @@ TEST_F(PluginTest, FailedInitializeDoesNotLoad)
     auto fp = ext::make_object<FailingPlugin, IPlugin>();
 
     EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(fp));
-    EXPECT_EQ(nullptr, reg.find_plugin<FailingPlugin>());
+    EXPECT_FALSE(reg.find_plugin<FailingPlugin>());
     EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
@@ -360,7 +360,7 @@ TEST_F(PluginTest, VersionedDependencyTooNew)
 
     auto vp = ext::make_object<VersionTooNewPlugin, IPlugin>();
     EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(vp));
-    EXPECT_EQ(nullptr, reg.find_plugin<VersionTooNewPlugin>());
+    EXPECT_FALSE(reg.find_plugin<VersionTooNewPlugin>());
 }
 
 TEST_F(PluginTest, DependencyNotLoadedFails)
@@ -369,7 +369,7 @@ TEST_F(PluginTest, DependencyNotLoadedFails)
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
 
     EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(dp));
-    EXPECT_EQ(nullptr, reg.find_plugin<DependentPlugin>());
+    EXPECT_FALSE(reg.find_plugin<DependentPlugin>());
 }
 
 TEST_F(PluginTest, DependencyLoadedSucceeds)
@@ -380,7 +380,7 @@ TEST_F(PluginTest, DependencyLoadedSucceeds)
 
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
     EXPECT_EQ(ReturnValue::Success, reg.load_plugin(dp));
-    EXPECT_NE(nullptr, reg.find_plugin<DependentPlugin>());
+    EXPECT_TRUE(reg.find_plugin<DependentPlugin>());
 }
 
 TEST_F(PluginTest, UnloadRejectsWhenDependentsLoaded)
@@ -393,7 +393,7 @@ TEST_F(PluginTest, UnloadRejectsWhenDependentsLoaded)
 
     // TestPlugin cannot be unloaded while DependentPlugin depends on it
     EXPECT_EQ(ReturnValue::Fail, reg.unload_plugin<TestPlugin>());
-    EXPECT_NE(nullptr, reg.find_plugin<TestPlugin>());
+    EXPECT_TRUE(reg.find_plugin<TestPlugin>());
 
     // Unload the dependent first, then the dependency succeeds
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<DependentPlugin>());
@@ -491,8 +491,8 @@ TEST_F(PluginTest, LoadFromPathSuccess)
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
     EXPECT_EQ(builtin_count_ + 2, reg.plugin_count()); // host + sub-plugin
 
-    auto* plugin = reg.find_plugin(DllTestPluginUid);
-    ASSERT_NE(nullptr, plugin);
+    auto plugin = reg.find_plugin(DllTestPluginUid);
+    ASSERT_TRUE(plugin);
     EXPECT_EQ(string_view("DllTestPlugin"), plugin->get_name());
 }
 
@@ -510,7 +510,7 @@ TEST_F(PluginTest, LoadFromPathThenUnload)
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
     EXPECT_EQ(builtin_count_, reg.plugin_count());
-    EXPECT_EQ(nullptr, reg.find_plugin(DllTestPluginUid));
+    EXPECT_FALSE(reg.find_plugin(DllTestPluginUid));
 }
 
 TEST_F(PluginTest, LoadFromPathMultiPlugin)
@@ -520,13 +520,13 @@ TEST_F(PluginTest, LoadFromPathMultiPlugin)
 
     // Host plugin and sub-plugin should both be loaded
     EXPECT_EQ(builtin_count_ + 2, reg.plugin_count());
-    EXPECT_NE(nullptr, reg.find_plugin(DllTestPluginUid));
-    EXPECT_NE(nullptr, reg.find_plugin(DllSubPluginUid));
+    EXPECT_TRUE(reg.find_plugin(DllTestPluginUid));
+    EXPECT_TRUE(reg.find_plugin(DllSubPluginUid));
     EXPECT_EQ(string_view("DllSubPlugin"), reg.find_plugin(DllSubPluginUid)->get_name());
 
     // Unloading the host should also unload the sub-plugin (via shutdown)
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
     EXPECT_EQ(builtin_count_, reg.plugin_count());
-    EXPECT_EQ(nullptr, reg.find_plugin(DllSubPluginUid));
+    EXPECT_FALSE(reg.find_plugin(DllSubPluginUid));
 }
 #endif

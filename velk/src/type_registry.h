@@ -7,6 +7,8 @@
 
 #include <velk/vector.h>
 
+#include <shared_mutex>
+
 namespace velk {
 
 /**
@@ -30,11 +32,20 @@ public:
     InterpolatorFn find_interpolator(Uid typeUid) const override;
 
     /** @brief Creates an instance of a registered type by its UID. */
-    IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const;
+    IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const override;
     /** @brief Sets the current owner context for subsequent register_type calls. */
     void set_owner(Uid uid);
     /** @brief Erases all entries owned by the given plugin UID. */
     void sweep_owner(Uid uid);
+
+    IAny::Ptr create_any(Uid type) const override;
+    IVariant::Ptr create_variant() const override;
+    IObjectRef::Ptr create_object_ref() const override;
+    IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const override;
+    IFuture::Ptr create_future() const override;
+    IFunction::Ptr create_callback(IFunction::CallableFn* fn) const override;
+    IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
+                                         IFunction::ContextDeleter* deleter) const override;
 
 private:
     /** @brief Registry entry mapping a class UID to its factory. */
@@ -61,6 +72,7 @@ private:
     vector<Entry> types_;                     ///< Sorted registry of class factories.
     vector<InterpolatorEntry> interpolators_; ///< Sorted registry of interpolator functions.
     Uid current_owner_;                            ///< Owner context for type registration.
+    mutable std::shared_mutex mutex_;              ///< Protects types_, interpolators_, current_owner_.
     ILog& log_;
 };
 

@@ -10,6 +10,7 @@
 #include "hive/object_hive.h"
 #include "hive/raw_hive.h"
 #include "property.h"
+#include "object_ref.h"
 #include "variant.h"
 
 #include <velk/ext/any.h>
@@ -17,6 +18,7 @@
 #include <velk/string.h>
 
 #include <algorithm>
+#include <shared_mutex>
 
 namespace velk {
 
@@ -33,6 +35,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<HierarchyImpl>();
     ITypeRegistry::register_type<BindingImpl>();
     ITypeRegistry::register_type<VariantImpl>();
+    ITypeRegistry::register_type<ObjectRefImpl>();
 
     ITypeRegistry::register_type<ext::AnyValue<bool>>();
     ITypeRegistry::register_type<ext::AnyValue<float>>();
@@ -64,6 +67,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
 
 const IObjectFactory* TypeRegistry::find(Uid uid) const
 {
+    std::shared_lock lock(mutex_);
     Entry key{uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == uid) {
@@ -82,6 +86,7 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
                      "Register %.*s",
                      static_cast<int>(info.name.size()),
                      info.name.data());
+    std::unique_lock lock(mutex_);
     Entry entry{info.uid, &factory, current_owner_};
     auto it = std::lower_bound(types_.begin(), types_.end(), entry);
     if (it != types_.end() && it->uid == info.uid) {
@@ -95,6 +100,7 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
 
 ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
 {
+    std::unique_lock lock(mutex_);
     Entry key{factory.get_class_info().uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == key.uid) {
@@ -132,11 +138,13 @@ const IObjectFactory* TypeRegistry::find_factory(Uid classUid) const
 
 void TypeRegistry::set_owner(Uid uid)
 {
+    std::unique_lock lock(mutex_);
     current_owner_ = uid;
 }
 
 void TypeRegistry::sweep_owner(Uid uid)
 {
+    std::unique_lock lock(mutex_);
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
     interpolators_.erase(std::remove_if(interpolators_.begin(),
@@ -147,6 +155,7 @@ void TypeRegistry::sweep_owner(Uid uid)
 
 ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)
 {
+    std::unique_lock lock(mutex_);
     InterpolatorEntry entry{typeUid, fn, current_owner_};
     auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), entry);
     if (it != interpolators_.end() && it->typeUid == typeUid) {
@@ -160,6 +169,7 @@ ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)
 
 ReturnValue TypeRegistry::unregister_interpolator(Uid typeUid)
 {
+    std::unique_lock lock(mutex_);
     InterpolatorEntry key{typeUid, nullptr, {}};
     auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), key);
     if (it != interpolators_.end() && it->typeUid == typeUid) {
@@ -171,12 +181,82 @@ ReturnValue TypeRegistry::unregister_interpolator(Uid typeUid)
 
 InterpolatorFn TypeRegistry::find_interpolator(Uid typeUid) const
 {
+    std::shared_lock lock(mutex_);
     InterpolatorEntry key{typeUid, nullptr, {}};
     auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), key);
     if (it != interpolators_.end() && it->typeUid == typeUid) {
         return it->fn;
     }
     return nullptr;
+}
+
+IAny::Ptr TypeRegistry::create_any(Uid type) const
+{
+    return interface_pointer_cast<IAny>(create(type));
+}
+
+IVariant::Ptr TypeRegistry::create_variant() const
+{
+    static const auto& factory = VariantImpl::get_factory();
+    return interface_pointer_cast<IVariant>(factory.create_instance());
+}
+
+IObjectRef::Ptr TypeRegistry::create_object_ref() const
+{
+    static const auto& factory = ObjectRefImpl::get_factory();
+    return interface_pointer_cast<IObjectRef>(factory.create_instance());
+}
+
+IFuture::Ptr TypeRegistry::create_future() const
+{
+    static const auto& factory = FutureImpl::get_factory();
+    return interface_pointer_cast<IFuture>(factory.create_instance());
+}
+
+IFunction::Ptr TypeRegistry::create_callback(IFunction::CallableFn* fn) const
+{
+    static const auto& factory = FunctionImpl::get_factory();
+    auto func = interface_pointer_cast<IFunction>(factory.create_instance());
+    if (fn) {
+        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+            internal->set_invoke_callback(fn);
+        }
+    }
+    return func;
+}
+
+IFunction::Ptr TypeRegistry::create_owned_callback(void* context, IFunction::BoundFn* fn,
+                                                   IFunction::ContextDeleter* deleter) const
+{
+    static const auto& factory = FunctionImpl::get_factory();
+    auto func = interface_pointer_cast<IFunction>(factory.create_instance());
+    if (fn && deleter) {
+        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+            internal->set_owned_callback(context, fn, deleter);
+        }
+    }
+    return func;
+}
+
+IProperty::Ptr TypeRegistry::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
+{
+    static const auto& factory = PropertyImpl::get_factory();
+    auto property = interface_pointer_cast<IProperty>(factory.create_instance(flags));
+    if (auto pi = interface_cast<IPropertyInternal>(property)) {
+        if (value && is_compatible(value, type)) {
+            if (pi->set_any(value)) {
+                return property;
+            }
+            VELK_LOG(E, "Initial value is of incompatible type");
+        }
+        // Any was not specified for property instance, create new one
+        if (auto any = create_any(type)) {
+            if (pi->set_any(any)) {
+                return property;
+            }
+        }
+    }
+    return {};
 }
 
 } // namespace velk
