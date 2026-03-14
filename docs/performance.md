@@ -81,12 +81,9 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 |---|---|---|---|
 | **Property get** | 1 virtual call + `memcpy` | ~10 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
 | **Property set** | 1 virtual call + `memcpy` | ~12 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
-| **Variant get (same type)** | Property lookup + delegate | ~8 ns | Returns IAny pointer (the VariantImpl itself); no `get_data` call |
-| **Variant get (conversion)** | 2 virtual calls + convert | ~41 ns | Reads inner value into temp buffer, scans conversion table, writes to output |
-| **Variant set (same type)** | `copy_from` + delegate | ~31 ns | `Property::set_value` calls `copy_from`, which delegates to inner `IAny` |
-| **Variant set (type change)** | `copy_from` + `create_any` | ~92 ns | Creates a new inner `IAny` for the new type, then copies data into it |
-| **Variant state read** | `get_data` through inner | ~5 ns | `Variant::get<T>()` calls `VariantImpl::get_data` directly, no PropertyImpl overhead |
-| **Variant state write** | `set_data` through inner | ~9 ns | `Variant::set<T>()` calls `VariantImpl::set_data` directly; same-type fast path |
+| **Variant get** | Property lookup + delegate | ~8 ns | Same-type returns IAny pointer directly; conversion path scans type table (~41 ns) |
+| **Variant set** | `copy_from` + delegate | ~31 ns | Same-type delegates to inner IAny; type-change allocates new inner (~92 ns) |
+| **Variant state read/write** | Direct `get_data`/`set_data` | ~5/9 ns | `Variant::get<T>()`/`set<T>()` bypass PropertyImpl, call VariantImpl directly |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~13 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
@@ -109,23 +106,7 @@ The backing `IAny` is typically an `AnyRef<T>`, a non-owning pointer into the ob
 
 ### Variant property get/set
 
-A variant property follows the same `PropertyImpl` path as a typed property. The difference is that the backing `IAny` is a `VariantImpl` instead of an `AnyRef<T>`. `VariantImpl` holds an inner typed `IAny` (e.g. `AnyValue<float>`) and delegates to it:
-
-**Get (same type, ~8 ns)**: `Property<Variant>::get_value()` returns the backing `IAny` pointer directly (the `VariantImpl` itself). This is actually cheaper than a typed `Property<T>::get_value()` which calls `get_data` + `memcpy`. To extract a typed value, the caller must then call `get_data` on the returned `IAny`.
-
-**Get (conversion, ~41 ns)**: `VariantImpl::get_data` reads the stored value into a stack buffer (8 bytes max for numeric types), scans the static 42-entry conversion table for a matching `(from, to)` pair, and applies the conversion function. No heap allocation. The linear scan of the conversion table is the dominant cost.
-
-**Set (same type, ~31 ns)**: `Property<Variant>::set_value(const IAny&)` triggers `PropertyImpl::set_value`, which calls `VariantImpl::copy_from`. When the stored type matches, `copy_from` delegates to `stored_->copy_from(other)` which reads the source value via `get_data`, compares, and writes if changed. No heap allocation in the steady state.
-
-**Set (type change, ~92 ns)**: When `copy_from` receives a source whose type differs from the stored type, it falls through to clone or create a new inner `IAny`. For regular (non-Variant) sources this calls `other.clone()`; for Variant sources it calls `create_any(type)` + `copy_from`. The heap allocation dominates.
-
-**State read (~5 ns)**: `Variant::get<T>()` calls `VariantImpl::get_data` directly, bypassing `PropertyImpl` and `IPropertyInternal`. For same-type reads this is a compatibility check + delegate to inner `get_data`. This is the fastest typed-value path.
-
-**State write (~9 ns)**: `Variant::set<T>()` calls `VariantImpl::set_data` directly. For same-type writes, this delegates to `stored_->set_data()` with no allocation. This avoids the `copy_from` clone that the property accessor path triggers.
-
-**Memory overhead**: Per-instance cost is one `IAny::Ptr` (16 bytes for the `shared_ptr` to the inner `AnyValue<T>`) stored inside `VariantImpl`. The `Variant` class in the State struct holds one `IVariant::Ptr` (16 bytes). Compatible-type information uses a single static `Uid[7]` array shared across all variant instances. No per-instance caches.
-
-**Performance guidance**: For read-heavy workloads, prefer state struct access (`read_state<T>(obj)->value.get<float>()`) at ~5 ns over the property accessor at ~8 ns + `get_data` cost. For write-heavy workloads, the state struct path (~9 ns) avoids the `copy_from` overhead that costs ~31 ns through the property accessor. Use the property accessor when you need change notifications.
+A variant property uses the same `PropertyImpl` path as a typed property, but the backing `IAny` is a `VariantImpl` that holds an inner typed `IAny` (e.g. `AnyValue<float>`) and delegates to it. Same-type gets (~8 ns) return the `IAny` pointer directly without calling `get_data`, while conversion gets (~41 ns) scan a static 42-entry conversion table with no heap allocation. Same-type sets (~31 ns) delegate to the inner `IAny`'s `copy_from`; type-change sets (~92 ns) allocate a new inner `IAny`, which dominates the cost. For hot paths, `Variant::get<T>()`/`set<T>()` bypass `PropertyImpl` entirely and call `VariantImpl` directly (~5/9 ns). Per-instance memory overhead is one `IAny::Ptr` (16 bytes) inside `VariantImpl` plus one `IVariant::Ptr` (16 bytes) in the State struct; compatible-type information is a single static array shared across all instances.
 
 ### Direct state access
 
