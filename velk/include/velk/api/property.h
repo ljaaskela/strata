@@ -256,6 +256,51 @@ public:
 };
 
 /**
+ * @brief Read-only object ref property wrapper. Returns the backing IAny directly.
+ *
+ * Returned by RPROP accessors when the type is ObjectRef.
+ */
+template <>
+class ConstProperty<ObjectRef> : public detail::PropertyStorage
+{
+public:
+    explicit ConstProperty(IProperty::Ptr existing) : PropertyStorage(std::move(existing)) {}
+
+    /** @brief Returns the backing IAny (the ObjectRefImpl itself). */
+    IAny::ConstPtr get_value() const
+    {
+        if (auto internal = get_internal()) {
+            return internal->get_any();
+        }
+        return {};
+    }
+};
+
+/**
+ * @brief Read-write object ref property wrapper. Accepts any IAny value.
+ *
+ * Returned by PROP accessors when the type is ObjectRef.
+ */
+template <>
+class Property<ObjectRef> : public ConstProperty<ObjectRef>
+{
+public:
+    explicit Property(IProperty::Ptr existing) : ConstProperty<ObjectRef>(std::move(existing)) {}
+
+    /** @brief Sets the property from a raw IAny reference. */
+    ReturnValue set_value(const IAny& value, InvokeType type = Immediate)
+    {
+        return prop_ ? prop_->set_value(value, type) : ReturnValue::Fail;
+    }
+
+    /** @brief Sets the property from an IAny shared pointer. */
+    ReturnValue set_value(const IAny::ConstPtr& value, InvokeType type = Immediate)
+    {
+        return (prop_ && value) ? prop_->set_value(*value, type) : ReturnValue::Fail;
+    }
+};
+
+/**
  * @brief A helper template for creating a new read-only poperty instance
  */
 template <class T, class = std::enable_if_t<std::is_const_v<T>>>

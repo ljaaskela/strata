@@ -8,6 +8,7 @@
 #include <velk/interface/intf_plugin_registry.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_type_registry.h>
+#include <velk/interface/intf_object_ref.h>
 #include <velk/interface/intf_variant.h>
 #include <velk/interface/types.h>
 #include <velk/vector.h>
@@ -127,6 +128,8 @@ public:
     virtual IAny::Ptr create_any(Uid type) const = 0;
     /** @brief Creates a new Variant value container that can hold any type. */
     virtual IVariant::Ptr create_variant() const = 0;
+    /** @brief Creates a new ObjectRef value container for storing object references. */
+    virtual IObjectRef::Ptr create_object_ref() const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
     virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value,
                                            uint32_t flags = ObjectFlags::None) const = 0;

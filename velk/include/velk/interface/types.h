@@ -36,9 +36,12 @@ inline constexpr Uid Hierarchy{"b7d3e1a2-5f48-4c96-9e0a-1d2b3c4e5f67"};
 inline constexpr Uid Binding{"c4e8f2a1-6b39-47d5-8e1c-3a9d5f7b2e04"};
 /** @brief Variant object implementation. */
 inline constexpr Uid Variant{"e5f2a7b3-8c14-4d69-9e2f-3a1b5c6d7e80"};
+/** @brief Object reference implementation. */
+inline constexpr Uid ObjectRef{"f3a1b5c6-d7e8-4f09-a2b3-c4d5e6f70189"};
 } // namespace ClassId
 
-class Variant; // Defined in api/variant.h
+class Variant;   // Defined in api/variant.h
+class ObjectRef; // Defined in api/object_ref.h
 
 /** @brief A duration in microseconds. */
 struct Duration

@@ -42,6 +42,7 @@ public:
     IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const override;
     IAny::Ptr create_any(Uid type) const override;
     IVariant::Ptr create_variant() const override;
+    IObjectRef::Ptr create_object_ref() const override;
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
     void queue_deferred_property(DeferredPropertySet task) const override;

@@ -28,6 +28,7 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
   - [Change notifications](#change-notifications)
   - [Custom Any types](#custom-any-types)
   - [Variant properties](#variant-properties)
+  - [Object reference properties](#object-reference-properties)
   - [Direct state access](#direct-state-access)
     - [read_state / write_state](#read_state--write_state)
     - [Raw state pointer](#raw-state-pointer)
@@ -756,6 +757,106 @@ auto val = port->value().get_value();
 if (auto* v = interface_cast<IVariant>(val)) {
     Uid stored = v->stored_type();
     bool ok = v->can_convert_to(type_uid<int32_t>());
+}
+```
+
+### Object reference properties
+
+Object reference properties store a reference to another velk object. They support both owning (strong) and non-owning (weak) modes, and optional interface constraint validation. Use them when an object needs to point at another object (e.g. a parent link, a target reference, a selected item).
+
+Declare an object reference property with `velk::ObjectRef` as the type:
+
+```cpp
+#include <velk/interface/intf_metadata.h>
+
+class INode : public Interface<INode>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, velk::ObjectRef, child, {})
+    )
+};
+```
+
+The accessor returns `Property<ObjectRef>`. Write a reference by creating an `ObjectRef` wrapper via `create_object_ref()`, setting its target, and passing it to `set_value`. Read it back by casting the backing `IAny` to `IObjectRef`:
+
+```cpp
+#include <velk/api/object_ref.h>
+
+auto* node = interface_cast<INode>(obj);
+
+// Create a target object
+auto target = instance().create<IObject>(SomeClass::class_id());
+
+// Write via property accessor
+auto ref = create_object_ref();
+ref.set(target);
+node->child().set_value(ref);
+
+// Read via property accessor
+auto val = node->child().get_value();          // IAny::ConstPtr
+auto* r = interface_cast<IObjectRef>(val);
+IObject::Ptr stored = r->get_object();         // target
+```
+
+#### State struct access
+
+The `ObjectRef` in the State struct provides direct `set`/`get` convenience methods:
+
+```cpp
+// Write via state struct
+{
+    auto writer = write_state<INode>(node);
+    writer->child.set(target);
+}
+
+// Read via state struct
+auto reader = read_state<INode>(node);
+IObject::Ptr ref = reader->child.get();  // target
+```
+
+#### Owning mode
+
+By default, an `ObjectRef` holds a strong (owning) reference that keeps the target alive. Switch to non-owning mode to hold only a weak reference:
+
+```cpp
+auto writer = write_state<INode>(node);
+writer->child.set(target);
+writer->child.set_owning(false);  // releases strong ref
+
+// get() locks the weak ref on each call; returns nullptr if expired
+IObject::Ptr ref = writer->child.get();
+```
+
+Switching back to owning mode locks the weak reference into a strong one. This fails if the target has already been destroyed.
+
+#### Interface constraints
+
+Constrain which objects can be stored by requiring a specific interface:
+
+```cpp
+auto writer = write_state<INode>(node);
+writer->child.set_constraint<IMyWidget>();  // only accept IMyWidget implementors
+
+auto good = instance().create<IObject>(MyWidget::class_id());
+writer->child.set(good);   // Success
+
+auto bad = instance().create<IObject>(OtherClass::class_id());
+writer->child.set(bad);    // InvalidArgument
+```
+
+#### IObjectRef interface
+
+For advanced access, cast the backing `IAny` to `IObjectRef`:
+
+```cpp
+#include <velk/interface/intf_object_ref.h>
+
+auto val = node->child().get_value();
+if (auto* r = interface_cast<IObjectRef>(val)) {
+    IObject::Ptr obj = r->get_object();
+    bool owning = r->is_owning();
+    Uid constraint = r->constraint_uid();
 }
 ```
 

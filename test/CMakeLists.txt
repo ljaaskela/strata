@@ -38,6 +38,7 @@ add_executable(tests
     test_shared_ptr.cpp
     test_vector.cpp
     test_c_api.cpp
+    test_object_ref.cpp
     test_variant.cpp
 )
 
