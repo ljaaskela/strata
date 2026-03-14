@@ -24,7 +24,7 @@ PluginRegistry::PluginRegistry(IVelk& velk, TypeRegistry& types)
 ReturnValue PluginRegistry::check_dependencies(const PluginInfo& info)
 {
     for (auto& dep : info.dependencies) {
-        auto* plugin = find_plugin(dep.uid);
+        auto plugin = find_plugin(dep.uid);
         if (!plugin) {
             detail::velk_log(log_,
                              LogLevel::Error,
@@ -215,12 +215,12 @@ ReturnValue PluginRegistry::unload_plugin(Uid pluginId)
     return ReturnValue::Success;
 }
 
-IPlugin* PluginRegistry::find_plugin(Uid pluginId) const
+IPlugin::Ptr PluginRegistry::find_plugin(Uid pluginId) const
 {
     PluginEntry key{pluginId, {}};
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == pluginId) {
-        return it->plugin.get();
+        return it->plugin;
     }
     return nullptr;
 }

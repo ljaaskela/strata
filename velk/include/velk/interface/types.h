@@ -68,11 +68,12 @@ inline constexpr uint32_t ReadOnly = 1 << 0;    ///< Property rejects writes via
 inline constexpr uint32_t HiveManaged = 1 << 1; ///< Object is managed by a Hive.
 } // namespace ObjectFlags
 
-/** @brief Controls whether metadata lookups create instances on miss. */
+/** @brief Controls whether a lookup should create a new instances on miss.
+           Used by e.g. IMetadata and IObjectStorage lookup functions. */
 enum class Resolve : uint8_t
 {
-    Existing, ///< Return only an already-created instance; never allocate.
-    Create    ///< Create the instance on first access (default behavior).
+    Existing = 0, ///< Return only an already-created instance; never allocate.
+    Create        ///< Create the instance on first access (default behavior).
 };
 
 /** @brief Returns true if the return value indicates success (non-negative). */

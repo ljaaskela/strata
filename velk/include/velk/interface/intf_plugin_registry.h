@@ -23,14 +23,8 @@ public:
     virtual ReturnValue load_plugin_from_path(const char* path) = 0;
     /** @brief Unloads a plugin by ID, calling shutdown() and sweeping owned types. */
     virtual ReturnValue unload_plugin(Uid pluginId) = 0;
-    /**
-     * @brief Finds a loaded plugin by its ID, or nullptr if not loaded.
-     *
-     * Returns a non-owning pointer. Do not store the result beyond the
-     * current scope, as the plugin may be unloaded (and its DLL freed)
-     * at any time.
-     */
-    virtual IPlugin* find_plugin(Uid pluginId) const = 0;
+    /** @brief Finds a loaded plugin by its ID, or nullptr if not loaded. */
+    virtual IPlugin::Ptr find_plugin(Uid pluginId) const = 0;
     /** @brief Returns the number of currently loaded plugins. */
     virtual size_t plugin_count() const = 0;
 
@@ -42,7 +36,7 @@ public:
     }
     /** @brief Finds a loaded plugin by its class type, or nullptr if not loaded. */
     template <class T>
-    IPlugin* find_plugin() const
+    IPlugin::Ptr find_plugin() const
     {
         return find_plugin(T::class_id());
     }
@@ -52,9 +46,9 @@ public:
      * @param pluginId Id if the plugin.
      * @return Plugin instance or nullptr if loading failed.
      */
-    IPlugin* get_or_load_plugin(Uid pluginId)
+    IPlugin::Ptr get_or_load_plugin(Uid pluginId)
     {
-        auto* plugin = find_plugin(pluginId);
+        auto plugin = find_plugin(pluginId);
         if (!plugin) {
             load_plugin(pluginId);
             plugin = find_plugin(pluginId);

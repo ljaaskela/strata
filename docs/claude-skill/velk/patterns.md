@@ -776,5 +776,5 @@ auto* widget = velk::interface_cast<mylib::IWidget>(obj);
 
 // Lazy load (loads if not already loaded)
 auto& reg = ::velk::instance().plugin_registry();
-auto* plugin = reg.get_or_load_plugin(mylib::PluginId::MyPlugin);
+auto plugin = reg.get_or_load_plugin(mylib::PluginId::MyPlugin); // IPlugin::Ptr
 ```

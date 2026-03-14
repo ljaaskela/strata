@@ -31,7 +31,7 @@ public:
     ReturnValue load_plugin(Uid pluginUid) override;
     ReturnValue load_plugin_from_path(const char* path) override;
     ReturnValue unload_plugin(Uid pluginId) override;
-    IPlugin* find_plugin(Uid pluginId) const override;
+    IPlugin::Ptr find_plugin(Uid pluginId) const override;
     size_t plugin_count() const override;
     /** @brief Shuts down all plugins in reverse order. Called from ~VelkInstance. */
     void shutdown_all();
