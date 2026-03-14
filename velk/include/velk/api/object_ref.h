@@ -73,10 +73,35 @@ private:
     IObjectRef::Ptr any_;
 };
 
-/** @brief Creates a new ObjectRef with an initialized IObjectRef backing. */
+/** @brief Creates an empty owning ObjectRef. */
 inline ObjectRef create_object_ref()
 {
     return ObjectRef(instance().create_object_ref());
+}
+
+/** @brief Creates an owning ObjectRef that references @p obj. */
+inline ObjectRef create_object_ref(const IObject::Ptr& obj)
+{
+    auto ref = create_object_ref();
+    ref.set(obj);
+    return ref;
+}
+
+/** @brief Creates an empty non-owning (weak) ObjectRef. */
+inline ObjectRef create_weak_object_ref()
+{
+    auto ref = create_object_ref();
+    ref.set_owning(false);
+    return ref;
+}
+
+/** @brief Creates a non-owning (weak) ObjectRef that references @p obj. */
+inline ObjectRef create_weak_object_ref(const IObject::Ptr& obj)
+{
+    auto ref = create_object_ref();
+    ref.set(obj);
+    ref.set_owning(false);
+    return ref;
 }
 
 } // namespace velk

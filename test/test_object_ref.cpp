@@ -125,6 +125,45 @@ TEST(ObjectRef, CopyFrom)
     EXPECT_EQ(dst_ref->get_object(), target);
 }
 
+// Factory helper tests
+
+TEST(ObjectRef, CreateWithObject)
+{
+    auto target = ::velk::instance().create<velk::IObject>(velk::ClassId::Property);
+    auto ref = ::velk::create_object_ref(target);
+    EXPECT_TRUE(ref);
+    EXPECT_TRUE(ref.is_owning());
+    EXPECT_EQ(ref.get(), target);
+}
+
+TEST(ObjectRef, CreateWeakEmpty)
+{
+    auto ref = ::velk::create_weak_object_ref();
+    EXPECT_TRUE(ref);
+    EXPECT_FALSE(ref.is_owning());
+    EXPECT_EQ(ref.get(), nullptr);
+}
+
+TEST(ObjectRef, CreateWeakWithObject)
+{
+    auto target = ::velk::instance().create<velk::IObject>(velk::ClassId::Property);
+    auto ref = ::velk::create_weak_object_ref(target);
+    EXPECT_TRUE(ref);
+    EXPECT_FALSE(ref.is_owning());
+    EXPECT_EQ(ref.get(), target);
+}
+
+TEST(ObjectRef, WeakRefExpires)
+{
+    velk::ObjectRef ref;
+    {
+        auto target = ::velk::instance().create<velk::IObject>(velk::ClassId::Property);
+        ref = ::velk::create_weak_object_ref(target);
+        EXPECT_EQ(ref.get(), target);
+    }
+    EXPECT_EQ(ref.get(), nullptr);
+}
+
 // Constraint tests
 
 class IConstraintTest : public ::velk::Interface<IConstraintTest>
