@@ -106,7 +106,11 @@ The backing `IAny` is typically an `AnyRef<T>`, a non-owning pointer into the ob
 
 ### Variant property get/set
 
-A variant property uses the same `PropertyImpl` path as a typed property, but the backing `IAny` is a `VariantImpl` that holds an inner typed `IAny` (e.g. `AnyValue<float>`) and delegates to it. Same-type gets (~8 ns) return the `IAny` pointer directly without calling `get_data`, while conversion gets (~41 ns) scan a static 42-entry conversion table with no heap allocation. Same-type sets (~31 ns) delegate to the inner `IAny`'s `copy_from`; type-change sets (~92 ns) allocate a new inner `IAny`, which dominates the cost. For hot paths, `Variant::get<T>()`/`set<T>()` bypass `PropertyImpl` entirely and call `VariantImpl` directly (~5/9 ns). Per-instance memory overhead is one `IAny::Ptr` (16 bytes) inside `VariantImpl` plus one `IVariant::Ptr` (16 bytes) in the State struct; compatible-type information is a single static array shared across all instances.
+A variant property uses the same `ClassId::Property` path as a typed property, but the backing `IAny` is a `ClassId::Variant` that holds an inner typed `IAny` (e.g. `AnyValue<float>`) and delegates to it. 
+* Same-type gets (~8 ns) return the `IAny` pointer directly without calling `get_data`, while conversion gets (~41 ns) scan a static 42-entry conversion table with no heap allocation. 
+* Same-type sets (~31 ns) delegate to the inner `IAny`'s `copy_from`, type-change sets (~92 ns) allocate a new inner `IAny`, which dominates the cost. For hot paths, `Variant::get<T>()`/`set<T>()` bypass `ClassId::Property` entirely and call `ClassId::Variant` directly (~5/9 ns). 
+
+Per-instance memory overhead of a Variant is one `IAny::Ptr` (16 bytes) inside `ClassId::Variant` plus one `IVariant::Ptr` (16 bytes) in the State struct; compatible-type information is a single static array shared across all instances.
 
 ### Direct state access
 
