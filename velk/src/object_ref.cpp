@@ -59,7 +59,7 @@ ReturnValue ObjectRefImpl::copy_from(const IAny& other)
             // Clear our reference
             bool had = (strong_ != nullptr || weak_.lock() != nullptr);
             strong_ = nullptr;
-            weak_ = {};
+            weak_.reset();
             return had ? ReturnValue::Success : ReturnValue::NothingToDo;
         }
         return set_object(obj);
