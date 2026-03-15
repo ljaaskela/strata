@@ -5,6 +5,7 @@
 #include <velk/interface/intf_thread_context.h>
 #include <velk/interface/types.h>
 
+#include <mutex>
 #include <shared_mutex>
 
 namespace velk {
