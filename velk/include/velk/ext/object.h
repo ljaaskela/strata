@@ -21,6 +21,28 @@ namespace velk::detail {
  */
 class ObjectStorageBase
 {
+private:
+    template <class Fn>
+    auto with_storage(Fn&& fn) const
+    {
+        auto* s = stor();
+        using F = decltype(fn(*s));
+        if constexpr (std::is_void_v<F>) {
+            if (s) {
+                fn(*s);
+            }
+        } else {
+            return s ? fn(*s) : F{};
+        }
+    }
+
+    template <class Fn, class R>
+    auto with_storage(Fn&& fn, R error) const
+    {
+        auto* s = stor();
+        return s ? fn(*s) : error;
+    }
+
 protected:
     ~ObjectStorageBase()
     {
@@ -42,58 +64,45 @@ protected:
             instance().destroy_metadata_container(created);
         }
     }
-
-    IObjectStorage* stor() const { return storage_.load(std::memory_order_acquire); }
-
     IProperty::Ptr storage_get_property(string_view name, Resolve mode = Resolve::Create) const
     {
-        auto* s = stor();
-        return s ? s->get_property(name, mode) : nullptr;
+        return with_storage([&](auto& s) { return s.get_property(name, mode); });
     }
     IEvent::Ptr storage_get_event(string_view name, Resolve mode = Resolve::Create) const
     {
-        auto* s = stor();
-        return s ? s->get_event(name, mode) : nullptr;
+        return with_storage([&](auto& s) { return s.get_event(name, mode); });
     }
     IFunction::Ptr storage_get_function(string_view name, Resolve mode = Resolve::Create) const
     {
-        auto* s = stor();
-        return s ? s->get_function(name, mode) : nullptr;
+        return with_storage([&](auto& s) { return s.get_function(name, mode); });
     }
     void storage_notify(MemberKind kind, Uid interfaceUid, Notification notification) const
     {
-        auto* s = stor();
-        if (s) {
-            s->notify(kind, interfaceUid, notification);
-        }
+        return with_storage([&](auto& s) { return s.notify(kind, interfaceUid, notification); });
     }
-
     ReturnValue storage_add_attachment(const IInterface::Ptr& attachment) const
     {
-        auto* s = stor();
-        return s ? s->add_attachment(attachment) : ReturnValue::Fail;
+        return with_storage([&](auto& s) { return s.add_attachment(attachment); }, ReturnValue::Fail);
     }
     ReturnValue storage_remove_attachment(const IInterface::Ptr& attachment) const
     {
-        auto* s = stor();
-        return s ? s->remove_attachment(attachment) : ReturnValue::Fail;
+        return with_storage([&](auto& s) { return s.remove_attachment(attachment); }, ReturnValue::Fail);
     }
     size_t storage_attachment_count() const
     {
-        auto* s = stor();
-        return s ? s->attachment_count() : 0;
+        return with_storage([&](auto& s) { return s.attachment_count(); }, 0);
     }
     IInterface::Ptr storage_get_attachment(size_t index) const
     {
-        auto* s = stor();
-        return s ? s->get_attachment(index) : nullptr;
+        return with_storage([&](auto& s) { return s.get_attachment(index); });
     }
     IInterface::Ptr storage_find_attachment(const AttachmentQuery& query, Resolve mode)
     {
-        auto* s = stor();
-        return s ? s->find_attachment(query, mode) : nullptr;
+        return with_storage([&](auto& s) { return s.find_attachment(query, mode); });
     }
 
+private:
+    IObjectStorage* stor() const { return storage_.load(std::memory_order_acquire); }
     mutable std::atomic<IObjectStorage*> storage_{};
 };
 
@@ -125,65 +134,56 @@ public:
     ~Object() override = default;
 
 private:
-    void ensure_stor() const
+    void ensure_object_storage(Resolve mode = Resolve::Create) const
     {
-        ensure_storage(
-            FinalClass::get_factory().get_class_info(),
-            static_cast<IInterface*>(const_cast<IObjectStorage*>(static_cast<const IObjectStorage*>(this))));
+        if (mode == Resolve::Existing) {
+            return;
+        }
+        static const auto& ci = FinalClass::get_factory().get_class_info();
+        auto* me =
+            static_cast<IInterface*>(const_cast<IObjectStorage*>(static_cast<const IObjectStorage*>(this)));
+        ensure_storage(ci, me);
     }
 
 public: // IMetadata overrides
     array_view<MemberDesc> get_static_metadata() const override { return class_metadata; }
     IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const override
     {
-        if (mode == Resolve::Existing && !stor()) {
-            return {};
-        }
-        ensure_stor();
+        ensure_object_storage(mode);
         return storage_get_property(name, mode);
     }
     IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const override
     {
-        if (mode == Resolve::Existing && !stor()) {
-            return {};
-        }
-        ensure_stor();
+        ensure_object_storage(mode);
         return storage_get_event(name, mode);
     }
     IFunction::Ptr get_function(string_view name, Resolve mode = Resolve::Create) const override
     {
-        if (mode == Resolve::Existing && !stor()) {
-            return {};
-        }
-        ensure_stor();
+        ensure_object_storage(mode);
         return storage_get_function(name, mode);
     }
     void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
     {
-        // No need to ensure storage. If container has not been initialized there won't be anything
-        // to notify either.
+        // No need to ensure storage, if there's none there can't be anything to notify
         storage_notify(kind, interfaceUid, notification);
     }
 
 public: // IObjectStorage overrides
     ReturnValue add_attachment(const IInterface::Ptr& attachment) override
     {
-        ensure_stor();
+        ensure_object_storage();
         return storage_add_attachment(attachment);
     }
     ReturnValue remove_attachment(const IInterface::Ptr& attachment) override
     {
-        ensure_stor();
+        // No need to ensure storage, if there's none there can't be an attachment to remove either
         return storage_remove_attachment(attachment);
     }
     size_t attachment_count() const override { return storage_attachment_count(); }
     IInterface::Ptr get_attachment(size_t index) const override { return storage_get_attachment(index); }
     IInterface::Ptr find_attachment(const AttachmentQuery& query, Resolve mode) override
     {
-        if (mode == Resolve::Existing && !stor()) {
-            return {};
-        }
-        ensure_stor();
+        ensure_object_storage(mode);
         return storage_find_attachment(query, mode);
     }
 

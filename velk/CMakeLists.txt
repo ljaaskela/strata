@@ -64,6 +64,7 @@ add_library(velk SHARED
     include/velk/interface/intf_metadata.h
     include/velk/interface/intf_object_storage.h
     include/velk/interface/intf_hierarchy.h
+    include/velk/interface/intf_thread_context.h
     include/velk/interface/member_desc.h
     include/velk/interface/types.h
     include/velk/api/any.h
@@ -79,6 +80,7 @@ add_library(velk SHARED
     include/velk/api/velk.h
     include/velk/api/attachment.h
     include/velk/api/hierarchy.h
+    include/velk/api/thread_context.h
     include/velk/api/object.h
     include/velk/api/object_ref.h
     include/velk/api/variant.h

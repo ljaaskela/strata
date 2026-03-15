@@ -2,6 +2,7 @@
 #define VELK_API_HIERARCHY_H
 
 #include <velk/api/object.h>
+#include <velk/api/thread_context.h>
 #include <velk/interface/intf_hierarchy.h>
 
 #include <type_traits>
@@ -325,6 +326,28 @@ public:
 
     /** @brief Returns true if the hierarchy is empty. */
     bool empty() const { return size() == 0; }
+
+    /** @brief Attaches a ThreadContext to this hierarchy for concurrent access. */
+    void set_thread_context(ThreadContext ctx)
+    {
+        auto* storage = as<IObjectStorage>();
+        if (!storage) {
+            return;
+        }
+        // Remove any existing thread context attachment
+        if (auto existing = storage->find_attachment<IThreadContext>()) {
+            storage->remove_attachment(existing);
+        }
+        if (ctx) {
+            storage->add_attachment(ctx.get());
+        }
+    }
+
+    /** @brief Returns the ThreadContext attached to this hierarchy, if any. */
+    ThreadContext thread_context() const
+    {
+        return ThreadContext(find_attachment<IThreadContext>());
+    }
 
     /** @brief Implicit conversion to IHierarchy::Ptr. */
     operator IHierarchy::Ptr() const { return as_ptr<IHierarchy>(); }

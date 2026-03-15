@@ -22,6 +22,7 @@ This document describes the general architecture and code division in Velk.
   - [Design rationale](#design-rationale)
   - [InvokeType and thread ownership](#invoketype-and-thread-ownership)
   - [What Auto does not cover](#what-auto-does-not-cover)
+  - [ThreadContext (opt-in read/write synchronization)](#threadcontext-opt-in-readwrite-synchronization)
   - [Thread safety guarantees](#thread-safety-guarantees)
   - [Platform thread IDs](#platform-thread-ids)
 - [Key types](#key-types)
@@ -75,6 +76,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_plugin_registry.h` | `IPluginRegistry` for loading/unloading plugins by instance or from shared libraries |
 | `intf_velk.h` | `UpdateInfo`, `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` and plugin management to `IPluginRegistry` via `plugin_registry()` |
 | `intf_hierarchy.h` | `HierarchyNode`, `HierarchyChange`, `IHierarchy` external tree of `IObject` references with `on_changing`/`on_changed` events; `IHierarchyAware` optional lifecycle callbacks |
+| `intf_thread_context.h` | `IThreadContext` opt-in shared reader/writer lock satisfying C++ SharedMutex named requirements |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `Duration`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
@@ -108,6 +110,7 @@ User-facing typed wrappers.
 | `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
 | `object.h` | `Object` convenience wrapper with null-safe metadata, state, and attachment access |
 | `hierarchy.h` | `Hierarchy` wrapper inheriting `Object` for `IHierarchy` operations; `Node` wrapper for `HierarchyNode` snapshots |
+| `thread_context.h` | `ThreadContext` wrapper with `read_lock()`/`write_lock()` RAII helpers; `create_thread_context()` factory |
 | `attachment.h` | `find_or_create_attachment<T>()` free function helpers |
 
 ## src/
@@ -193,6 +196,11 @@ classDiagram
         <<interface>>
         load/unload/find plugin
     }
+    class IThreadContext {
+        <<interface>>
+        lock_shared/unlock_shared
+        lock/unlock/try_lock
+    }
 
     IInterface <|-- IObject
     IObject <|-- IAny
@@ -209,6 +217,7 @@ classDiagram
     IInterface <|-- ITypeRegistry
     IInterface <|-- IPluginRegistry
     IInterface <|-- IVelk
+    IInterface <|-- IThreadContext
 ```
 
 ### ext/ class hierarchy
@@ -397,7 +406,37 @@ The `Auto = 0` enum value means that zero-initialized or default-constructed `In
 
 Auto mode solves **accidental cross-thread writes**: a background thread calling `set_value` without specifying `Deferred` will have its write safely queued instead of corrupting data. But it does not provide **read/write synchronization**.
 
-If a render thread reads property state while the UI thread writes (both on the owning thread's `update()` cycle), Auto mode does not help because both threads may be accessing data simultaneously. That scenario requires actual synchronization, such as a shared mutex or snapshot mechanism to be used by the application.
+If a render thread reads property state while the UI thread writes (both on the owning thread's `update()` cycle), Auto mode does not help because both threads may be accessing data simultaneously. Velk provides `IThreadContext` as an opt-in solution for this case (see below).
+
+### ThreadContext (opt-in read/write synchronization)
+
+`IThreadContext` is an opt-in shared reader/writer lock that satisfies the C++ SharedMutex named requirements. This means `std::shared_lock<IThreadContext>` and `std::unique_lock<IThreadContext>` work directly.
+
+**Why manual, not automatic:** Per-property mutexes would add overhead to every object whether it needs thread safety or not, and would make batch operations (reading ten properties in one frame) acquire and release ten separate locks. A single shared lock per object group is both cheaper and more correct: readers hold a shared lock for the duration of their batch, writers hold an exclusive lock for theirs, and objects that never leave the owning thread pay zero cost.
+
+**Usage:**
+
+```cpp
+auto ctx = create_thread_context();
+
+// Attach to a hierarchy so all objects in the tree share one lock
+auto h = create_hierarchy();
+h.set_thread_context(ctx);
+
+// Reader thread
+{
+    auto lock = ctx.read_lock();   // std::shared_lock
+    auto val = prop.get_value();
+}
+
+// Writer thread
+{
+    auto lock = ctx.write_lock();  // std::unique_lock
+    prop.set_value(42, Immediate);
+}
+```
+
+**Hierarchy attachment:** `Hierarchy::set_thread_context()` stores the context as an attachment on the hierarchy object. `Hierarchy::thread_context()` retrieves it. This lets an entire object tree share a single lock without each object needing to know about threading.
 
 ### Thread safety guarantees
 
@@ -407,7 +446,8 @@ If a render thread reads property state while the UI thread writes (both on the 
 | `instance().plugin_registry()` | Thread-safe (concurrent reads, exclusive writes) |
 | `instance().queue_deferred_tasks()` | Thread-safe (mutex-protected queue) |
 | `instance().create_future()` | Thread-safe (safe to resolve, wait, and add continuations from any thread) |
-| Properties, events, functions | Not internally synchronized. `InvokeMode::Auto` routes cross-thread writes through the deferred queue. |
+| `IThreadContext` | Thread-safe (wraps `std::shared_mutex`; satisfies SharedMutex named requirements) |
+| Properties, events, functions | Not internally synchronized. `InvokeMode::Auto` routes cross-thread writes through the deferred queue. Opt-in `IThreadContext` available for read/write synchronization. |
 
 ### Platform thread IDs
 
@@ -450,5 +490,7 @@ The `current_thread_id()` utility in `thread.h` is a thin inline wrapper. On Win
 | `PluginDependency` | Plugin dependency entry: UID and optional minimum version |
 | `Duration` | Type-safe microsecond duration (`{int64_t us}`) used in `UpdateInfo` and `IVelk::update()` |
 | `UpdateInfo` | Time information passed to plugin `update()`: `time`, `elapsed`, and `dt` (all `Duration`) |
+| `IThreadContext` | Opt-in shared reader/writer lock interface; satisfies C++ SharedMutex named requirements (`lock_shared`/`unlock_shared`/`lock`/`unlock`/`try_lock_shared`/`try_lock`) |
+| `ThreadContext` | API wrapper around `IThreadContext::Ptr`; provides `read_lock()` (shared) and `write_lock()` (exclusive) returning RAII lock guards |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, `array_view<InterfaceInfo>` of implemented interfaces, and `array_view<MemberDesc>` for a registered class |

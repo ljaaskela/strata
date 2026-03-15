@@ -40,6 +40,7 @@ add_executable(tests
     test_c_api.cpp
     test_object_ref.cpp
     test_variant.cpp
+    test_thread_context.cpp
 )
 
 target_link_libraries(tests PRIVATE velk velk_c GTest::gtest_main)
