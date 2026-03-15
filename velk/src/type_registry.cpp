@@ -15,6 +15,7 @@
 #include "thread_context.h"
 #include "variant.h"
 
+#include <velk/api/velk.h>
 #include <velk/ext/any.h>
 #include <velk/interface/intf_log.h>
 #include <velk/string.h>
@@ -249,6 +250,44 @@ IFunction::Ptr TypeRegistry::create_owned_callback(void* context, IFunction::Bou
         }
     }
     return func;
+}
+
+Uid TypeRegistry::find_class_by_name(string_view name) const
+{
+    // Check for scoped name: "plugin_name.ClassName"
+    size_t dot = name.find(".");
+    if (dot != string_view::npos) {
+        auto plugin_name = string_view(name.data(), dot);
+        auto class_name = string_view(name.data() + dot + 1, name.size() - dot - 1);
+
+        auto& reg = instance().plugin_registry();
+        std::shared_lock lock(mutex_);
+        for (const auto& entry : types_) {
+            if (!entry.factory || entry.owner == Uid{}) {
+                continue;
+            }
+            auto plugin = reg.find_plugin(entry.owner);
+            if (plugin && plugin->get_name() == plugin_name) {
+                auto& info = entry.factory->get_class_info();
+                if (info.name == class_name) {
+                    return info.uid;
+                }
+            }
+        }
+        return {};
+    }
+
+    // Unscoped: match by class name directly
+    std::shared_lock lock(mutex_);
+    for (const auto& entry : types_) {
+        if (entry.factory) {
+            auto& info = entry.factory->get_class_info();
+            if (info.name == name) {
+                return info.uid;
+            }
+        }
+    }
+    return {};
 }
 
 void TypeRegistry::for_each_class(void* ctx, ClassVisitorFn visitor) const

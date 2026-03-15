@@ -108,6 +108,9 @@ public:
         return get_class_info(T::class_id());
     }
 
+    /** @brief Returns the class UID for a registered type by name, or zero Uid if not found. */
+    virtual Uid find_class_by_name(string_view name) const = 0;
+
     /**
      * @brief Iterates all registered classes.
      * @param ctx Opaque pointer forwarded to the visitor.

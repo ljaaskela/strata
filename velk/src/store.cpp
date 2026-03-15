@@ -8,7 +8,7 @@ IObject::Ptr StoreImpl::find(string_view id) const
 {
     std::shared_lock lock(mutex_);
     for (const auto& entry : entries_) {
-        if (string_view(entry.id) == id) {
+        if (entry.id == id) {
             return entry.object;
         }
     }
@@ -24,10 +24,7 @@ size_t StoreImpl::object_count() const
 IObject::Ptr StoreImpl::object_at(size_t index) const
 {
     std::shared_lock lock(mutex_);
-    if (index >= entries_.size()) {
-        return {};
-    }
-    return entries_[index].object;
+    return index < entries_.size() ? entries_[index].object : nullptr;
 }
 
 ReturnValue StoreImpl::add(string_view id, const IObject::Ptr& object)
@@ -37,11 +34,11 @@ ReturnValue StoreImpl::add(string_view id, const IObject::Ptr& object)
     }
     std::unique_lock lock(mutex_);
     for (const auto& entry : entries_) {
-        if (string_view(entry.id) == id) {
+        if (entry.id == id) {
             return ReturnValue::Fail;
         }
     }
-    entries_.push_back({string(id), object});
+    entries_.push_back({id, object});
     return ReturnValue::Success;
 }
 

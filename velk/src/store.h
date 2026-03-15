@@ -27,12 +27,13 @@ public:
     IObject::Ptr object_at(size_t index) const override;
     ReturnValue add(string_view id, const IObject::Ptr& object) override;
 
-private:
     struct Entry
     {
         string id;
         IObject::Ptr object;
     };
+
+private:
 
     mutable std::shared_mutex mutex_;
     vector<Entry> entries_;

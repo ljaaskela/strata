@@ -2,6 +2,7 @@
 #include <velk/ext/object.h>
 #include <velk/ext/plugin.h>
 #include <velk/interface/types.h>
+#include <velk/string.h>
 
 #include <gtest/gtest.h>
 
@@ -206,6 +207,45 @@ TEST_F(PluginTest, PluginTypesRegistered)
 
     auto obj = velk_.create<IObject>(PluginWidget::class_id());
     ASSERT_TRUE(obj);
+}
+
+TEST_F(PluginTest, FindClassByNameUnscoped)
+{
+    auto& reg = velk_.plugin_registry();
+    reg.load_plugin(plugin_);
+
+    auto uid = velk_.type_registry().find_class_by_name(PluginWidget::class_name());
+    EXPECT_EQ(PluginWidget::class_id(), uid);
+}
+
+TEST_F(PluginTest, FindClassByNameScoped)
+{
+    auto& reg = velk_.plugin_registry();
+    reg.load_plugin(plugin_);
+
+    // "TestPlugin.<class_name>" should resolve via plugin name + class name
+    auto scoped = ::velk::string(tp_->get_name());
+    scoped += ::velk::string(".");
+    scoped += ::velk::string(PluginWidget::class_name());
+    auto uid = velk_.type_registry().find_class_by_name(scoped);
+    EXPECT_EQ(PluginWidget::class_id(), uid);
+}
+
+TEST_F(PluginTest, FindClassByNameScopedWrongPlugin)
+{
+    auto& reg = velk_.plugin_registry();
+    reg.load_plugin(plugin_);
+
+    auto scoped = ::velk::string("WrongPlugin.");
+    scoped += ::velk::string(PluginWidget::class_name());
+    auto uid = velk_.type_registry().find_class_by_name(string_view(scoped));
+    EXPECT_EQ(Uid{}, uid);
+}
+
+TEST_F(PluginTest, FindClassByNameNotFound)
+{
+    auto uid = velk_.type_registry().find_class_by_name("NonExistentClass");
+    EXPECT_EQ(Uid{}, uid);
 }
 
 TEST_F(PluginTest, UnloadPlugin)
