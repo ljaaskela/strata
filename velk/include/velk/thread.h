@@ -16,6 +16,10 @@ inline uint32_t current_thread_id()
 {
 #ifdef _WIN32
     return static_cast<uint32_t>(GetCurrentThreadId());
+#elif defined(__APPLE__)
+    uint64_t tid = 0;
+    pthread_threadid_np(nullptr, &tid);
+    return static_cast<uint32_t>(tid);
 #else
     return static_cast<uint32_t>(pthread_self());
 #endif
