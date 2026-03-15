@@ -11,6 +11,7 @@
 #include "hive/raw_hive.h"
 #include "property.h"
 #include "object_ref.h"
+#include "thread_context.h"
 #include "variant.h"
 
 #include <velk/ext/any.h>
@@ -36,6 +37,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<BindingImpl>();
     ITypeRegistry::register_type<VariantImpl>();
     ITypeRegistry::register_type<ObjectRefImpl>();
+    ITypeRegistry::register_type<ThreadContextImpl>();
 
     ITypeRegistry::register_type<ext::AnyValue<bool>>();
     ITypeRegistry::register_type<ext::AnyValue<float>>();
@@ -188,6 +190,15 @@ InterpolatorFn TypeRegistry::find_interpolator(Uid typeUid) const
         return it->fn;
     }
     return nullptr;
+}
+
+void TypeRegistry::create_event_once(IEvent::Ptr& slot) const
+{
+    std::unique_lock lock(mutex_);
+    if (!slot) {
+        static const auto& factory = EventImpl::get_factory();
+        slot = interface_pointer_cast<IEvent>(factory.create_instance());
+    }
 }
 
 IAny::Ptr TypeRegistry::create_any(Uid type) const

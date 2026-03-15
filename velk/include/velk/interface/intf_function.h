@@ -4,14 +4,23 @@
 #include <velk/common.h>
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_interface.h>
+#include <velk/thread.h>
 
 namespace velk {
 
-/** @brief Specifies whether an invocation should execute immediately or be deferred to update(). */
+/**
+ * @brief Specifies invocation timing.
+ *
+ * Auto (default): checks the current thread against the object's owner thread.
+ * Same thread resolves to Immediate; different thread resolves to Deferred.
+ * Immediate: executes synchronously.
+ * Deferred: queues for the next update() call.
+ */
 enum InvokeType : uint8_t
 {
-    Immediate = 0,
-    Deferred = 1
+    Auto = 0,
+    Immediate = 1,
+    Deferred = 2
 };
 
 /**
@@ -52,7 +61,7 @@ public:
      * @param type Immediate executes now; Deferred queues for the next update() call.
      * @return Typed result (nullptr = void/no result).
      */
-    virtual IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const = 0;
+    virtual IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const = 0;
 };
 
 /**
@@ -61,16 +70,28 @@ public:
  * @param args Arguments for invocation.
  * @param type Immediate executes now; Deferred queues for the next update() call.
  */
-inline IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, FnArgs args = {}, InvokeType type = Immediate)
+inline IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, FnArgs args = {}, InvokeType type = Auto)
 {
     return fn ? fn->invoke(args, type) : nullptr;
 }
 
 /** @brief Invokes a function with a single IAny argument. */
-inline IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const IAny* arg, InvokeType type = Immediate)
+inline IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const IAny* arg, InvokeType type = Auto)
 {
     FnArgs args{&arg, 1};
     return fn ? fn->invoke(args, type) : nullptr;
+}
+
+/**
+ * @brief Resolves Auto to Immediate or Deferred based on thread ownership.
+ * @param type The requested invoke type.
+ * @param owner_thread_id The thread that owns the target object.
+ * @return Immediate if same thread or type was already Immediate; Deferred otherwise.
+ */
+inline InvokeType resolve_invoke_type(InvokeType type, uint32_t owner_thread_id)
+{
+    if (type != Auto) return type;
+    return current_thread_id() == owner_thread_id ? Immediate : Deferred;
 }
 
 } // namespace velk

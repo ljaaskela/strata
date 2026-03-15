@@ -11,8 +11,8 @@ namespace velk {
 /** @brief Static descriptor for an interface type, providing its UID and name. */
 struct InterfaceInfo
 {
-    Uid uid;
-    string_view name;
+    Uid uid;          ///< Interface uid
+    string_view name; ///< Interface name
 };
 
 /**
@@ -96,7 +96,7 @@ protected:
 template <typename T, typename Base = IInterface, uint64_t UidHi = 0, uint64_t UidLo = 0>
 class Interface : public Base
 {
-    static constexpr Uid compute_uid()
+    static constexpr Uid get_interface_uid()
     {
         if constexpr (UidHi == 0 && UidLo == 0) {
             return type_uid<T>();
@@ -107,9 +107,9 @@ class Interface : public Base
 
 public:
     /** @brief Compile-time unique identifier for this interface type. */
-    static constexpr Uid UID = compute_uid();
+    static constexpr Uid UID = get_interface_uid();
     /** @brief Static descriptor containing the UID and human-readable name. */
-    static constexpr InterfaceInfo INFO{compute_uid(), get_name<T>()};
+    static constexpr InterfaceInfo INFO{get_interface_uid(), get_name<T>()};
     /** @brief Shared pointer to a mutable T. */
     using Ptr = shared_ptr<T>;
     /** @brief Shared pointer to a const T. */

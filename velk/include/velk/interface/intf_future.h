@@ -30,7 +30,7 @@ public:
      * @param fn The continuation function.
      * @param type Immediate fires synchronously; Deferred queues via instance().queue_deferred_tasks().
      */
-    virtual void add_continuation(const IFunction::ConstPtr& fn, InvokeType type = Immediate) = 0;
+    virtual void add_continuation(const IFunction::ConstPtr& fn, InvokeType type = Auto) = 0;
 
     /**
      * @brief Adds a continuation and returns a chained future that resolves with its result.
@@ -42,7 +42,7 @@ public:
      * @param type Immediate fires synchronously; Deferred queues via instance().queue_deferred_tasks().
      * @return A new IFuture that resolves when the continuation completes.
      */
-    virtual IFuture::Ptr then(const IFunction::ConstPtr& fn, InvokeType type = Immediate) = 0;
+    virtual IFuture::Ptr then(const IFunction::ConstPtr& fn, InvokeType type = Auto) = 0;
 };
 
 /**

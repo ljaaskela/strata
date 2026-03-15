@@ -175,7 +175,7 @@ ReturnValue set_at(size_t index, const T& value);
 ReturnValue push_back(const T& value);
 ReturnValue erase_at(size_t index);
 void clear();
-ReturnValue set_value(const vector<T>& value, InvokeType type = Immediate);
+ReturnValue set_value(const vector<T>& value, InvokeType type = Auto);
 ```
 
 #### ArrayAny\<T\>
@@ -427,9 +427,21 @@ The three constructor forms are mutually exclusive via SFINAE:
 
 `invoke()` returns `IAny::Ptr`, `nullptr` for void results, or a typed result. Typed-return lambdas have their result automatically wrapped via `Any<R>`. When fewer arguments are provided than the lambda expects, `invoke()` returns `nullptr`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
 
+### Invocation modes
+
+Functions, events, and properties use the `InvokeType` enum to control execution timing:
+
+| Mode | Value | Behavior |
+|---|---|---|
+| `Auto` | 0 | Default. Compares the calling thread to the object's owner thread. Same thread resolves to `Immediate`; different thread resolves to `Deferred`. |
+| `Immediate` | 1 | Executes synchronously on the calling thread. |
+| `Deferred` | 2 | Queues work for the next `instance().update()` call. |
+
+`Auto` is the default for all APIs. It adds one thread ID comparison per call. Use `Immediate` to opt out for zero overhead, or `Deferred` to explicitly queue.
+
 ### Deferred invocation
 
-Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::velk::instance().update()` is called.
+Deferred work is queued and executed when `::velk::instance().update()` is called.
 
 ```mermaid
 sequenceDiagram
@@ -459,8 +471,9 @@ Pass `Deferred` to `invoke()` to queue the entire invocation:
 
 ```cpp
 auto fn = iw->reset();
-invoke_function(fn, args);                                // executes now (default)
-invoke_function(fn, args, InvokeType::Deferred);          // queued for update()
+invoke_function(fn, args);                                // Auto (default): same thread = immediate
+invoke_function(fn, args, Immediate);                     // always executes now
+invoke_function(fn, args, Deferred);                      // always queued for update()
 ```
 
 #### Deferred event handlers
@@ -469,8 +482,8 @@ Register a handler as deferred so it is queued each time the event fires, while 
 
 ```cpp
 auto event = iw->on_clicked();
-event->add_handler(immediateHandler);                        // fires synchronously
-event->add_handler(deferredHandler, InvokeType::Deferred);   // queued for update()
+event->add_handler(immediateHandler);                        // Auto: same thread = immediate
+event->add_handler(deferredHandler, Deferred);               // always queued for update()
 
 invoke_event(event, args);  // immediateHandler runs now, deferredHandler is queued
 instance().update();        // deferredHandler runs here

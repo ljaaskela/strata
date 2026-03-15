@@ -22,7 +22,7 @@ public:
      * @param fn Handler to register. A handler can only be added once.
      * @param type Immediate handlers fire synchronously; Deferred handlers are queued for update().
      */
-    virtual ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const = 0;
+    virtual ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Auto) const = 0;
     /**
      * @brief Removes an event handler function.
      * @param fn Handler to remove (searched in both immediate and deferred lists).

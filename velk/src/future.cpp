@@ -47,6 +47,7 @@ ReturnValue FutureImpl::set_result(const IAny* result)
 
 void FutureImpl::add_continuation(const IFunction::ConstPtr& fn, InvokeType type)
 {
+    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (!fn) {
         return;
     }
@@ -81,6 +82,7 @@ void FutureImpl::fire_continuation(const Continuation& cont, const IAny* result)
 
 IFuture::Ptr FutureImpl::then(const IFunction::ConstPtr& fn, InvokeType type)
 {
+    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     auto chained = instance().create_future();
     auto* internal = interface_cast<IFutureInternal>(chained);
     Callback wrapper([internal, chained, fn](FnArgs args) -> IAny::Ptr {

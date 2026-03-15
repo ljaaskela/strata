@@ -38,6 +38,7 @@ public:
     /** @brief Erases all entries owned by the given plugin UID. */
     void sweep_owner(Uid uid);
 
+    void create_event_once(IEvent::Ptr& slot) const override;
     IAny::Ptr create_any(Uid type) const override;
     IVariant::Ptr create_variant() const override;
     IObjectRef::Ptr create_object_ref() const override;

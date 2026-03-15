@@ -107,7 +107,7 @@ inline Binding create_binding()
  * @param mode OneWay (default) or TwoWay.
  * @return The binding (not yet installed on any target).
  */
-inline Binding create_binding(const IProperty::Ptr& source, InvokeType type = Immediate,
+inline Binding create_binding(const IProperty::Ptr& source, InvokeType type = Auto,
                               BindingMode mode = BindingMode::OneWay)
 {
     auto b = create_binding();
@@ -133,7 +133,7 @@ inline Binding create_binding(const IProperty::Ptr& source, InvokeType type = Im
  */
 inline Binding create_binding(const IFunction::ConstPtr& fn,
                               std::initializer_list<IProperty::ConstPtr> deps,
-                              InvokeType type = Immediate)
+                              InvokeType type = Auto)
 {
     auto b = create_binding();
     if (auto* internal = interface_cast<IBindingInternal>(IBinding::Ptr(b))) {
@@ -154,7 +154,7 @@ inline Binding create_binding(const IFunction::ConstPtr& fn,
  * @param type Immediate (default) fires on_changed synchronously; Deferred batches to update().
  * @return The binding (not yet installed on any target).
  */
-inline Binding create_binding(const IFunction::ConstPtr& fn, InvokeType type = Immediate)
+inline Binding create_binding(const IFunction::ConstPtr& fn, InvokeType type = Auto)
 {
     auto b = create_binding();
     if (auto* internal = interface_cast<IBindingInternal>(IBinding::Ptr(b))) {
@@ -166,7 +166,7 @@ inline Binding create_binding(const IFunction::ConstPtr& fn, InvokeType type = I
 
 /** @brief Creates a property binding and installs it on a single target. */
 inline Binding create_binding(const IProperty::Ptr& target, const IProperty::Ptr& source,
-                              InvokeType type = Immediate, BindingMode mode = BindingMode::OneWay)
+                              InvokeType type = Auto, BindingMode mode = BindingMode::OneWay)
 {
     auto b = create_binding(source, type, mode);
     b.add_target(target);
@@ -176,7 +176,7 @@ inline Binding create_binding(const IProperty::Ptr& target, const IProperty::Ptr
 /** @brief Creates a function binding with explicit deps and installs it on a single target. */
 inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
                               std::initializer_list<IProperty::ConstPtr> deps,
-                              InvokeType type = Immediate)
+                              InvokeType type = Auto)
 {
     auto b = create_binding(fn, deps, type);
     b.add_target(target);
@@ -185,7 +185,7 @@ inline Binding create_binding(const IProperty::Ptr& target, const IFunction::Con
 
 /** @brief Creates an auto-tracked function binding and installs it on a single target. */
 inline Binding create_binding(const IProperty::Ptr& target, const IFunction::ConstPtr& fn,
-                              InvokeType type = Immediate)
+                              InvokeType type = Auto)
 {
     auto b = create_binding(fn, type);
     b.add_target(target);

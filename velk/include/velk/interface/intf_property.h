@@ -19,7 +19,7 @@ public:
      *         ReturnValue::NothingToDo if the same value was set
      *         ReturnValue::Fail otherwise
      */
-    virtual ReturnValue set_value(const IAny& from, InvokeType type = Immediate) = 0;
+    virtual ReturnValue set_value(const IAny& from, InvokeType type = Auto) = 0;
     /**
      * @brief Returns the property's current value.
      */
@@ -55,7 +55,7 @@ public:
      * @param type Type UID of the data.
      */
     virtual ReturnValue set_data(const void* data, size_t size, Uid type,
-                                 InvokeType invokeType = Immediate) = 0;
+                                 InvokeType invokeType = Auto) = 0;
     /**
      * @brief Copies @p from into the backing value without firing on_changed.
      * @return ReturnValue::Success if the value changed and the caller should fire on_changed.

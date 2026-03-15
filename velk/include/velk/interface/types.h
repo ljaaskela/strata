@@ -48,6 +48,9 @@ inline constexpr Uid Variant{"e5f2a7b3-8c14-4d69-9e2f-3a1b5c6d7e80"};
  *  Declared via `(PROP, ObjectRef, name, {})` in VELK_INTERFACE.
  *  @see velk::ObjectRef (api/object_ref.h) */
 inline constexpr Uid ObjectRef{"f3a1b5c6-d7e8-4f09-a2b3-c4d5e6f70189"};
+/** @brief Opt-in shared reader/writer lock for concurrent property access.
+ *  @see velk::ThreadContext (api/thread_context.h) */
+inline constexpr Uid ThreadContext{"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"};
 } // namespace ClassId
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */

@@ -18,6 +18,13 @@ This document describes the general architecture and code division in Velk.
   - [shared_ptr dual mode](#shared_ptr-dual-mode)
   - [STL types in public headers](#stl-types-in-public-headers)
   - [What is NOT replaced](#what-is-not-replaced)
+- [Threading model](#threading-model)
+  - [Design rationale](#design-rationale)
+  - [InvokeType and thread ownership](#invoketype-and-thread-ownership)
+  - [What Auto does not cover](#what-auto-does-not-cover)
+  - [ThreadContext (opt-in read/write synchronization)](#threadcontext-opt-in-readwrite-synchronization)
+  - [Thread safety guarantees](#thread-safety-guarantees)
+  - [Platform thread IDs](#platform-thread-ids)
 - [Key types](#key-types)
 
 ## Layers
@@ -61,7 +68,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_object_storage.h` | `AttachmentQuery`, `IObjectStorage` extends `IMetadata` with attachment support |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
 | `intf_event.h` | `IEvent` (inherits `IFunction`) with add/remove handler (immediate or deferred) |
-| `intf_function.h` | `FnArgs` argument view, `IFunction` invocable callback with `InvokeType` support |
+| `intf_function.h` | `FnArgs` argument view, `IFunction` invocable callback with `InvokeType` support, `resolve_invoke_type()` helper |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
 | `intf_type_registry.h` | `ITypeRegistry` for type registration and class info lookup |
@@ -69,6 +76,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_plugin_registry.h` | `IPluginRegistry` for loading/unloading plugins by instance or from shared libraries |
 | `intf_velk.h` | `UpdateInfo`, `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` and plugin management to `IPluginRegistry` via `plugin_registry()` |
 | `intf_hierarchy.h` | `HierarchyNode`, `HierarchyChange`, `IHierarchy` external tree of `IObject` references with `on_changing`/`on_changed` events; `IHierarchyAware` optional lifecycle callbacks |
+| `intf_thread_context.h` | `IThreadContext` opt-in shared reader/writer lock satisfying C++ SharedMutex named requirements |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `Duration`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
@@ -102,6 +110,7 @@ User-facing typed wrappers.
 | `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
 | `object.h` | `Object` convenience wrapper with null-safe metadata, state, and attachment access |
 | `hierarchy.h` | `Hierarchy` wrapper inheriting `Object` for `IHierarchy` operations; `Node` wrapper for `HierarchyNode` snapshots |
+| `thread_context.h` | `ThreadContext` wrapper with `read_lock()`/`write_lock()` RAII helpers; `create_thread_context()` factory |
 | `attachment.h` | `find_or_create_attachment<T>()` free function helpers |
 
 ## src/
@@ -187,6 +196,11 @@ classDiagram
         <<interface>>
         load/unload/find plugin
     }
+    class IThreadContext {
+        <<interface>>
+        lock_shared/unlock_shared
+        lock/unlock/try_lock
+    }
 
     IInterface <|-- IObject
     IObject <|-- IAny
@@ -203,6 +217,7 @@ classDiagram
     IInterface <|-- ITypeRegistry
     IInterface <|-- IPluginRegistry
     IInterface <|-- IVelk
+    IInterface <|-- IThreadContext
 ```
 
 ### ext/ class hierarchy
@@ -353,6 +368,93 @@ The public headers also make heavy use of STL type traits (`std::is_base_of_v`, 
 
 `std::unique_ptr`, `std::mutex`, and `std::vector` are used in internal DLL implementations (`src/`) where they do not cross the boundary. `velk::string` and `velk::vector<T>` are available as ABI-stable replacements for `std::string` and `std::vector<T>` in public interface signatures. Internal DLL code may still use the STL variants when values do not cross the boundary.
 
+## Threading model
+
+Velk objects are not internally synchronized. Properties, events, and functions have no mutexes. Instead, thread safety is handled through **invocation modes** that route work based on which thread is calling.
+
+### Design rationale
+
+Properties, events, and functions use three invocation modes to control when work executes:
+
+- **Auto** (default): compares the calling thread's ID against the object's owner thread ID. Same thread executes immediately; different thread defers to `update()`. One thread ID comparison per call.
+- **Immediate**: executes synchronously, zero overhead. The caller takes responsibility for thread safety.
+- **Deferred**: clones arguments and queues the work for the next `instance().update()` call, regardless of which thread is calling. Useful for batching changes.
+
+Immediate and Deferred map directly to same-thread and cross-thread access: a write from the owning thread can safely execute in place, while a write from another thread should be queued to avoid data races. Auto makes this routing automatic so callers don't need to know which thread they're on.
+
+This fits a pay-for-what-you-use model. Auto is the safe default with minimal overhead. Single-threaded apps can switch to Immediate to eliminate even the thread ID comparison. Multi-threaded apps that want explicit control over batching can use Deferred directly.
+
+### InvokeType and thread ownership
+
+Every object stores the thread ID of its creator in `ObjectData::owner_thread_id`. This is set once at construction and currently cannot be changed (thread ownership transfer is future work).
+
+When a method like `set_value`, `invoke`, or `add_handler` receives `Auto`, the implementation calls `resolve_invoke_type()`:
+
+```cpp
+inline InvokeType resolve_invoke_type(InvokeType type, uint32_t owner_thread_id)
+{
+    if (type != Auto) return type;
+    return current_thread_id() == owner_thread_id ? Immediate : Deferred;
+}
+```
+
+This happens at the top of each DLL-side implementation (`ClassId::Property`, `ClassId::Function`, `ClassId::Event`, `ClassId::Future`). API wrappers and interfaces pass `Auto` through unchanged; resolution always happens inside the DLL where the object's thread ID is accessible.
+
+The `Auto = 0` enum value means that zero-initialized or default-constructed `InvokeType` fields are Auto, making it the natural default everywhere.
+
+### What Auto does not cover
+
+Auto mode solves **accidental cross-thread writes**: a background thread calling `set_value` without specifying `Deferred` will have its write safely queued instead of corrupting data. But it does not provide **read/write synchronization**.
+
+If a render thread reads property state while the UI thread writes (both on the owning thread's `update()` cycle), Auto mode does not help because both threads may be accessing data simultaneously. Velk provides `IThreadContext` as an opt-in solution for this case (see below).
+
+### ThreadContext (opt-in read/write synchronization)
+
+`IThreadContext` is an opt-in shared reader/writer lock that satisfies the C++ SharedMutex named requirements. This means `std::shared_lock<IThreadContext>` and `std::unique_lock<IThreadContext>` work directly.
+
+**Why manual, not automatic:** Per-property mutexes would add overhead to every object whether it needs thread safety or not, and would make batch operations (reading ten properties in one frame) acquire and release ten separate locks. A single shared lock per object group is both cheaper and more correct: readers hold a shared lock for the duration of their batch, writers hold an exclusive lock for theirs, and objects that never leave the owning thread pay zero cost.
+
+**Usage:**
+
+```cpp
+auto ctx = create_thread_context();
+
+// Attach to a hierarchy so all objects in the tree share one lock
+auto h = create_hierarchy();
+h.set_thread_context(ctx);
+
+// Reader thread
+{
+    auto lock = ctx.read_lock();   // std::shared_lock
+    auto val = prop.get_value();
+}
+
+// Writer thread
+{
+    auto lock = ctx.write_lock();  // std::unique_lock
+    prop.set_value(42, Immediate);
+}
+```
+
+**Hierarchy attachment:** `Hierarchy::set_thread_context()` stores the context as an attachment on the hierarchy object. `Hierarchy::thread_context()` retrieves it. This lets an entire object tree share a single lock without each object needing to know about threading.
+
+### Thread safety guarantees
+
+| Component | Thread safety |
+|---|---|
+| `instance().type_registry()` | Thread-safe (concurrent reads, exclusive writes) |
+| `instance().plugin_registry()` | Thread-safe (concurrent reads, exclusive writes) |
+| `instance().queue_deferred_tasks()` | Thread-safe (mutex-protected queue) |
+| `instance().create_future()` | Thread-safe (safe to resolve, wait, and add continuations from any thread) |
+| `IThreadContext` | Thread-safe (wraps `std::shared_mutex`; satisfies SharedMutex named requirements) |
+| Properties, events, functions | Not internally synchronized. `InvokeMode::Auto` routes cross-thread writes through the deferred queue. Opt-in `IThreadContext` available for read/write synchronization. |
+
+### Platform thread IDs
+
+Thread identification uses OS-level thread IDs (`GetCurrentThreadId()` on Windows, `pthread_self()` on POSIX) stored as `uint32_t`. These are plain integers that are safe to compare across DLL boundaries, unlike `std::thread::id` which is CRT-dependent and may differ between compilation units linked against different standard libraries.
+
+The `current_thread_id()` utility in `thread.h` is a thin inline wrapper. On Windows it uses a forward-declared `GetCurrentThreadId()` to avoid pulling in `windows.h`.
+
 ## Key types
 
 | Type | Role |
@@ -371,7 +473,7 @@ The public headers also make heavy use of STL type traits (`std::is_base_of_v`, 
 | `ext::RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |
 | `ext::ObjectCore<T, Interfaces...>` | Minimal CRTP base for objects (without metadata); auto UID/name, factory, self-pointer |
 | `ext::Object<T, Interfaces...>` | Full CRTP base; extends `ObjectCore` with metadata from all interfaces |
-| `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
+| `InvokeType` | Enum (`Auto`, `Immediate`, `Deferred`) controlling execution timing. `Auto` (default) checks thread ownership: same thread = `Immediate`, different thread = `Deferred` |
 | `FnArgs` | Non-owning view of function arguments (`{const IAny* const* data, size_t count}`) with bounds-checked `operator[]` |
 | `FunctionContext` | Lightweight view over `FnArgs` with count validation and typed `arg<T>(i)` access |
 | `DeferredTask` | Nested struct in `IVelk` pairing an `IFunction::ConstPtr` with a cloned `std::vector<IAny::Ptr>` of args |
@@ -388,5 +490,7 @@ The public headers also make heavy use of STL type traits (`std::is_base_of_v`, 
 | `PluginDependency` | Plugin dependency entry: UID and optional minimum version |
 | `Duration` | Type-safe microsecond duration (`{int64_t us}`) used in `UpdateInfo` and `IVelk::update()` |
 | `UpdateInfo` | Time information passed to plugin `update()`: `time`, `elapsed`, and `dt` (all `Duration`) |
+| `IThreadContext` | Opt-in shared reader/writer lock interface; satisfies C++ SharedMutex named requirements (`lock_shared`/`unlock_shared`/`lock`/`unlock`/`try_lock_shared`/`try_lock`) |
+| `ThreadContext` | API wrapper around `IThreadContext::Ptr`; provides `read_lock()` (shared) and `write_lock()` (exclusive) returning RAII lock guards |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, `array_view<InterfaceInfo>` of implemented interfaces, and `array_view<MemberDesc>` for a registered class |
