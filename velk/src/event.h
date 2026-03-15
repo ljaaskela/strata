@@ -18,7 +18,7 @@ namespace velk::impl {
 class Event final : public ext::ObjectCore<Event, IFunctionInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Event);
+    VELK_CLASS_UID(ClassId::Event, "Event");
 
     Event() = default;
     ~Event();

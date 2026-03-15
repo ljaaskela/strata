@@ -2,6 +2,7 @@
 #include <velk/api/store.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
+#include <velk/ext/plugin.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
 #include <velk/string.h>
@@ -25,7 +26,7 @@ public:
 class TestImportWidget : public ext::Object<TestImportWidget, ITestImportWidget>
 {
 public:
-    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000010");
+    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000010", "SimpleType");
 };
 
 class ITestImportPanel : public Interface<ITestImportPanel>
@@ -39,7 +40,36 @@ public:
 class TestImportPanel : public ext::Object<TestImportPanel, ITestImportPanel>
 {
 public:
-    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000011");
+    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000011", "AnotherType");
+};
+
+class IPluginWidget : public Interface<IPluginWidget>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, float, width, 0.f),
+        (PROP, float, height, 0.f)
+    )
+};
+
+class PluginOwnedWidget : public ext::Object<PluginOwnedWidget, IPluginWidget>
+{
+public:
+    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000020", "Widget");
+};
+
+class WidgetPlugin : public ext::Plugin<WidgetPlugin>
+{
+public:
+    VELK_PLUGIN_UID("c0000000-0000-0000-0000-0000000000a0");
+    VELK_PLUGIN_NAME("velk-ui");
+
+    ReturnValue initialize(IVelk& velk, PluginConfig&) override
+    {
+        return ::velk::register_type<PluginOwnedWidget>(velk);
+    }
+
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
 } // namespace velk
@@ -69,8 +99,8 @@ protected:
         ASSERT_TRUE(plugin);
         importer_ = interface_cast<IImporterPlugin>(plugin);
         ASSERT_NE(nullptr, importer_);
-        importer_->register_class_alias("test.Widget", TestImportWidget::class_id());
-        importer_->register_class_alias("test.Panel", TestImportPanel::class_id());
+        importer_->register_class_alias("test.Widget", TestImportWidget::static_class_id());
+        importer_->register_class_alias("test.Panel", TestImportPanel::static_class_id());
     }
 
     void TearDown() override
@@ -318,4 +348,42 @@ TEST_F(ImporterTest, EmptyStore)
     ASSERT_TRUE(result.store);
     EXPECT_TRUE(result.errors.empty());
     EXPECT_EQ(0u, result.store->object_count());
+}
+
+TEST_F(ImporterTest, ImportByScopedFriendlyName)
+{
+    load_importer();
+
+    // Load a plugin that registers PluginOwnedWidget with friendly name "Widget"
+    auto plugin = ext::make_object<WidgetPlugin, IPlugin>(); // Plugin name: velk-ui
+    ::velk::instance().plugin_registry().load_plugin(plugin);
+
+    // Import using "velk-ui.Widget" with no alias registration
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            {
+                "id": "w1",
+                "class": "velk-ui.Widget",
+                "properties": {
+                    "width": 320.0,
+                    "height": 240.0
+                }
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    // Expect an instance of "velk-ui.Widget" to be there
+    auto obj = result.store->find("w1");
+    ASSERT_TRUE(obj);
+
+    auto* pw = interface_cast<IPluginWidget>(obj);
+    ASSERT_NE(nullptr, pw);
+    EXPECT_FLOAT_EQ(320.0f, pw->width().get_value());
+    EXPECT_FLOAT_EQ(240.0f, pw->height().get_value());
+
+    ::velk::instance().plugin_registry().unload_plugin(WidgetPlugin::static_class_id());
 }

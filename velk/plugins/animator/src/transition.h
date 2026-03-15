@@ -58,7 +58,7 @@ inline constexpr Uid TransitionProxy{"a1b2c3d4-e5f6-4789-abcd-ef0123456789"};
 class TransitionProxy : public ext::AnyExtension<TransitionProxy>
 {
 public:
-    VELK_CLASS_UID(ProxyId::TransitionProxy);
+    VELK_CLASS_UID(ProxyId::TransitionProxy, "TransitionProxy");
 
     // IAnyExtension overrides
     bool set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner) override;
@@ -102,7 +102,7 @@ public:
 class Transition final : public ext::Object<Transition, ITransition, IAnyExtension>
 {
 public:
-    VELK_CLASS_UID(ClassId::Transition);
+    VELK_CLASS_UID(ClassId::Transition, "Transition");
     ~Transition();
 
     // IAnimation (base)

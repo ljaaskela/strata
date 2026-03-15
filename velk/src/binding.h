@@ -37,7 +37,7 @@ struct BindingData
 class Binding final : public ext::ObjectCore<Binding, IBindingInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Binding);
+    VELK_CLASS_UID(ClassId::Binding, "Binding");
 
     ~Binding();
 

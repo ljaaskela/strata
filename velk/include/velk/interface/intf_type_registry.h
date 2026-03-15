@@ -99,13 +99,13 @@ public:
         return unregister_type(T::get_factory());
     }
     /**
-     * @brief Returns the ClassInfo for a type using its static class_id() method.
-     * @tparam T An Object-derived class with a static class_id() method.
+     * @brief Returns the ClassInfo for a type using its static static_class_id() method.
+     * @tparam T An Object-derived class with a static static_class_id() method.
      */
     template <class T>
     const ClassInfo* get_class_info() const
     {
-        return get_class_info(T::class_id());
+        return get_class_info(T::static_class_id());
     }
 
     /** @brief Returns the class UID for a registered type by name, or zero Uid if not found. */

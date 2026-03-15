@@ -50,9 +50,9 @@ public:
     IObjectHive::Ptr get_hive()
     {
         static_assert(detail::has_class_id<T>::value,
-                      "T must be a registered Velk object type with class_id(). "
+                      "T must be a registered Velk object type with static_class_id(). "
                       "For plain data types use get_raw_hive<T>() instead.");
-        return get_hive(T::class_id());
+        return get_hive(T::static_class_id());
     }
 
     /** @brief Returns the object hive for type T, or nullptr if it does not exist. */
@@ -60,9 +60,9 @@ public:
     IObjectHive::Ptr find_hive() const
     {
         static_assert(detail::has_class_id<T>::value,
-                      "T must be a registered Velk object type with class_id(). "
+                      "T must be a registered Velk object type with static_class_id(). "
                       "For plain data types use find_raw_hive<T>() instead.");
-        return find_hive(T::class_id());
+        return find_hive(T::static_class_id());
     }
 
     /** @brief Returns the raw hive for type T, creating it if it does not exist. */

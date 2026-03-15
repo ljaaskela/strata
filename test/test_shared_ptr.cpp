@@ -267,7 +267,7 @@ TEST(SharedPtrIntrusive, LastSharedPtrDestroysObject)
 {
     TrackableObject::alive_count = 0;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         EXPECT_EQ(TrackableObject::alive_count, 1);
     }
     EXPECT_EQ(TrackableObject::alive_count, 0);
@@ -279,7 +279,7 @@ TEST(SharedPtrIntrusive, CopyKeepsObjectAlive)
     {
         shared_ptr<IObject> copy;
         {
-            auto obj = instance().create<IObject>(TrackableObject::class_id());
+            auto obj = instance().create<IObject>(TrackableObject::static_class_id());
             copy = obj;
             EXPECT_EQ(TrackableObject::alive_count, 1);
         }
@@ -293,7 +293,7 @@ TEST(SharedPtrIntrusive, MultipleCopiesKeepObjectAlive)
 {
     TrackableObject::alive_count = 0;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         auto copy1 = obj;
         auto copy2 = obj;
         auto copy3 = copy1;
@@ -312,7 +312,7 @@ TEST(SharedPtrIntrusive, MoveDoesNotDestroyObject)
 {
     TrackableObject::alive_count = 0;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         auto moved = std::move(obj);
         EXPECT_EQ(TrackableObject::alive_count, 1);
         EXPECT_FALSE(obj);
@@ -324,7 +324,7 @@ TEST(SharedPtrIntrusive, MoveDoesNotDestroyObject)
 TEST(SharedPtrIntrusive, ResetDestroysWhenLastRef)
 {
     TrackableObject::alive_count = 0;
-    auto obj = instance().create<IObject>(TrackableObject::class_id());
+    auto obj = instance().create<IObject>(TrackableObject::static_class_id());
     EXPECT_EQ(TrackableObject::alive_count, 1);
     obj.reset();
     EXPECT_EQ(TrackableObject::alive_count, 0);
@@ -338,7 +338,7 @@ TEST(SharedPtrIntrusive, InterfacePointerCastKeepsAlive)
     {
         shared_ptr<IInterface> base;
         {
-            auto obj = instance().create<IObject>(TrackableObject::class_id());
+            auto obj = instance().create<IObject>(TrackableObject::static_class_id());
             base = interface_pointer_cast<IInterface>(obj);
             EXPECT_TRUE(base);
         }
@@ -352,7 +352,7 @@ TEST(SharedPtrIntrusive, InterfaceCastBackAndForth)
 {
     TrackableObject::alive_count = 0;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         auto asIntf = interface_pointer_cast<IInterface>(obj);
         auto backToObj = interface_pointer_cast<IObject>(asIntf);
         EXPECT_EQ(backToObj.get(), obj.get());
@@ -372,7 +372,7 @@ TEST(WeakPtrIntrusive, ExpiredAfterLastSharedDies)
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         wp = obj;
         EXPECT_FALSE(wp.expired());
         EXPECT_EQ(TrackableObject::alive_count, 1);
@@ -387,7 +387,7 @@ TEST(WeakPtrIntrusive, LockExtendsLifetime)
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         wp = obj;
     }
     // object should be dead, lock should fail
@@ -396,7 +396,7 @@ TEST(WeakPtrIntrusive, LockExtendsLifetime)
 
     // now test that lock() while alive extends lifetime
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         wp = obj;
         auto locked = wp.lock();
         EXPECT_TRUE(locked);
@@ -413,7 +413,7 @@ TEST(WeakPtrIntrusive, MultipleWeakPtrsToSameObject)
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp1, wp2, wp3;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         wp1 = obj;
         wp2 = obj;
         wp3 = wp1;
@@ -433,7 +433,7 @@ TEST(WeakPtrIntrusive, WeakPtrSurvivesObjectDestruction)
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp;
     {
-        auto obj = instance().create<IObject>(TrackableObject::class_id());
+        auto obj = instance().create<IObject>(TrackableObject::static_class_id());
         wp = obj;
     }
     EXPECT_EQ(TrackableObject::alive_count, 0);
@@ -455,7 +455,7 @@ TEST(SharedPtrIntrusive, GetSelfKeepsObjectAlive)
     {
         IObject::Ptr self;
         {
-            auto obj = instance().create<IObject>(TrackableObject::class_id());
+            auto obj = instance().create<IObject>(TrackableObject::static_class_id());
             self = obj->get_self();
             EXPECT_EQ(self.get(), obj.get());
         }

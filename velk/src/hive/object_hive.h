@@ -53,7 +53,7 @@ struct HivePage
 class ObjectHive final : public ext::ObjectCore<ObjectHive, IObjectHive>
 {
 public:
-    VELK_CLASS_UID(ClassId::ObjectHive);
+    VELK_CLASS_UID(ClassId::ObjectHive, "ObjectHive");
 
     ObjectHive() = default;
     ~ObjectHive() override;

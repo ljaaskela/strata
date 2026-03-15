@@ -20,7 +20,7 @@ namespace velk::impl {
 class Property final : public ext::ObjectCore<Property, IPropertyInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Property);
+    VELK_CLASS_UID(ClassId::Property, "Property");
 
     Property() = default;
 

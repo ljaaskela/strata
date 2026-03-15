@@ -20,7 +20,7 @@ namespace velk::impl {
 class Store final : public ext::Object<Store, IStore>
 {
 public:
-    VELK_CLASS_UID(ClassId::Store);
+    VELK_CLASS_UID(ClassId::Store, "Store");
 
     IObject::Ptr find(string_view id) const override;
     size_t object_count() const override;

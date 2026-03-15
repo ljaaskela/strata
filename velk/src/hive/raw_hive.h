@@ -43,7 +43,7 @@ struct RawHivePage
 class RawHive final : public ext::ObjectCore<RawHive, IRawHive>
 {
 public:
-    VELK_CLASS_UID(ClassId::RawHive);
+    VELK_CLASS_UID(ClassId::RawHive, "RawHive");
 
     RawHive() = default;
     ~RawHive() override;

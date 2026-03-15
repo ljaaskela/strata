@@ -15,7 +15,7 @@ namespace velk::impl {
 class ThreadContext final : public ext::ObjectCore<ThreadContext, IThreadContext>
 {
 public:
-    VELK_CLASS_UID(ClassId::ThreadContext);
+    VELK_CLASS_UID(ClassId::ThreadContext, "ThreadContext");
 
     void lock_shared() override { mutex_.lock_shared(); }
     void unlock_shared() override { mutex_.unlock_shared(); }

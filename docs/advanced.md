@@ -131,7 +131,7 @@ bool remove_extension(const IAnyExtension::Ptr& extension);
 auto* pi = interface_cast<IPropertyInternal>(property);
 
 // Install
-auto clamp = instance().create<IValueClamp>(ValueClamp::class_id());
+auto clamp = instance().create<IValueClamp>(ValueClamp::static_class_id());
 clamp->set_bounds(0.f, 100.f);
 pi->install_extension(interface_pointer_cast<IAnyExtension>(clamp));
 

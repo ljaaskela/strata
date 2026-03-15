@@ -1,5 +1,6 @@
 #include "json_parser.h"
 
+#include <cstdint>
 #include <cstring>
 
 namespace velk {

@@ -18,7 +18,7 @@ namespace velk::impl {
 class AnimationTrack : public ext::Object<AnimationTrack, IAnimationTrack, IAnyExtension>
 {
 public:
-    VELK_CLASS_UID(ClassId::AnimationTrack);
+    VELK_CLASS_UID(ClassId::AnimationTrack, "AnimationTrack");
 
     ~AnimationTrack();
 

@@ -19,7 +19,7 @@ namespace velk::impl {
 class ObjectRef final : public ext::ObjectCore<ObjectRef, IObjectRef>
 {
 public:
-    VELK_CLASS_UID(ClassId::ObjectRef);
+    VELK_CLASS_UID(ClassId::ObjectRef, "ObjectRef");
 
     // IAny
     array_view<Uid> get_compatible_types() const override;

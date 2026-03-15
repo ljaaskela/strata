@@ -22,7 +22,7 @@ namespace velk::impl {
 class ArrayProperty final : public ext::ObjectCore<ArrayProperty, IPropertyInternal, IArrayProperty>
 {
 public:
-    VELK_CLASS_UID(ClassId::ArrayProperty);
+    VELK_CLASS_UID(ClassId::ArrayProperty, "ArrayProperty");
 
     ArrayProperty() = default;
 

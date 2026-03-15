@@ -16,7 +16,7 @@ namespace velk::impl {
 class Variant final : public ext::ObjectCore<Variant, IVariant>
 {
 public:
-    VELK_CLASS_UID(ClassId::Variant);
+    VELK_CLASS_UID(ClassId::Variant, "Variant");
 
     // IAny
     array_view<Uid> get_compatible_types() const override;

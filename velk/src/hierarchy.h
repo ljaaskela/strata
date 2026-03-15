@@ -19,7 +19,7 @@ namespace velk::impl {
 class Hierarchy final : public ext::Object<Hierarchy, IHierarchy>
 {
 public:
-    VELK_CLASS_UID(ClassId::Hierarchy);
+    VELK_CLASS_UID(ClassId::Hierarchy, "Hierarchy");
 
     ReturnValue set_root(const IObject::Ptr& root) override;
     ReturnValue add(const IObject::Ptr& parent, const IObject::Ptr& child) override;

@@ -11,7 +11,7 @@ namespace velk::impl {
 class Animator : public ext::Object<Animator, IAnimator>
 {
 public:
-    VELK_CLASS_UID(ClassId::Animator);
+    VELK_CLASS_UID(ClassId::Animator, "Animator");
 
     void tick(const UpdateInfo& info) override;
     void add(const IAnimation::Ptr& animation) override;

@@ -62,7 +62,7 @@ protected:
         instance().type_registry().register_type<ListenerObj>();
     }
 
-    IObject::Ptr make_obj() { return instance().create<IObject>(HierarchyTestObj::class_id()); }
+    IObject::Ptr make_obj() { return instance().create<IObject>(HierarchyTestObj::static_class_id()); }
 };
 
 TEST_F(HierarchyTest, CreateHierarchy)
@@ -439,8 +439,8 @@ TEST_F(HierarchyTest, ChildrenOfReturnsNodes)
     auto children = h.children_of(root);
     EXPECT_EQ(children.size(), 2u);
     // Each child is a Node that can be used as an Object
-    EXPECT_EQ(children[0].class_uid(), HierarchyTestObj::class_id());
-    EXPECT_EQ(children[1].class_uid(), HierarchyTestObj::class_id());
+    EXPECT_EQ(children[0].class_uid(), HierarchyTestObj::static_class_id());
+    EXPECT_EQ(children[1].class_uid(), HierarchyTestObj::static_class_id());
 }
 
 TEST_F(HierarchyTest, ForEachChild)
@@ -543,7 +543,7 @@ TEST_F(HierarchyTest, NodeInheritsObject)
 
     // Access through Node's inherited Object methods
     auto node = h.root();
-    EXPECT_EQ(node.class_uid(), HierarchyTestObj::class_id());
+    EXPECT_EQ(node.class_uid(), HierarchyTestObj::static_class_id());
     auto* iht = node.as<IHierarchyTest>();
     ASSERT_NE(iht, nullptr);
     EXPECT_EQ(iht->value().get_value(), 42);
@@ -702,7 +702,7 @@ TEST_F(HierarchyTest, ListenerJoinedCalledOnAdd)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
 
     h.set_root(root);
@@ -716,7 +716,7 @@ TEST_F(HierarchyTest, ListenerJoinedCalledOnInsert)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
 
     h.set_root(root);
@@ -728,7 +728,7 @@ TEST_F(HierarchyTest, ListenerJoinedCalledOnInsert)
 TEST_F(HierarchyTest, ListenerJoinedCalledOnSetRoot)
 {
     auto h = create_hierarchy();
-    auto root = instance().create<IObject>(ListenerObj::class_id());
+    auto root = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(root);
 
     h.set_root(root);
@@ -741,7 +741,7 @@ TEST_F(HierarchyTest, ListenerLeftCalledOnRemove)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
 
     h.set_root(root);
@@ -756,7 +756,7 @@ TEST_F(HierarchyTest, ListenerLeftCalledOnSubtreeRemove)
     auto h = create_hierarchy();
     auto root = make_obj();
     auto parent = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
 
     h.set_root(root);
@@ -771,8 +771,8 @@ TEST_F(HierarchyTest, ListenerLeftCalledOnSubtreeRemove)
 TEST_F(HierarchyTest, ListenerLeftCalledOnClear)
 {
     auto h = create_hierarchy();
-    auto root = instance().create<IObject>(ListenerObj::class_id());
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto root = instance().create<IObject>(ListenerObj::static_class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* rootListener = interface_cast<ITestListener>(root);
     auto* childListener = interface_cast<ITestListener>(child);
 
@@ -787,8 +787,8 @@ TEST_F(HierarchyTest, ListenerLeftCalledOnClear)
 TEST_F(HierarchyTest, ListenerLeftCalledOnSetRootReplace)
 {
     auto h = create_hierarchy();
-    auto root1 = instance().create<IObject>(ListenerObj::class_id());
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto root1 = instance().create<IObject>(ListenerObj::static_class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto root2 = make_obj();
     auto* root1Listener = interface_cast<ITestListener>(root1);
     auto* childListener = interface_cast<ITestListener>(child);
@@ -805,8 +805,8 @@ TEST_F(HierarchyTest, ListenerReplaceNotifiesBoth)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto old_child = instance().create<IObject>(ListenerObj::class_id());
-    auto new_child = instance().create<IObject>(ListenerObj::class_id());
+    auto old_child = instance().create<IObject>(ListenerObj::static_class_id());
+    auto new_child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* oldListener = interface_cast<ITestListener>(old_child);
     auto* newListener = interface_cast<ITestListener>(new_child);
 
@@ -823,7 +823,7 @@ TEST_F(HierarchyTest, ListenerRefuseJoin)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
     listener->state().allow_join = false;
 
@@ -837,7 +837,7 @@ TEST_F(HierarchyTest, ListenerRefuseJoinOnInsert)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
     listener->state().allow_join = false;
 
@@ -849,7 +849,7 @@ TEST_F(HierarchyTest, ListenerRefuseJoinOnInsert)
 TEST_F(HierarchyTest, ListenerRefuseJoinOnSetRoot)
 {
     auto h = create_hierarchy();
-    auto root = instance().create<IObject>(ListenerObj::class_id());
+    auto root = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(root);
     listener->state().allow_join = false;
 
@@ -861,7 +861,7 @@ TEST_F(HierarchyTest, ListenerRefuseLeave)
 {
     auto h = create_hierarchy();
     auto root = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
 
     h.set_root(root);
@@ -877,7 +877,7 @@ TEST_F(HierarchyTest, ListenerRefuseLeaveDoesNotAffectSubtreeRemove)
     auto h = create_hierarchy();
     auto root = make_obj();
     auto parent = make_obj();
-    auto child = instance().create<IObject>(ListenerObj::class_id());
+    auto child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(child);
     listener->state().allow_leave = false;
 
@@ -894,7 +894,7 @@ TEST_F(HierarchyTest, ListenerRefuseLeaveDoesNotAffectSubtreeRemove)
 TEST_F(HierarchyTest, ListenerRefuseLeaveDoesNotAffectClear)
 {
     auto h = create_hierarchy();
-    auto root = instance().create<IObject>(ListenerObj::class_id());
+    auto root = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(root);
     listener->state().allow_leave = false;
 
@@ -909,7 +909,7 @@ TEST_F(HierarchyTest, ListenerRefuseJoinOnReplace)
     auto h = create_hierarchy();
     auto root = make_obj();
     auto old_child = make_obj();
-    auto new_child = instance().create<IObject>(ListenerObj::class_id());
+    auto new_child = instance().create<IObject>(ListenerObj::static_class_id());
     auto* listener = interface_cast<ITestListener>(new_child);
     listener->state().allow_join = false;
 
@@ -1096,7 +1096,7 @@ TEST_F(EventHierarchyTest, NoEventOnVetoedOperation)
     auto h = create_hierarchy();
     subscribe(h);
 
-    auto root_obj = instance().create<IObject>(ListenerObj::class_id());
+    auto root_obj = instance().create<IObject>(ListenerObj::static_class_id());
     auto* root_listener = interface_cast<ITestListener>(root_obj);
     root_listener->state().allow_join = false;
 

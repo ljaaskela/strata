@@ -62,7 +62,7 @@ TEST_F(CApi, CreateAndRelease)
 {
     velk_uid class_id = velk_uid_from_string(nullptr);
     // Get the class UID via C++ and convert
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     class_id.hi = cpp_uid.hi;
     class_id.lo = cpp_uid.lo;
 
@@ -76,7 +76,7 @@ TEST_F(CApi, CreateAndRelease)
 
 TEST_F(CApi, ClassUidAndName)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -97,7 +97,7 @@ TEST_F(CApi, ClassUidAndName)
 
 TEST_F(CApi, PropertyGetSetFloat)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -128,7 +128,7 @@ TEST_F(CApi, PropertyGetSetFloat)
 
 TEST_F(CApi, PropertyGetSetInt32)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -165,7 +165,7 @@ static void test_callback(void* user_data, velk_property source)
 
 TEST_F(CApi, EventAddRemoveCallback)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -216,7 +216,7 @@ static void on_changed_callback(void* user_data, velk_property source)
 
 TEST_F(CApi, PropertyOnChanged)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -252,7 +252,7 @@ TEST_F(CApi, PropertyOnChanged)
 
 TEST_F(CApi, GetFunctionAndInvoke)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -279,7 +279,7 @@ TEST_F(CApi, GetFunctionAndInvoke)
 
 TEST_F(CApi, InvokeWithArgs)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);
@@ -308,7 +308,7 @@ TEST_F(CApi, InvokeWithArgs)
 
 TEST_F(CApi, GetFunctionNotFound)
 {
-    auto cpp_uid = CApiWidget::class_id();
+    auto cpp_uid = CApiWidget::static_class_id();
     velk_uid class_id = {cpp_uid.hi, cpp_uid.lo};
 
     velk_object obj = velk_create(class_id, 0);

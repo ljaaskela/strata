@@ -159,7 +159,7 @@ protected:
  * on top of the raw IObjectHive interface. The template parameter T controls the
  * interface type used by add(), remove(), contains(), and for_each():
  *
- *   ObjectHive<IMyWidget> hive(store, MyWidget::class_id());
+ *   ObjectHive<IMyWidget> hive(store, MyWidget::static_class_id());
  *   IMyWidget::Ptr w = hive.add();   // returns IMyWidget::Ptr
  *   hive.for_each([](IMyWidget& w) { ... });
  *

@@ -64,7 +64,7 @@ namespace velk::impl {
 class Function final : public ext::ObjectCore<Function, IFunctionInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Function);
+    VELK_CLASS_UID(ClassId::Function, "Function");
 
     Function() = default;
     ~Function();

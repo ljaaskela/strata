@@ -17,7 +17,7 @@ namespace velk::impl {
 class HiveStore final : public ext::ObjectCore<HiveStore, IHiveStore>
 {
 public:
-    VELK_CLASS_UID(ClassId::HiveStore);
+    VELK_CLASS_UID(ClassId::HiveStore, "HiveStore");
 
     // IHiveStore overrides
     IObjectHive::Ptr get_hive(Uid classUid) override;

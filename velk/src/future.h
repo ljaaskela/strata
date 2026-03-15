@@ -25,7 +25,7 @@ namespace velk::impl {
 class Future final : public ext::ObjectCore<Future, IFutureInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Future);
+    VELK_CLASS_UID(ClassId::Future, "Future");
 
     Future() = default;
 
