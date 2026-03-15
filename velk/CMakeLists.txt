@@ -21,6 +21,8 @@ add_library(velk SHARED
     include/velk/uid.h
     include/velk/duration.h
     include/velk/thread.h
+    src/store.cpp
+    src/store.h
     src/object_storage.cpp
     src/object_storage.h
     src/object_ref.cpp
@@ -63,6 +65,7 @@ add_library(velk SHARED
     include/velk/interface/intf_velk.h
     include/velk/interface/intf_metadata.h
     include/velk/interface/intf_object_storage.h
+    include/velk/interface/intf_store.h
     include/velk/interface/intf_hierarchy.h
     include/velk/interface/intf_thread_context.h
     include/velk/interface/member_desc.h
@@ -83,6 +86,7 @@ add_library(velk SHARED
     include/velk/api/thread_context.h
     include/velk/api/object.h
     include/velk/api/object_ref.h
+    include/velk/api/store.h
     include/velk/api/variant.h
     include/velk/ext/any.h
     include/velk/ext/any_extension.h

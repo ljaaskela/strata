@@ -51,6 +51,9 @@ inline constexpr Uid ObjectRef{"f3a1b5c6-d7e8-4f09-a2b3-c4d5e6f70189"};
 /** @brief Opt-in shared reader/writer lock for concurrent property access.
  *  @see velk::ThreadContext (api/thread_context.h) */
 inline constexpr Uid ThreadContext{"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"};
+/** @brief Flat collection of objects with id-based lookup.
+ *  @see velk::Store (api/store.h) */
+inline constexpr Uid Store{"b4dde845-c159-4737-90ed-f63d4bce6c42"};
 } // namespace ClassId
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */

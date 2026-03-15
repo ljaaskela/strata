@@ -107,6 +107,14 @@ public:
     {
         return get_class_info(T::class_id());
     }
+
+    /**
+     * @brief Iterates all registered classes.
+     * @param ctx Opaque pointer forwarded to the visitor.
+     * @param visitor Called for each registered class. Return false to stop early.
+     */
+    using ClassVisitorFn = bool (*)(void* ctx, const ClassInfo&);
+    virtual void for_each_class(void* ctx, ClassVisitorFn visitor) const = 0;
 };
 
 } // namespace velk

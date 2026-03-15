@@ -10,6 +10,7 @@
 #include "hive/object_hive.h"
 #include "hive/raw_hive.h"
 #include "property.h"
+#include "store.h"
 #include "object_ref.h"
 #include "thread_context.h"
 #include "variant.h"
@@ -37,6 +38,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<BindingImpl>();
     ITypeRegistry::register_type<VariantImpl>();
     ITypeRegistry::register_type<ObjectRefImpl>();
+    ITypeRegistry::register_type<StoreImpl>();
     ITypeRegistry::register_type<ThreadContextImpl>();
 
     ITypeRegistry::register_type<ext::AnyValue<bool>>();
@@ -247,6 +249,18 @@ IFunction::Ptr TypeRegistry::create_owned_callback(void* context, IFunction::Bou
         }
     }
     return func;
+}
+
+void TypeRegistry::for_each_class(void* ctx, ClassVisitorFn visitor) const
+{
+    std::shared_lock lock(mutex_);
+    for (const auto& entry : types_) {
+        if (entry.factory) {
+            if (!visitor(ctx, entry.factory->get_class_info())) {
+                break;
+            }
+        }
+    }
 }
 
 IProperty::Ptr TypeRegistry::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
