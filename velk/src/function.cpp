@@ -25,6 +25,7 @@ IAny::Ptr FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
 
 IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
 {
+    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (type == Deferred) {
         DeferredTask task;
         task.fn = get_self<IFunction>();

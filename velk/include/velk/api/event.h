@@ -25,7 +25,7 @@ public:
     operator bool() const { return event_.operator bool(); }
 
     /** @brief Adds a handler function for the event (null-safe). */
-    ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const
+    ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Auto) const
     {
         return event_ ? event_->add_handler(fn, type) : ReturnValue::InvalidArgument;
     }
@@ -49,7 +49,7 @@ public:
      * @endcode
      */
     template <class F, detail::require<!std::is_convertible_v<F, const IFunction::ConstPtr&>> = 0>
-    ReturnValue add_handler(F&& callable, InvokeType type = Immediate) const
+    ReturnValue add_handler(F&& callable, InvokeType type = Auto) const
     {
         Callback cb(std::forward<F>(callable));
         return add_handler(cb, type);
@@ -65,7 +65,7 @@ public:
     bool has_handlers() const { return event_ ? event_->has_handlers() : false; }
 
     /** @brief Invokes the event with no arguments (null-safe). */
-    ReturnValue invoke(InvokeType type = Immediate) const
+    ReturnValue invoke(InvokeType type = Auto) const
     {
         if (!event_) {
             return ReturnValue::InvalidArgument;
@@ -75,7 +75,7 @@ public:
     }
 
     /** @brief Invokes the event with the given @p args (null-safe). */
-    ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const
+    ReturnValue invoke(FnArgs args, InvokeType type = Auto) const
     {
         if (!event_) {
             return ReturnValue::InvalidArgument;

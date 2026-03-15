@@ -86,7 +86,7 @@ private:
     std::unique_ptr<BindingData> data_;
     vector<TargetEntry> targets_;
     IFunction::Ptr handler_;
-    InvokeType invoke_type_ = Immediate;
+    InvokeType invoke_type_ = Auto;
     bool subscribed_ = false;
     BindingMode mode_ = BindingMode::OneWay;
     bool pending_writeback_ = false;

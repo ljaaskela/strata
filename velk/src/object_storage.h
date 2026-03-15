@@ -6,8 +6,6 @@
 
 #include <velk/vector.h>
 
-#include <memory>
-
 namespace velk {
 
 /**

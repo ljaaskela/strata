@@ -27,14 +27,14 @@ public:
     ArrayPropertyImpl() = default;
 
 protected: // IProperty
-    ReturnValue set_value(const IAny& from, InvokeType type = Immediate) override;
+    ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;
     const IAny::ConstPtr get_value() const override;
     IEvent::Ptr on_changed() const override { return onChanged_; }
 
 protected: // IPropertyInternal
     bool set_any(const IAny::Ptr& value, IAny::Ptr* previous = nullptr) override;
     IAny::ConstPtr get_any() const override;
-    ReturnValue set_data(const void* data, size_t size, Uid type, InvokeType invokeType = Immediate) override;
+    ReturnValue set_data(const void* data, size_t size, Uid type, InvokeType invokeType = Auto) override;
     ReturnValue set_value_silent(const IAny& from) override;
     bool install_extension(const IAnyExtension::Ptr& extension) override;
     bool remove_extension(const IAnyExtension::Ptr& extension) override;

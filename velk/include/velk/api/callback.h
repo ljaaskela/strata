@@ -130,11 +130,11 @@ public:
 
     /** @brief Invokes the function with no arguments.
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    IAny::Ptr invoke(InvokeType type = Immediate) const { return fn_->invoke({}, type); }
+    IAny::Ptr invoke(InvokeType type = Auto) const { return fn_->invoke({}, type); }
     /** @brief Invokes the function with the given @p args.
      *  @param args Arguments for invocation.
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const { return fn_->invoke(args, type); }
+    IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const { return fn_->invoke(args, type); }
 
 private:
     IFunction::Ptr fn_;

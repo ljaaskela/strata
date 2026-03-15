@@ -24,7 +24,7 @@ public:
     ~EventImpl();
 
 public: // IFunction
-    IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const override;
+    IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const override;
 
 public: // IFunctionInternal
     void set_invoke_callback(IFunction::CallableFn* fn) override;
@@ -33,7 +33,7 @@ public: // IFunctionInternal
                             IFunction::ContextDeleter* deleter) override;
 
 public: // IEvent
-    ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const override;
+    ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Auto) const override;
     ReturnValue remove_handler(const IFunction::ConstPtr& fn) const override;
     bool has_handlers() const override;
 

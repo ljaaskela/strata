@@ -18,11 +18,11 @@ class LazyEvent
     mutable IEvent::Ptr event_;
 
 public:
-    /** @brief Returns the event, creating it on first access. */
+    /** @brief Returns the event, creating it on first access (thread-safe). */
     operator IEvent::Ptr() const
     {
         if (!event_) {
-            event_ = instance().create<IEvent>(ClassId::Event);
+            instance().type_registry().create_event_once(event_);
         }
         return event_;
     }
