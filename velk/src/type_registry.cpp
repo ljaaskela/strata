@@ -190,6 +190,15 @@ InterpolatorFn TypeRegistry::find_interpolator(Uid typeUid) const
     return nullptr;
 }
 
+void TypeRegistry::create_event_once(IEvent::Ptr& slot) const
+{
+    std::unique_lock lock(mutex_);
+    if (!slot) {
+        static const auto& factory = EventImpl::get_factory();
+        slot = interface_pointer_cast<IEvent>(factory.create_instance());
+    }
+}
+
 IAny::Ptr TypeRegistry::create_any(Uid type) const
 {
     return interface_pointer_cast<IAny>(create(type));

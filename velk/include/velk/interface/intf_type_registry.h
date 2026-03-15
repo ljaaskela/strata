@@ -2,6 +2,7 @@
 #define VELK_INTF_TYPE_REGISTRY_H
 
 #include <velk/interface/intf_any.h>
+#include <velk/interface/intf_event.h>
 #include <velk/interface/intf_future.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_object_ref.h>
@@ -52,6 +53,8 @@ public:
                                            uint32_t flags = ObjectFlags::None) const = 0;
     /** @brief Creates a new future/promise pair. */
     virtual IFuture::Ptr create_future() const = 0;
+    /** @brief Thread-safe lazy event creation: if slot is null, creates an EventImpl and stores it. */
+    virtual void create_event_once(IEvent::Ptr& slot) const = 0;
     /** @brief Creates a callback-backed IFunction from a raw function pointer. */
     virtual IFunction::Ptr create_callback(IFunction::CallableFn* fn) const = 0;
     /** @brief Creates an owned-callback IFunction from a context, trampoline, and deleter. */
