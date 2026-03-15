@@ -11,6 +11,7 @@ namespace velk {
 
 ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
 {
+    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
@@ -89,6 +90,7 @@ ReturnValue PropertyImpl::set_value_silent(const IAny& from)
 
 ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
 {
+    invokeType = resolve_invoke_type(invokeType, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }

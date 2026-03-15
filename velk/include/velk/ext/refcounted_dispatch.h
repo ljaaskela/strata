@@ -4,6 +4,7 @@
 #include <velk/ext/interface_dispatch.h>
 #include <velk/interface/types.h>
 #include <velk/memory.h>
+#include <velk/thread.h>
 
 namespace velk {
 
@@ -67,6 +68,7 @@ protected:
     {
         control_block* block{detail::alloc_control_block()}; ///< Pooled control block (strong=1).
         uint32_t flags{ObjectFlags::None};                   ///< Bitwise combination of ObjectFlags.
+        uint32_t owner_thread_id{current_thread_id()};       ///< Thread that created this object.
     };
     /** @brief Returns a mutable reference to the per-object data. */
     constexpr ObjectData& get_object_data() noexcept { return data_; }

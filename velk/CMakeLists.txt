@@ -20,6 +20,7 @@ add_library(velk SHARED
     include/velk/vector.h
     include/velk/uid.h
     include/velk/duration.h
+    include/velk/thread.h
     src/object_storage.cpp
     src/object_storage.h
     src/object_ref.cpp

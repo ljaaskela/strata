@@ -82,7 +82,7 @@ public:
      * @return A Future that resolves with the continuation's return value.
      */
     template <class F>
-    auto then(F&& callable, InvokeType type = Immediate);
+    auto then(F&& callable, InvokeType type = Auto);
 
     /** @brief Implicit conversion to IFuture::Ptr. */
     operator IFuture::Ptr() { return future_; }
@@ -115,7 +115,7 @@ public:
 
     /** @copydoc Future::then */
     template <class F>
-    auto then(F&& callable, InvokeType type = Immediate);
+    auto then(F&& callable, InvokeType type = Auto);
 
     /** @brief Implicit conversion to IFuture::Ptr. */
     operator IFuture::Ptr() { return future_; }

@@ -103,7 +103,7 @@ public:
     explicit Property(IProperty::Ptr existing) : Base(std::move(existing)) {}
 
     /** @brief Sets the property to @p value. */
-    ReturnValue set_value(const Type& value, InvokeType type = Immediate)
+    ReturnValue set_value(const Type& value, InvokeType type = Auto)
     {
         if (auto internal = this->get_internal()) {
             return internal->set_data(&value, sizeof(Type), Base::TYPE_UID, type);
@@ -199,7 +199,7 @@ public:
     }
 
     /** @brief Sets the whole vector value. */
-    ReturnValue set_value(const vector<Type>& value, InvokeType type = Immediate)
+    ReturnValue set_value(const vector<Type>& value, InvokeType type = Auto)
     {
         if (this->prop_) {
             Any<vector<Type>> av(value);
@@ -245,13 +245,13 @@ public:
     explicit Property(IProperty::Ptr existing) : ConstProperty<Variant>(std::move(existing)) {}
 
     /** @brief Sets the property from a raw IAny reference. */
-    ReturnValue set_value(const IAny& value, InvokeType type = Immediate)
+    ReturnValue set_value(const IAny& value, InvokeType type = Auto)
     {
         return prop_ ? prop_->set_value(value, type) : ReturnValue::Fail;
     }
 
     /** @brief Sets the property from an IAny shared pointer. */
-    ReturnValue set_value(const IAny::ConstPtr& value, InvokeType type = Immediate)
+    ReturnValue set_value(const IAny::ConstPtr& value, InvokeType type = Auto)
     {
         return (prop_ && value) ? prop_->set_value(*value, type) : ReturnValue::Fail;
     }
@@ -290,13 +290,13 @@ public:
     explicit Property(IProperty::Ptr existing) : ConstProperty<ObjectRef>(std::move(existing)) {}
 
     /** @brief Sets the property from a raw IAny reference. */
-    ReturnValue set_value(const IAny& value, InvokeType type = Immediate)
+    ReturnValue set_value(const IAny& value, InvokeType type = Auto)
     {
         return prop_ ? prop_->set_value(value, type) : ReturnValue::Fail;
     }
 
     /** @brief Sets the property from an IAny shared pointer. */
-    ReturnValue set_value(const IAny::ConstPtr& value, InvokeType type = Immediate)
+    ReturnValue set_value(const IAny::ConstPtr& value, InvokeType type = Auto)
     {
         return (prop_ && value) ? prop_->set_value(*value, type) : ReturnValue::Fail;
     }

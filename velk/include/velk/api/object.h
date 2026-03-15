@@ -90,7 +90,7 @@ public:
 
     /** @brief Writes to T::State via a callback, with optional deferral. */
     template <class T, class Fn>
-    void write_state(Fn&& fn, InvokeType type = Immediate)
+    void write_state(Fn&& fn, InvokeType type = Auto)
     {
         if (obj_) {
             ::velk::write_state<T>(obj_.get(), std::forward<Fn>(fn), type);

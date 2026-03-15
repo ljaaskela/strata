@@ -9,6 +9,7 @@ namespace velk {
 
 ReturnValue ArrayPropertyImpl::set_value(const IAny& from, InvokeType type)
 {
+    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
@@ -58,6 +59,7 @@ IAny::ConstPtr ArrayPropertyImpl::get_any() const
 
 ReturnValue ArrayPropertyImpl::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
 {
+    invokeType = resolve_invoke_type(invokeType, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }

@@ -62,14 +62,14 @@ detail::StateWriter<T> write_state(const shared_ptr<U>& object)
  * @param type Immediate or Deferred.
  */
 template <class T, class U, class Fn>
-void write_state(U* object, Fn&& fn, InvokeType type = Immediate)
+void write_state(U* object, Fn&& fn, InvokeType type = Auto)
 {
     auto* meta = interface_cast<IMetadata>(object);
     auto* state = get_property_state<T>(meta);
     if (!state) {
         return;
     }
-    if (type == Immediate) {
+    if (type != Deferred) {
         fn(*state);
         meta->notify(MemberKind::Property, T::UID, Notification::Changed);
         return;
@@ -101,7 +101,7 @@ void write_state(U* object, Fn&& fn, InvokeType type = Immediate)
 
 /** @brief Callback-based write access to T::State from a shared_ptr. */
 template <class T, class U, class Fn>
-void write_state(const shared_ptr<U>& object, Fn&& fn, InvokeType type = Immediate)
+void write_state(const shared_ptr<U>& object, Fn&& fn, InvokeType type = Auto)
 {
     write_state<T>(object.get(), std::forward<Fn>(fn), type);
 }
