@@ -7,16 +7,16 @@
 
 #include <algorithm>
 
-namespace velk {
+namespace velk::impl {
 
-AnimationTrackImpl::~AnimationTrackImpl()
+AnimationTrack::~AnimationTrack()
 {
     if (transient_) {
-        AnimationTrackImpl::uninstall();
+        AnimationTrack::uninstall();
     }
 }
 
-void AnimationTrackImpl::uninstall()
+void AnimationTrack::uninstall()
 {
     for (auto& entry : targets_) {
         auto owner = entry.owner.lock();
@@ -34,29 +34,29 @@ void AnimationTrackImpl::uninstall()
     interpolator_ = nullptr;
 }
 
-void AnimationTrackImpl::set_transient(bool transient)
+void AnimationTrack::set_transient(bool transient)
 {
     transient_ = transient;
 }
 
-bool AnimationTrackImpl::is_active() const
+bool AnimationTrack::is_active() const
 {
     auto* s = state();
     return s && s->state == PlayState::Playing;
 }
 
-const IAnimationTrack::State* AnimationTrackImpl::state() const
+const IAnimationTrack::State* AnimationTrack::state() const
 {
     return interface_state<IAnimationTrack>();
 }
 
-IAnimationTrack::State* AnimationTrackImpl::state()
+IAnimationTrack::State* AnimationTrack::state()
 {
     return interface_state<IAnimationTrack>();
 }
 
 
-void AnimationTrackImpl::set_keyframes(array_view<KeyframeEntry> keyframes)
+void AnimationTrack::set_keyframes(array_view<KeyframeEntry> keyframes)
 {
     auto* s = state();
     if (!s) {
@@ -67,7 +67,7 @@ void AnimationTrackImpl::set_keyframes(array_view<KeyframeEntry> keyframes)
     sorted_ = false;
 }
 
-void AnimationTrackImpl::play()
+void AnimationTrack::play()
 {
     auto* s = state();
     if (!s) {
@@ -81,7 +81,7 @@ void AnimationTrackImpl::play()
     notify_state(*s);
 }
 
-void AnimationTrackImpl::pause()
+void AnimationTrack::pause()
 {
     auto* s = state();
     if (!s || s->state != PlayState::Playing) {
@@ -91,7 +91,7 @@ void AnimationTrackImpl::pause()
     notify_state(*s);
 }
 
-void AnimationTrackImpl::stop()
+void AnimationTrack::stop()
 {
     auto* s = state();
     if (!s || s->state == PlayState::Idle) {
@@ -103,7 +103,7 @@ void AnimationTrackImpl::stop()
     notify_state(*s);
 }
 
-void AnimationTrackImpl::finish()
+void AnimationTrack::finish()
 {
     auto* s = state();
     if (!s || s->state == PlayState::Finished) {
@@ -113,7 +113,7 @@ void AnimationTrackImpl::finish()
     mark_finished(*s);
 }
 
-void AnimationTrackImpl::restart()
+void AnimationTrack::restart()
 {
     auto* s = state();
     if (!s) {
@@ -125,7 +125,7 @@ void AnimationTrackImpl::restart()
     notify_state(*s);
 }
 
-void AnimationTrackImpl::seek(float p)
+void AnimationTrack::seek(float p)
 {
     auto* s = state();
     if (!s) {
@@ -144,7 +144,7 @@ void AnimationTrackImpl::seek(float p)
     notify_state(*s);
 }
 
-void AnimationTrackImpl::ensure_init(IAnimationTrack::State& s)
+void AnimationTrack::ensure_init(IAnimationTrack::State& s)
 {
     if (sorted_) {
         return;
@@ -169,7 +169,7 @@ void AnimationTrackImpl::ensure_init(IAnimationTrack::State& s)
     sorted_ = true;
 }
 
-void AnimationTrackImpl::apply_at(IAnimationTrack::State& s)
+void AnimationTrack::apply_at(IAnimationTrack::State& s)
 {
     if (!has_targets()) {
         return;
@@ -214,7 +214,7 @@ void AnimationTrackImpl::apply_at(IAnimationTrack::State& s)
     }
 }
 
-void AnimationTrackImpl::mark_finished(IAnimationTrack::State& s)
+void AnimationTrack::mark_finished(IAnimationTrack::State& s)
 {
     s.elapsed = s.duration;
     s.progress = 1.f;
@@ -223,7 +223,7 @@ void AnimationTrackImpl::mark_finished(IAnimationTrack::State& s)
     notify_state(s);
 }
 
-void AnimationTrackImpl::write_value(const IAny& value)
+void AnimationTrack::write_value(const IAny& value)
 {
     if (display_) {
         display_->copy_from(value);
@@ -242,12 +242,12 @@ void AnimationTrackImpl::write_value(const IAny& value)
     }
 }
 
-void AnimationTrackImpl::notify_state(IAnimationTrack::State& state)
+void AnimationTrack::notify_state(IAnimationTrack::State& state)
 {
     notify(MemberKind::Property, IAnimationTrack::UID, Notification::Changed);
 }
 
-ReturnValue AnimationTrackImpl::tick(const UpdateInfo& info)
+ReturnValue AnimationTrack::tick(const UpdateInfo& info)
 {
     // Skip if not actively playing
     auto* st = state();
@@ -282,12 +282,12 @@ ReturnValue AnimationTrackImpl::tick(const UpdateInfo& info)
 
 // IAnyExtension
 
-IAny::ConstPtr AnimationTrackImpl::get_inner() const
+IAny::ConstPtr AnimationTrack::get_inner() const
 {
     return targets_.empty() ? nullptr : targets_[0].inner;
 }
 
-bool AnimationTrackImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+bool AnimationTrack::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     // First target entry: initialize display/result/interpolator
     if (targets_.empty() && inner) {
@@ -304,7 +304,7 @@ bool AnimationTrackImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& o
     return true;
 }
 
-IAny::Ptr AnimationTrackImpl::take_inner(IInterface& owner)
+IAny::Ptr AnimationTrack::take_inner(IInterface& owner)
 {
     for (auto it = targets_.begin(); it != targets_.end(); ++it) {
         auto locked = it->owner.lock();
@@ -324,7 +324,7 @@ IAny::Ptr AnimationTrackImpl::take_inner(IInterface& owner)
 
 // IAnimationTrack: add_target / remove_target
 
-void AnimationTrackImpl::add_target(const IProperty::Ptr& target)
+void AnimationTrack::add_target(const IProperty::Ptr& target)
 {
     auto* pi = interface_cast<IPropertyInternal>(target.get());
     if (pi) {
@@ -332,7 +332,7 @@ void AnimationTrackImpl::add_target(const IProperty::Ptr& target)
     }
 }
 
-void AnimationTrackImpl::remove_target(const IProperty::Ptr& target)
+void AnimationTrack::remove_target(const IProperty::Ptr& target)
 {
     auto* pi = interface_cast<IPropertyInternal>(target.get());
     if (pi) {
@@ -342,17 +342,17 @@ void AnimationTrackImpl::remove_target(const IProperty::Ptr& target)
 
 // IAny overrides
 
-array_view<Uid> AnimationTrackImpl::get_compatible_types() const
+array_view<Uid> AnimationTrack::get_compatible_types() const
 {
     return display_ ? display_->get_compatible_types() : array_view<Uid>{};
 }
 
-size_t AnimationTrackImpl::get_data_size(Uid type) const
+size_t AnimationTrack::get_data_size(Uid type) const
 {
     return display_ ? display_->get_data_size(type) : 0;
 }
 
-ReturnValue AnimationTrackImpl::get_data(void* to, size_t toSize, Uid type) const
+ReturnValue AnimationTrack::get_data(void* to, size_t toSize, Uid type) const
 {
     auto* s = state();
     if (s && (s->state == PlayState::Playing || s->state == PlayState::Paused)) {
@@ -362,7 +362,7 @@ ReturnValue AnimationTrackImpl::get_data(void* to, size_t toSize, Uid type) cons
                                                     : ReturnValue::Fail;
 }
 
-ReturnValue AnimationTrackImpl::set_data(void const* from, size_t fromSize, Uid type)
+ReturnValue AnimationTrack::set_data(void const* from, size_t fromSize, Uid type)
 {
     ReturnValue ret = ReturnValue::Fail;
     for (auto& entry : targets_) {
@@ -379,7 +379,7 @@ ReturnValue AnimationTrackImpl::set_data(void const* from, size_t fromSize, Uid 
     return ret;
 }
 
-ReturnValue AnimationTrackImpl::copy_from(const IAny& other)
+ReturnValue AnimationTrack::copy_from(const IAny& other)
 {
     ReturnValue ret = ReturnValue::Fail;
     for (auto& entry : targets_) {
@@ -396,10 +396,10 @@ ReturnValue AnimationTrackImpl::copy_from(const IAny& other)
     return ret;
 }
 
-IAny::Ptr AnimationTrackImpl::clone() const
+IAny::Ptr AnimationTrack::clone() const
 {
     return display_ ? display_->clone()
                     : ((!targets_.empty() && targets_[0].inner) ? targets_[0].inner->clone() : nullptr);
 }
 
-} // namespace velk
+} // namespace velk::impl

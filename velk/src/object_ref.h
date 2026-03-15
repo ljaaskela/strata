@@ -5,7 +5,7 @@
 #include <velk/interface/intf_object_ref.h>
 #include <velk/interface/types.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief IObjectRef implementation that stores a reference to another IObject.
@@ -16,7 +16,7 @@ namespace velk {
  *
  * get_data/set_data operate on IObject::Ptr values.
  */
-class ObjectRefImpl final : public ext::ObjectCore<ObjectRefImpl, IObjectRef>
+class ObjectRef final : public ext::ObjectCore<ObjectRef, IObjectRef>
 {
 public:
     VELK_CLASS_UID(ClassId::ObjectRef);
@@ -44,6 +44,6 @@ private:
     bool owning_{true};
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_OBJECT_REF_IMPL_H

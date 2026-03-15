@@ -2,9 +2,9 @@
 
 #include <mutex>
 
-namespace velk {
+namespace velk::impl {
 
-IObject::Ptr StoreImpl::find(string_view id) const
+IObject::Ptr Store::find(string_view id) const
 {
     std::shared_lock lock(mutex_);
     for (const auto& entry : entries_) {
@@ -15,19 +15,19 @@ IObject::Ptr StoreImpl::find(string_view id) const
     return {};
 }
 
-size_t StoreImpl::object_count() const
+size_t Store::object_count() const
 {
     std::shared_lock lock(mutex_);
     return entries_.size();
 }
 
-IObject::Ptr StoreImpl::object_at(size_t index) const
+IObject::Ptr Store::object_at(size_t index) const
 {
     std::shared_lock lock(mutex_);
     return index < entries_.size() ? entries_[index].object : nullptr;
 }
 
-ReturnValue StoreImpl::add(string_view id, const IObject::Ptr& object)
+ReturnValue Store::add(string_view id, const IObject::Ptr& object)
 {
     if (id.empty() || !object) {
         return ReturnValue::InvalidArgument;
@@ -42,4 +42,4 @@ ReturnValue StoreImpl::add(string_view id, const IObject::Ptr& object)
     return ReturnValue::Success;
 }
 
-} // namespace velk
+} // namespace velk::impl

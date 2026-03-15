@@ -7,7 +7,7 @@
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default IProperty/IPropertyInternal implementation.
@@ -17,12 +17,12 @@ namespace velk {
  * ObjectFlags::ReadOnly. When the backing IAny implements IExternalAny,
  * automatically relays its on_data_changed event to the property's on_changed.
  */
-class PropertyImpl final : public ext::ObjectCore<PropertyImpl, IPropertyInternal>
+class Property final : public ext::ObjectCore<Property, IPropertyInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Property);
 
-    PropertyImpl() = default;
+    Property() = default;
 
 protected: // IProperty
     ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;
@@ -44,6 +44,6 @@ private:
                       ///< automatically).
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // PROPERTY_H

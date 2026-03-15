@@ -6,16 +6,16 @@
 #include <velk/api/velk.h>
 #include <velk/interface/intf_any.h>
 
-namespace velk {
+namespace velk::impl {
 
 namespace {
 
 // Thread-local loop detection for binding evaluation and on_changed propagation.
-// Only touched inside BindingImpl; zero cost for unbound properties.
+// Only touched inside Binding; zero cost for unbound properties.
 static constexpr size_t kMaxBindingDepth = 64;
-static thread_local const BindingImpl* tls_evaluating[kMaxBindingDepth] = {};
+static thread_local const Binding* tls_evaluating[kMaxBindingDepth] = {};
 static thread_local size_t tls_eval_depth = 0;
-static thread_local const BindingImpl* tls_notifying[kMaxBindingDepth] = {};
+static thread_local const Binding* tls_notifying[kMaxBindingDepth] = {};
 static thread_local size_t tls_notify_depth = 0;
 
 struct LoopGuard
@@ -23,7 +23,7 @@ struct LoopGuard
     size_t& depth;
     bool looped = false;
 
-    LoopGuard(const BindingImpl* s, const BindingImpl* (&arr)[kMaxBindingDepth], size_t& d) : depth(d)
+    LoopGuard(const Binding* s, const Binding* (&arr)[kMaxBindingDepth], size_t& d) : depth(d)
     {
         for (size_t i = 0; i < depth; ++i) {
             if (arr[i] == s) {
@@ -228,38 +228,38 @@ struct FunctionBindingDataAuto final : BindingData
 
 } // namespace
 
-// BindingImpl
+// Binding
 
-BindingImpl::~BindingImpl()
+Binding::~Binding()
 {
     unsubscribe();
 }
 
 // IBinding
 
-IProperty::Ptr BindingImpl::get_source_property() const
+IProperty::Ptr Binding::get_source_property() const
 {
     return data_ ? data_->get_source_property() : nullptr;
 }
 
-IFunction::ConstPtr BindingImpl::get_source_function() const
+IFunction::ConstPtr Binding::get_source_function() const
 {
     return data_ ? data_->get_source_function() : nullptr;
 }
 
-bool BindingImpl::add_target(const IProperty::Ptr& target)
+bool Binding::add_target(const IProperty::Ptr& target)
 {
     auto* pi = interface_cast<IPropertyInternal>(target.get());
     return pi && pi->install_extension(get_self<IAnyExtension>());
 }
 
-bool BindingImpl::remove_target(const IProperty::Ptr& target)
+bool Binding::remove_target(const IProperty::Ptr& target)
 {
     auto* pi = interface_cast<IPropertyInternal>(target.get());
     return pi && pi->remove_extension(get_self<IAnyExtension>());
 }
 
-void BindingImpl::uninstall()
+void Binding::uninstall()
 {
     // Iterate a copy since remove_extension calls take_inner which modifies targets_.
     auto targets = targets_;
@@ -277,7 +277,7 @@ void BindingImpl::uninstall()
 
 // IBindingInternal
 
-void BindingImpl::set_source_property(const IProperty::Ptr& source)
+void Binding::set_source_property(const IProperty::Ptr& source)
 {
     unsubscribe();
     data_ = std::make_unique<PropertyBindingData>(source);
@@ -286,7 +286,7 @@ void BindingImpl::set_source_property(const IProperty::Ptr& source)
     }
 }
 
-void BindingImpl::set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps)
+void Binding::set_source_function(const IFunction::ConstPtr& fn, vector<IProperty::ConstPtr> deps)
 {
     unsubscribe();
     data_ = std::make_unique<FunctionBindingDataManual>(fn, std::move(deps));
@@ -295,31 +295,31 @@ void BindingImpl::set_source_function(const IFunction::ConstPtr& fn, vector<IPro
     }
 }
 
-void BindingImpl::set_source_function(const IFunction::ConstPtr& fn)
+void Binding::set_source_function(const IFunction::ConstPtr& fn)
 {
     unsubscribe();
     data_ = std::make_unique<FunctionBindingDataAuto>(fn);
     // Don't subscribe yet; deps are discovered on first evaluate().
 }
 
-void BindingImpl::set_invoke_type(InvokeType type)
+void Binding::set_invoke_type(InvokeType type)
 {
     invoke_type_ = type;
 }
 
-void BindingImpl::set_binding_mode(BindingMode mode)
+void Binding::set_binding_mode(BindingMode mode)
 {
     mode_ = mode;
 }
 
 // IAnyExtension
 
-IAny::ConstPtr BindingImpl::get_inner() const
+IAny::ConstPtr Binding::get_inner() const
 {
     return !targets_.empty() ? IAny::ConstPtr(targets_[0].inner) : nullptr;
 }
 
-bool BindingImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+bool Binding::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     auto source = evaluate();
     if (inner && source && !is_compatible(inner, source)) {
@@ -333,7 +333,7 @@ bool BindingImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
     return true;
 }
 
-IAny::Ptr BindingImpl::take_inner(IInterface& owner)
+IAny::Ptr Binding::take_inner(IInterface& owner)
 {
     for (size_t i = 0; i < targets_.size(); ++i) {
         auto locked = targets_[i].owner.lock();
@@ -359,7 +359,7 @@ IAny::Ptr BindingImpl::take_inner(IInterface& owner)
 
 // IAny overrides
 
-array_view<Uid> BindingImpl::get_compatible_types() const
+array_view<Uid> Binding::get_compatible_types() const
 {
     auto source = evaluate();
     if (source) {
@@ -369,7 +369,7 @@ array_view<Uid> BindingImpl::get_compatible_types() const
     return inner ? inner->get_compatible_types() : array_view<Uid>{};
 }
 
-size_t BindingImpl::get_data_size(Uid type) const
+size_t Binding::get_data_size(Uid type) const
 {
     auto source = evaluate();
     if (source) {
@@ -379,7 +379,7 @@ size_t BindingImpl::get_data_size(Uid type) const
     return inner ? inner->get_data_size(type) : 0;
 }
 
-ReturnValue BindingImpl::get_data(void* to, size_t toSize, Uid type) const
+ReturnValue Binding::get_data(void* to, size_t toSize, Uid type) const
 {
     LoopGuard guard(this, tls_evaluating, tls_eval_depth);
     if (guard.looped) {
@@ -395,7 +395,7 @@ ReturnValue BindingImpl::get_data(void* to, size_t toSize, Uid type) const
     return inner ? inner->get_data(to, toSize, type) : ReturnValue::Fail;
 }
 
-ReturnValue BindingImpl::set_data(void const* from, size_t fromSize, Uid type)
+ReturnValue Binding::set_data(void const* from, size_t fromSize, Uid type)
 {
     if (mode_ != BindingMode::TwoWay || !data_) {
         return ReturnValue::Fail;
@@ -424,7 +424,7 @@ ReturnValue BindingImpl::set_data(void const* from, size_t fromSize, Uid type)
     return ReturnValue::Fail;
 }
 
-ReturnValue BindingImpl::copy_from(const IAny& other)
+ReturnValue Binding::copy_from(const IAny& other)
 {
     if (mode_ != BindingMode::TwoWay || !data_) {
         return ReturnValue::Fail;
@@ -445,7 +445,7 @@ ReturnValue BindingImpl::copy_from(const IAny& other)
     return succeeded(rv) ? ReturnValue::NothingToDo : rv;
 }
 
-IAny::Ptr BindingImpl::clone() const
+IAny::Ptr Binding::clone() const
 {
     auto source = evaluate();
     if (source) {
@@ -457,7 +457,7 @@ IAny::Ptr BindingImpl::clone() const
 
 // Private
 
-IAny::ConstPtr BindingImpl::evaluate() const
+IAny::ConstPtr Binding::evaluate() const
 {
     if (pending_writeback_) {
         return first_inner();
@@ -465,7 +465,7 @@ IAny::ConstPtr BindingImpl::evaluate() const
     return data_ ? data_->evaluate() : nullptr;
 }
 
-void BindingImpl::ensure_handler()
+void Binding::ensure_handler()
 {
     if (handler_) {
         return;
@@ -479,7 +479,7 @@ void BindingImpl::ensure_handler()
         auto* weak = new Weak(get_self<IInterface>());
         auto* trampoline = +[](void* ctx, FnArgs) -> IAny::Ptr {
             if (auto locked = static_cast<Weak*>(ctx)->lock()) {
-                auto* binding = static_cast<BindingImpl*>(interface_cast<IBindingInternal>(locked));
+                auto* binding = static_cast<Binding*>(interface_cast<IBindingInternal>(locked));
                 if (binding) {
                     binding->on_source_changed();
                 }
@@ -492,7 +492,7 @@ void BindingImpl::ensure_handler()
     handler_ = fn;
 }
 
-void BindingImpl::subscribe()
+void Binding::subscribe()
 {
     if (subscribed_ || !data_) {
         return;
@@ -503,7 +503,7 @@ void BindingImpl::subscribe()
     subscribed_ = true;
 }
 
-void BindingImpl::unsubscribe()
+void Binding::unsubscribe()
 {
     if (!subscribed_ || !handler_ || !data_) {
         return;
@@ -513,7 +513,7 @@ void BindingImpl::unsubscribe()
     subscribed_ = false;
 }
 
-void BindingImpl::queue_writeback(const IAny& value)
+void Binding::queue_writeback(const IAny& value)
 {
     pending_writeback_ = true;
     auto src = interface_pointer_cast<IPropertyInternal>(data_->get_source_property());
@@ -522,7 +522,7 @@ void BindingImpl::queue_writeback(const IAny& value)
     }
 }
 
-void BindingImpl::on_source_changed()
+void Binding::on_source_changed()
 {
     LoopGuard guard(this, tls_notifying, tls_notify_depth);
     if (guard.looped) {
@@ -560,9 +560,9 @@ void BindingImpl::on_source_changed()
     }
 }
 
-IAny::Ptr BindingImpl::first_inner() const
+IAny::Ptr Binding::first_inner() const
 {
     return !targets_.empty() ? targets_[0].inner : nullptr;
 }
 
-} // namespace velk
+} // namespace velk::impl::impl

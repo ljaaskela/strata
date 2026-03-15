@@ -5,7 +5,7 @@
 #include <velk/api/velk.h>
 #include <velk/interface/intf_metadata.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Extended control block for hive-managed objects.
@@ -508,4 +508,4 @@ void ObjectHive::for_each_state(ptrdiff_t state_offset, void* context, StateVisi
     });
 }
 
-} // namespace velk
+} // namespace velk::impl

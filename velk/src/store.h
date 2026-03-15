@@ -8,7 +8,7 @@
 
 #include <shared_mutex>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default implementation of IStore.
@@ -17,7 +17,7 @@ namespace velk {
  * Linear lookup by id. Maintains insertion order for index-based access.
  * Thread-safe: reads use shared locks, mutations use exclusive locks.
  */
-class StoreImpl final : public ext::Object<StoreImpl, IStore>
+class Store final : public ext::Object<Store, IStore>
 {
 public:
     VELK_CLASS_UID(ClassId::Store);
@@ -39,6 +39,6 @@ private:
     vector<Entry> entries_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_STORE_IMPL_H

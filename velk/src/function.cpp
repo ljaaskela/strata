@@ -2,14 +2,14 @@
 
 #include <velk/api/velk.h>
 
-namespace velk {
+namespace velk::impl {
 
-FunctionImpl::~FunctionImpl()
+Function::~Function()
 {
     release_owned_context();
 }
 
-void FunctionImpl::release_owned_context()
+void Function::release_owned_context()
 {
     if (context_deleter_ && owned_context_) {
         context_deleter_(owned_context_);
@@ -18,12 +18,12 @@ void FunctionImpl::release_owned_context()
     context_deleter_ = nullptr;
 }
 
-IAny::Ptr FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
+IAny::Ptr Function::callback_trampoline(void* ctx, FnArgs args)
 {
     return reinterpret_cast<IFunction::CallableFn*>(ctx)(args);
 }
 
-IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
+IAny::Ptr Function::invoke(FnArgs args, InvokeType type) const
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (type == Deferred) {
@@ -40,21 +40,21 @@ IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
     return nullptr;
 }
 
-void FunctionImpl::set_invoke_callback(IFunction::CallableFn* fn)
+void Function::set_invoke_callback(IFunction::CallableFn* fn)
 {
     release_owned_context();
     target_context_ = reinterpret_cast<void*>(fn);
     target_fn_ = fn ? &callback_trampoline : nullptr;
 }
 
-void FunctionImpl::bind(void* context, IFunction::BoundFn* fn)
+void Function::bind(void* context, IFunction::BoundFn* fn)
 {
     release_owned_context();
     target_context_ = context;
     target_fn_ = fn;
 }
 
-void FunctionImpl::set_owned_callback(void* context, IFunction::BoundFn* fn,
+void Function::set_owned_callback(void* context, IFunction::BoundFn* fn,
                                       IFunction::ContextDeleter* deleter)
 {
     release_owned_context();
@@ -64,19 +64,19 @@ void FunctionImpl::set_owned_callback(void* context, IFunction::BoundFn* fn,
     target_fn_ = fn;
 }
 
-ReturnValue FunctionImpl::add_handler(const IFunction::ConstPtr& /*fn*/, InvokeType /*type*/) const
+ReturnValue Function::add_handler(const IFunction::ConstPtr& /*fn*/, InvokeType /*type*/) const
 {
     return ReturnValue::NothingToDo;
 }
 
-ReturnValue FunctionImpl::remove_handler(const IFunction::ConstPtr& /*fn*/) const
+ReturnValue Function::remove_handler(const IFunction::ConstPtr& /*fn*/) const
 {
     return ReturnValue::NothingToDo;
 }
 
-bool FunctionImpl::has_handlers() const
+bool Function::has_handlers() const
 {
     return false;
 }
 
-} // namespace velk
+} // namespace velk::impl

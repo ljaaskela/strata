@@ -3,11 +3,11 @@
 #include <velk/api/velk.h>
 #include <velk/interface/types.h>
 
-namespace velk {
+namespace velk::impl {
 
 // IProperty
 
-ReturnValue ArrayPropertyImpl::set_value(const IAny& from, InvokeType type)
+ReturnValue ArrayProperty::set_value(const IAny& from, InvokeType type)
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
@@ -31,14 +31,14 @@ ReturnValue ArrayPropertyImpl::set_value(const IAny& from, InvokeType type)
     return ret;
 }
 
-const IAny::ConstPtr ArrayPropertyImpl::get_value() const
+const IAny::ConstPtr ArrayProperty::get_value() const
 {
     return data_;
 }
 
 // IPropertyInternal
 
-bool ArrayPropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
+bool ArrayProperty::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
     if (previous) {
         *previous = {};
@@ -52,12 +52,12 @@ bool ArrayPropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
     return succeeded(invoke_event(on_changed(), data_.get()));
 }
 
-IAny::ConstPtr ArrayPropertyImpl::get_any() const
+IAny::ConstPtr ArrayProperty::get_any() const
 {
     return data_;
 }
 
-ReturnValue ArrayPropertyImpl::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
+ReturnValue ArrayProperty::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
 {
     invokeType = resolve_invoke_type(invokeType, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
@@ -81,7 +81,7 @@ ReturnValue ArrayPropertyImpl::set_data(const void* data, size_t size, Uid type,
     return ret;
 }
 
-ReturnValue ArrayPropertyImpl::set_value_silent(const IAny& from)
+ReturnValue ArrayProperty::set_value_silent(const IAny& from)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
@@ -92,7 +92,7 @@ ReturnValue ArrayPropertyImpl::set_value_silent(const IAny& from)
     return data_->copy_from(from);
 }
 
-bool ArrayPropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
+bool ArrayProperty::install_extension(const IAnyExtension::Ptr& extension)
 {
     if (!extension) {
         return false;
@@ -104,7 +104,7 @@ bool ArrayPropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
     return true;
 }
 
-bool ArrayPropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
+bool ArrayProperty::remove_extension(const IAnyExtension::Ptr& extension)
 {
     if (!extension || !data_) {
         return false;
@@ -137,24 +137,24 @@ bool ArrayPropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
 
 // IArrayProperty (delegates to IArrayAny on data_)
 
-IArrayAny* ArrayPropertyImpl::get_array_any() const
+IArrayAny* ArrayProperty::get_array_any() const
 {
     return data_ ? interface_cast<IArrayAny>(data_) : nullptr;
 }
 
-size_t ArrayPropertyImpl::array_size() const
+size_t ArrayProperty::array_size() const
 {
     auto* aa = get_array_any();
     return aa ? aa->array_size() : 0;
 }
 
-ReturnValue ArrayPropertyImpl::get_at(size_t index, IAny& out) const
+ReturnValue ArrayProperty::get_at(size_t index, IAny& out) const
 {
     auto* aa = get_array_any();
     return aa ? aa->get_at(index, out) : ReturnValue::Fail;
 }
 
-ReturnValue ArrayPropertyImpl::set_at(size_t index, const IAny& value)
+ReturnValue ArrayProperty::set_at(size_t index, const IAny& value)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
@@ -170,7 +170,7 @@ ReturnValue ArrayPropertyImpl::set_at(size_t index, const IAny& value)
     return ret;
 }
 
-ReturnValue ArrayPropertyImpl::push_back(const IAny& value)
+ReturnValue ArrayProperty::push_back(const IAny& value)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
@@ -186,7 +186,7 @@ ReturnValue ArrayPropertyImpl::push_back(const IAny& value)
     return ret;
 }
 
-ReturnValue ArrayPropertyImpl::erase_at(size_t index)
+ReturnValue ArrayProperty::erase_at(size_t index)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
@@ -202,7 +202,7 @@ ReturnValue ArrayPropertyImpl::erase_at(size_t index)
     return ret;
 }
 
-void ArrayPropertyImpl::clear_array()
+void ArrayProperty::clear_array()
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return;
@@ -215,4 +215,4 @@ void ArrayPropertyImpl::clear_array()
     invoke_event(on_changed(), data_.get());
 }
 
-} // namespace velk
+} // namespace velk::impl

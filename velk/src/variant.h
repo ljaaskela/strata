@@ -5,7 +5,7 @@
 #include <velk/interface/intf_variant.h>
 #include <velk/interface/types.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief IAny implementation that can store any type and convert between compatible types on read.
@@ -13,7 +13,7 @@ namespace velk {
  * Wraps an inner typed IAny (e.g. AnyValue<float>) and replaces it when a different type is set.
  * Provides numeric conversions between bool, int32_t, int64_t, uint32_t, uint64_t, float, double.
  */
-class VariantImpl final : public ext::ObjectCore<VariantImpl, IVariant>
+class Variant final : public ext::ObjectCore<Variant, IVariant>
 {
 public:
     VELK_CLASS_UID(ClassId::Variant);
@@ -34,6 +34,6 @@ private:
     IAny::Ptr stored_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_VARIANT_H

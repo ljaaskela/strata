@@ -10,7 +10,7 @@
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default IArrayProperty + IPropertyInternal implementation.
@@ -19,12 +19,12 @@ namespace velk {
  * delegating element-level operations to IArrayAny on its backing data_.
  * The data_ is expected to be an ArrayAnyRef<T> (which implements IArrayAny).
  */
-class ArrayPropertyImpl final : public ext::ObjectCore<ArrayPropertyImpl, IPropertyInternal, IArrayProperty>
+class ArrayProperty final : public ext::ObjectCore<ArrayProperty, IPropertyInternal, IArrayProperty>
 {
 public:
     VELK_CLASS_UID(ClassId::ArrayProperty);
 
-    ArrayPropertyImpl() = default;
+    ArrayProperty() = default;
 
 protected: // IProperty
     ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;
@@ -54,6 +54,6 @@ private:
     ext::LazyEvent onChanged_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // ARRAY_PROPERTY_H

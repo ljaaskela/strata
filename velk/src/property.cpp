@@ -7,9 +7,9 @@
 #include <velk/interface/intf_external_any.h>
 #include <velk/interface/types.h>
 
-namespace velk {
+namespace velk::impl {
 
-ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
+ReturnValue Property::set_value(const IAny& from, InvokeType type)
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
@@ -34,13 +34,13 @@ ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
     }
     return ret;
 }
-const IAny::ConstPtr PropertyImpl::get_value() const
+const IAny::ConstPtr Property::get_value() const
 {
     detail::record_dependency(this);
     return data_;
 }
 
-bool PropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
+bool Property::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
     if (previous) {
         *previous = {};
@@ -66,12 +66,12 @@ bool PropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
     }
     return succeeded(invoke_event(on_changed(), data_.get()));
 }
-IAny::ConstPtr PropertyImpl::get_any() const
+IAny::ConstPtr Property::get_any() const
 {
     detail::record_dependency(this);
     return data_;
 }
-ReturnValue PropertyImpl::set_value_silent(const IAny& from)
+ReturnValue Property::set_value_silent(const IAny& from)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
@@ -88,7 +88,7 @@ ReturnValue PropertyImpl::set_value_silent(const IAny& from)
     return ret;
 }
 
-ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
+ReturnValue Property::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
 {
     invokeType = resolve_invoke_type(invokeType, get_object_data().owner_thread_id);
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
@@ -112,7 +112,7 @@ ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type, Invo
     return ret;
 }
 
-bool PropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
+bool Property::install_extension(const IAnyExtension::Ptr& extension)
 {
     if (!extension) {
         return false;
@@ -124,7 +124,7 @@ bool PropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
     return true;
 }
 
-bool PropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
+bool Property::remove_extension(const IAnyExtension::Ptr& extension)
 {
     if (!extension || !data_) {
         return false;
@@ -162,4 +162,4 @@ bool PropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
     return false;
 }
 
-} // namespace velk
+} // namespace velk::impl

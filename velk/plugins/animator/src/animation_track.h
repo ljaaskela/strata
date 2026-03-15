@@ -6,7 +6,7 @@
 #include <velk/plugins/animator/plugin.h>
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Keyframe-based animation implementation that is itself an IAnyExtension.
@@ -15,12 +15,12 @@ namespace velk {
  * keyframes during tick(), writing directly to all inners and firing on_changed
  * via each owner.
  */
-class AnimationTrackImpl : public ext::Object<AnimationTrackImpl, IAnimationTrack, IAnyExtension>
+class AnimationTrack : public ext::Object<AnimationTrack, IAnimationTrack, IAnyExtension>
 {
 public:
     VELK_CLASS_UID(ClassId::AnimationTrack);
 
-    ~AnimationTrackImpl();
+    ~AnimationTrack();
 
     // IAnimation (base)
     ReturnValue tick(const UpdateInfo& info) override;
@@ -77,6 +77,6 @@ private:
     bool transient_ = false;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_ANIMATOR_ANIMATION_TRACK_IMPL_H

@@ -9,13 +9,13 @@
 
 #include <atomic>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Per-property transition state and interpolation logic.
  *
  * Plain C++ struct that holds the animation buffers (display, from, target, result)
- * and manages interpolation. Used by both TransitionImpl (direct install) and
+ * and manages interpolation. Used by both Transition (direct install) and
  * TransitionProxy (multi-target children).
  */
 struct TransitionDriver
@@ -51,7 +51,7 @@ inline constexpr Uid TransitionProxy{"a1b2c3d4-e5f6-4789-abcd-ef0123456789"};
 /**
  * @brief Lightweight IAnyExtension proxy for multi-target transitions.
  *
- * Installed on child properties by TransitionImpl::add_target. Uses
+ * Installed on child properties by Transition::add_target. Uses
  * ext::AnyExtension for ref counting and default IAny passthrough.
  * Only overrides the methods needed for animation interception.
  */
@@ -78,8 +78,8 @@ public:
     TransitionDriver driver;
     IInterface::WeakPtr owner_;
     InterpolatorFn interpolator_ = nullptr;
-    IInterface::Ptr parent_; ///< Strong ref to TransitionImpl when persistent (creates intentional cycle).
-    std::atomic<bool>* active_flag_ = nullptr; ///< Points into TransitionImpl::active_; set on driver start.
+    IInterface::Ptr parent_; ///< Strong ref to Transition when persistent (creates intentional cycle).
+    std::atomic<bool>* active_flag_ = nullptr; ///< Points into Transition::active_; set on driver start.
 
     // Pending target stash: set_data() may be called from any thread, but driver.start()
     // mutates driver state (from, target, elapsed) which tick() also reads on the update
@@ -99,11 +99,11 @@ public:
  * is a lightweight TransitionProxy with the same duration/easing, installed on
  * its own property. Config changes propagate to all children.
  */
-class TransitionImpl final : public ext::Object<TransitionImpl, ITransition, IAnyExtension>
+class Transition final : public ext::Object<Transition, ITransition, IAnyExtension>
 {
 public:
     VELK_CLASS_UID(ClassId::Transition);
-    ~TransitionImpl();
+    ~Transition();
 
     // IAnimation (base)
     ReturnValue tick(const UpdateInfo& info) override;
@@ -151,6 +151,6 @@ private:
     bool transient_ = false;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_ANIMATOR_TRANSITION_IMPL_H

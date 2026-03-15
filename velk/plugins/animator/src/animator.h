@@ -6,9 +6,9 @@
 #include <velk/plugins/animator/plugin.h>
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
-class AnimatorImpl : public ext::Object<AnimatorImpl, IAnimator>
+class Animator : public ext::Object<Animator, IAnimator>
 {
 public:
     VELK_CLASS_UID(ClassId::Animator);
@@ -24,6 +24,6 @@ private:
     vector<IAnimation::WeakPtr> animations_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_ANIMATOR_IMPL_H

@@ -7,12 +7,12 @@
 
 #include <shared_mutex>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default implementation of IThreadContext backed by std::shared_mutex.
  */
-class ThreadContextImpl final : public ext::ObjectCore<ThreadContextImpl, IThreadContext>
+class ThreadContext final : public ext::ObjectCore<ThreadContext, IThreadContext>
 {
 public:
     VELK_CLASS_UID(ClassId::ThreadContext);
@@ -28,6 +28,6 @@ private:
     std::shared_mutex mutex_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // THREAD_CONTEXT_H

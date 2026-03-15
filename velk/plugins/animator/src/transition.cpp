@@ -6,7 +6,7 @@
 
 #include <algorithm>
 
-namespace velk {
+namespace velk::impl {
 
 // ============================================================================
 // TransitionDriver
@@ -214,17 +214,17 @@ bool TransitionProxy::tick(Duration dt, Duration duration, easing::EasingFn easi
 }
 
 // ============================================================================
-// TransitionImpl
+// Transition
 // ============================================================================
 
-TransitionImpl::~TransitionImpl()
+Transition::~Transition()
 {
     if (transient_) {
-        TransitionImpl::uninstall();
+        Transition::uninstall();
     }
 }
 
-void TransitionImpl::set_transient(bool transient)
+void Transition::set_transient(bool transient)
 {
     transient_ = transient;
     auto self = transient ? IInterface::Ptr{} : get_self<IInterface>();
@@ -235,7 +235,7 @@ void TransitionImpl::set_transient(bool transient)
     }
 }
 
-void TransitionImpl::uninstall()
+void Transition::uninstall()
 {
     for (auto& child : children_) {
         auto prop = child.property.lock();
@@ -247,7 +247,7 @@ void TransitionImpl::uninstall()
             continue;
         }
         if (child.proxy == installed_proxy_) {
-            // This proxy lives behind TransitionImpl in the chain; remove self
+            // This proxy lives behind Transition in the chain; remove self
             pi->remove_extension(get_self<IAnyExtension>());
         } else {
             // add_target proxy: directly in the property's chain
@@ -258,12 +258,12 @@ void TransitionImpl::uninstall()
     installed_proxy_ = nullptr;
 }
 
-bool TransitionImpl::is_active() const
+bool Transition::is_active() const
 {
     return active_;
 }
 
-void TransitionImpl::ensure_registered()
+void Transition::ensure_registered()
 {
     if (!registered_) {
         auto ap = ::velk::get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
@@ -274,27 +274,27 @@ void TransitionImpl::ensure_registered()
     }
 }
 
-ITransition::State* TransitionImpl::state()
+ITransition::State* Transition::state()
 {
     return interface_state<ITransition>();
 }
 
-const ITransition::State* TransitionImpl::state() const
+const ITransition::State* Transition::state() const
 {
     return interface_state<ITransition>();
 }
 
-void TransitionImpl::notify_state()
+void Transition::notify_state()
 {
     notify(MemberKind::Property, ITransition::UID, Notification::Changed);
 }
 
-void TransitionImpl::set_easing(easing::EasingFn easing)
+void Transition::set_easing(easing::EasingFn easing)
 {
     easing_ = easing;
 }
 
-TransitionImpl::ChildEntry TransitionImpl::make_proxy()
+Transition::ChildEntry Transition::make_proxy()
 {
     auto ext = ext::make_object<TransitionProxy, IAnyExtension>();
     auto* p = static_cast<TransitionProxy*>(interface_cast<IAnyExtension>(ext.get()));
@@ -305,7 +305,7 @@ TransitionImpl::ChildEntry TransitionImpl::make_proxy()
     return {{}, ext, p};
 }
 
-void TransitionImpl::add_target(const IProperty::Ptr& target)
+void Transition::add_target(const IProperty::Ptr& target)
 {
     auto* pi = interface_cast<IPropertyInternal>(target.get());
     if (!pi) {
@@ -320,7 +320,7 @@ void TransitionImpl::add_target(const IProperty::Ptr& target)
     ensure_registered();
 }
 
-void TransitionImpl::remove_target(const IProperty::Ptr& target)
+void Transition::remove_target(const IProperty::Ptr& target)
 {
     for (auto it = children_.begin(); it != children_.end(); ++it) {
         auto prop = it->property.lock();
@@ -335,14 +335,14 @@ void TransitionImpl::remove_target(const IProperty::Ptr& target)
     }
 }
 
-// IAnyExtension: installing TransitionImpl on a property creates a proxy child
+// IAnyExtension: installing Transition on a property creates a proxy child
 
-IAny::ConstPtr TransitionImpl::get_inner() const
+IAny::ConstPtr Transition::get_inner() const
 {
     return installed_proxy_ ? installed_proxy_->get_inner() : nullptr;
 }
 
-bool TransitionImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+bool Transition::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
 {
     // The property calls set_inner during install_extension, before putting us
     // at the head of the chain. We create a proxy, initialize it directly with
@@ -357,7 +357,7 @@ bool TransitionImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner
     return true;
 }
 
-IAny::Ptr TransitionImpl::take_inner(IInterface& owner)
+IAny::Ptr Transition::take_inner(IInterface& owner)
 {
     if (!installed_proxy_) {
         return nullptr;
@@ -376,39 +376,39 @@ IAny::Ptr TransitionImpl::take_inner(IInterface& owner)
 
 // IAny passthrough to installed proxy
 
-array_view<Uid> TransitionImpl::get_compatible_types() const
+array_view<Uid> Transition::get_compatible_types() const
 {
     return installed_proxy_ ? installed_proxy_->get_compatible_types() : array_view<Uid>{};
 }
 
-size_t TransitionImpl::get_data_size(Uid type) const
+size_t Transition::get_data_size(Uid type) const
 {
     return installed_proxy_ ? installed_proxy_->get_data_size(type) : 0;
 }
 
-ReturnValue TransitionImpl::get_data(void* to, size_t toSize, Uid type) const
+ReturnValue Transition::get_data(void* to, size_t toSize, Uid type) const
 {
     return installed_proxy_ ? installed_proxy_->get_data(to, toSize, type) : ReturnValue::Fail;
 }
 
-ReturnValue TransitionImpl::set_data(void const* from, size_t fromSize, Uid type)
+ReturnValue Transition::set_data(void const* from, size_t fromSize, Uid type)
 {
     return installed_proxy_ ? installed_proxy_->set_data(from, fromSize, type) : ReturnValue::Fail;
 }
 
-ReturnValue TransitionImpl::copy_from(const IAny& other)
+ReturnValue Transition::copy_from(const IAny& other)
 {
     return installed_proxy_ ? installed_proxy_->copy_from(other) : ReturnValue::Fail;
 }
 
-IAny::Ptr TransitionImpl::clone() const
+IAny::Ptr Transition::clone() const
 {
     return installed_proxy_ ? installed_proxy_->clone() : nullptr;
 }
 
 // ITransition
 
-ReturnValue TransitionImpl::tick(const UpdateInfo& info)
+ReturnValue Transition::tick(const UpdateInfo& info)
 {
     // Nothing animating: skip the loop entirely
     if (!active_.load(std::memory_order_acquire)) {
@@ -436,4 +436,4 @@ ReturnValue TransitionImpl::tick(const UpdateInfo& info)
     return anyAnimating ? ReturnValue::Success : ReturnValue::NothingToDo;
 }
 
-} // namespace velk
+} // namespace velk::impl

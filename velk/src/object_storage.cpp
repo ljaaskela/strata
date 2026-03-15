@@ -35,7 +35,7 @@ IInterface::Ptr ObjectStorage::create(MemberDesc desc) const
     case MemberKind::Property: {
         {
             auto* pk = desc.propertyKind();
-            created = ext::make_object<PropertyImpl>(pk ? pk->flags : ObjectFlags::None);
+            created = ext::make_object<impl::Property>(pk ? pk->flags : ObjectFlags::None);
         }
         if (auto* pi = created->get_interface<IPropertyInternal>()) {
             if (auto* pk = desc.propertyKind()) {
@@ -63,7 +63,7 @@ IInterface::Ptr ObjectStorage::create(MemberDesc desc) const
     }
     case MemberKind::ArrayProperty: {
         auto* pk = desc.propertyKind();
-        created = ext::make_object<ArrayPropertyImpl>(pk ? pk->flags : ObjectFlags::None);
+        created = ext::make_object<impl::ArrayProperty>(pk ? pk->flags : ObjectFlags::None);
         if (auto* pi = created->get_interface<IPropertyInternal>()) {
             if (pk) {
                 if (pk->createRef && owner_) {
@@ -87,10 +87,10 @@ IInterface::Ptr ObjectStorage::create(MemberDesc desc) const
         break;
     }
     case MemberKind::Event:
-        created = ext::make_object<EventImpl>();
+        created = ext::make_object<impl::Event>();
         break;
     case MemberKind::Function:
-        created = ext::make_object<FunctionImpl>();
+        created = ext::make_object<impl::Function>();
         break;
     }
     return created;

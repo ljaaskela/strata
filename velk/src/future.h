@@ -11,7 +11,7 @@
 #include <condition_variable>
 #include <mutex>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default IFuture/IFutureInternal implementation.
@@ -22,12 +22,12 @@ namespace velk {
  * the result arrives. Continuations attached after are fired immediately
  * (Immediate type) or queued via instance().queue_deferred_tasks() (Deferred type).
  */
-class FutureImpl final : public ext::ObjectCore<FutureImpl, IFutureInternal>
+class Future final : public ext::ObjectCore<Future, IFutureInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Future);
 
-    FutureImpl() = default;
+    Future() = default;
 
 public: // IFuture
     bool is_ready() const override;
@@ -55,6 +55,6 @@ private:
     vector<Continuation> pending_continuations_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // FUTURE_H

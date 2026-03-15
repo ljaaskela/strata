@@ -14,7 +14,7 @@
 
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 enum class SlotState : uint8_t
 {
@@ -112,6 +112,6 @@ private:
     HivePageCapacity capacity_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_PLUGINS_OBJECT_HIVE_H

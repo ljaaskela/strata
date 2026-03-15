@@ -8,7 +8,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default implementation of IHierarchy backed by an unordered_map.
@@ -16,7 +16,7 @@ namespace velk {
  * Thread-safe: reads use shared locks, mutations use exclusive locks.
  * Listener callbacks and events are invoked outside the lock.
  */
-class HierarchyImpl final : public ext::Object<HierarchyImpl, IHierarchy>
+class Hierarchy final : public ext::Object<Hierarchy, IHierarchy>
 {
 public:
     VELK_CLASS_UID(ClassId::Hierarchy);
@@ -63,6 +63,6 @@ private:
     std::unordered_map<IObject*, Entry> entries_; // All nodes keyed by raw pointer.
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // HIERARCHY_H

@@ -6,7 +6,7 @@
 
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Concrete implementation of IHiveStore.
@@ -38,6 +38,6 @@ private:
     vector<HiveEntry> hives_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_PLUGINS_HIVE_STORE_H
