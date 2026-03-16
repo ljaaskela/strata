@@ -1,10 +1,11 @@
 #ifndef VELK_IMPORTER_PLUGIN_H
 #define VELK_IMPORTER_PLUGIN_H
 
-#include "json_importer.h"
-
 #include <velk/ext/plugin.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
+
+#include <string>
+#include <unordered_map>
 
 namespace velk {
 
@@ -18,11 +19,11 @@ public:
     ReturnValue initialize(IVelk& velk, PluginConfig& config) override;
     ReturnValue shutdown(IVelk&) override;
 
-    ImportResult import_from_json(string_view json) const override;
     void register_class_alias(string_view alias, Uid class_uid) override;
+    Uid resolve_class(string_view name) const override;
 
 private:
-    JsonImporter importer_;
+    std::unordered_map<std::string, Uid> aliases_;
 };
 
 } // namespace velk

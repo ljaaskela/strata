@@ -841,16 +841,14 @@ velk::ReturnValue MyPlugin::initialize(velk::IVelk& velk, velk::PluginConfig&) o
 ### Using the importer
 
 ```cpp
-#include <velk/plugins/importer/interface/intf_importer_plugin.h>
-#include <velk/plugins/importer/plugin.h>
+#include <velk/plugins/importer/api/importer.h>
 
-// Load importer plugin
-::velk::instance().plugin_registry().load_plugin_from_path("velk_importer.dll");
-auto plugin = ::velk::instance().plugin_registry().find_plugin(velk::PluginId::ImporterPlugin);
-auto* importer = velk::interface_cast<velk::IImporterPlugin>(plugin);
+// Register class aliases (optional)
+::velk::register_import_alias("mylib.Widget", MyWidget::static_class_id());
 
-// Import JSON
-auto result = importer->import_from_json(R"({
+// Create a JSON importer (loads plugin automatically) and import
+auto importer = ::velk::create_json_importer();
+auto result = importer.import_from(R"({
     "version": 1,
     "objects": [
         { "id": "w1", "class": "mylib.Widget", "properties": { "width": 100.0 } }

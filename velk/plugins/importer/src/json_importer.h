@@ -3,21 +3,24 @@
 
 #include "json_parser.h"
 
+#include <velk/ext/core_object.h>
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/member_desc.h>
 #include <velk/interface/types.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
+#include <velk/plugins/importer/plugin.h>
 
 #include <string>
 #include <unordered_map>
 
 namespace velk {
 
-class JsonImporter
+class JsonImporter : public ext::ObjectCore<JsonImporter, IStoreImporter>
 {
 public:
-    void register_class_alias(string_view import_name, Uid class_uid);
-    ImportResult import_from_json(string_view json) const;
+    VELK_CLASS_UID(ClassId::JsonImporter, "JsonImporter");
+
+    ImportResult import_from(string_view json) const override;
 
 private:
     friend class ImportResolver;
@@ -56,8 +59,6 @@ private:
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
                                     const std::string& path) const;
     void dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const;
-
-    std::unordered_map<std::string, Uid> aliases_;
 };
 
 } // namespace velk

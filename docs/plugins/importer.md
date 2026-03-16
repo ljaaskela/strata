@@ -1,16 +1,19 @@
 # Importer plugin
 
-The importer plugin (`velk_importer`) loads JSON scene files into Velk. It creates objects, sets properties, builds hierarchies, resolves references, creates bindings, and dispatches plugin-specific data to registered extensions. See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json) for the formal format definition.
+The importer plugin (`velk_importer`) loads scene files into Velk. It creates objects, sets properties, builds hierarchies, resolves references, creates bindings, and dispatches plugin-specific data to registered extensions.
+
+Currently the plugin ships a JSON importer (`ClassId::JsonImporter`). The architecture supports additional formats (binary, etc.) as separate `IStoreImporter` implementations registered by the same or other plugins. Extensions receive data through the format-neutral `IImportData` interface, so they work with any importer without changes.
+
+See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json) for the formal format definition.
 
 ## Contents
 
-- [Loading the plugin](#loading-the-plugin)
+- [Usage](#usage)
 - [JSON format](#json-format)
   - [Objects](#objects)
   - [Class resolution](#class-resolution)
   - [Properties](#properties)
   - [Hierarchies](#hierarchies)
-  - [Object references](#object-references)
   - [Bindings](#bindings)
   - [Extension collections](#extension-collections)
 - [Import result](#import-result)
@@ -19,22 +22,22 @@ The importer plugin (`velk_importer`) loads JSON scene files into Velk. It creat
   - [IImportResolver](#iimportresolver)
   - [Writing an extension](#writing-an-extension)
   - [Example: animator extension](#example-animator-extension)
+- [Advanced](#advanced)
+  - [Class aliases](#class-aliases)
+  - [Direct interface access](#direct-interface-access)
 
-## Loading the plugin
+## Usage
 
 ```cpp
-#include <velk/plugins/importer/interface/intf_importer_plugin.h>
-#include <velk/plugins/importer/plugin.h>
+#include <velk/plugins/importer/api/importer.h>
 
-// Load the plugin
-instance().plugin_registry().load_plugin_from_path("velk_importer.dll");
+auto importer = velk::create_json_importer();
+auto result = importer.import_from(json_string);
 
-// Get the plugin interface
-auto plugin = instance().plugin_registry().find_plugin(PluginId::ImporterPlugin);
-auto* importer = interface_cast<IImporterPlugin>(plugin);
-
-// Import a JSON string
-auto result = importer->import_from_json(json_string);
+if (result) {
+    auto obj = result.store->find("widget_1");
+    // ...
+}
 ```
 
 ## JSON format
@@ -81,7 +84,7 @@ The `id` is used for store lookup and reference resolution. The `name` is option
 The `class` field supports three formats, tried in order:
 
 1. **UUID string**: `"c0000000-0000-0000-0000-000000000010"` matches directly against the type registry.
-2. **Registered alias**: Custom names registered via `importer->register_class_alias("myapp.Widget", uid)`. Useful for application-level code that drives imports directly.
+2. **Registered alias**: Custom names registered via [`register_import_alias()`](#class-aliases).
 3. **Scoped class name**: `"plugin-name.ClassName"` resolves via `ITypeRegistry::find_class_by_name()`. Classes with a friendly name set via `VELK_CLASS_UID(uid, "ClassName")` and registered by a plugin named `"plugin-name"` are found as `"plugin-name.ClassName"`. Unscoped names do a first-match lookup.
 
 ### Properties
@@ -103,11 +106,12 @@ Property values are inferred from the class metadata (`VELK_INTERFACE` declarati
 **Object reference** (ObjectRef properties only):
 
 ```json
-"target": { "ref": "other_widget" }
-"target": { "ref": "other_widget", "type": "weak" }
+"target": { "ref": "widget_1" }
+"target": { "ref": "/scene/root/panel" }
+"target": { "ref": "widget_1", "type": "weak" }
 ```
 
-Only valid on properties of type `ObjectRef`. Default is strong; add `"type": "weak"` for a non-owning reference.
+Only valid on properties of type `ObjectRef`. The `ref` path supports direct ids (looked up by `id` then `name`), and hierarchy paths starting with `/` that walk the tree by matching object names at each level. Default is strong (owning); add `"type": "weak"` for a non-owning reference.
 
 **Inline binding** (any property):
 
@@ -136,24 +140,7 @@ Hierarchies are a top-level object mapping hierarchy names to parent-children ma
 
 The root is determined automatically (a node that appears as a key but never in any child array). Hierarchies are stored in the result store as `"hierarchy:<name>"`.
 
-### Object references
-
-Object references point to other objects in the store. They are set on properties of type `ObjectRef`:
-
-```json
-"target": { "ref": "widget_1" }
-```
-
-References support the same path formats used elsewhere:
-
-- **Direct id**: `"widget_1"`
-- **Hierarchy path**: `"/scene/root/panel"` walks the hierarchy tree matching object names at each level.
-
-Add `"type": "weak"` for a non-owning reference:
-
-```json
-"target": { "ref": "widget_1", "type": "weak" }
-```
+The same path formats (direct ids and hierarchy paths) are used in bindings, inline binds, and animation targets.
 
 ### Bindings
 
@@ -218,12 +205,13 @@ Unknown keys without a matching extension are silently ignored.
 
 ## Import result
 
-`import_from_json()` returns an `ImportResult`:
+`import_from()` returns an `ImportResult`:
 
 ```cpp
 struct ImportResult {
-    IStore::Ptr store;       // The imported store, or null if parsing failed
-    vector<string> errors;   // Collected errors (non-fatal problems are reported here)
+    IStore::Ptr store;
+    vector<string> errors;
+    explicit operator bool() const;  // true if store is valid and no errors
 };
 ```
 
@@ -238,27 +226,36 @@ Extensions let plugins add their own top-level collections to the JSON format wi
 Extensions receive data through `IImportData`, a format-neutral read-only data tree. This decouples extensions from JSON, so the transport format can change (e.g. to binary) without modifying extension code.
 
 ```cpp
-class IImportData {
+class IImportData : public Interface<IImportData> {
 public:
+    /** @brief Type discriminator for data nodes. */
     enum class Kind : uint8_t { Null, Bool, Number, String, Array, Object };
-
-    Kind kind() const;
-    bool as_bool() const;
-    double as_number() const;
-    string_view as_string() const;
-    size_t count() const;
-    const IImportData* at(size_t index) const;
-    const IImportData* find(string_view key) const;
-    string_view key_at(size_t index) const;
-    bool is_null() const;
+    /** @brief Returns the type of this node. */
+    virtual Kind kind() const = 0;
+    /** @brief Returns true if this is a null node. */
+    virtual bool is_null() const = 0;
+    /** @brief Returns the boolean value, or false if not a Bool node. */
+    virtual bool as_bool() const = 0;
+    /** @brief Returns the numeric value, or 0.0 if not a Number node. */
+    virtual double as_number() const = 0;
+    /** @brief Returns the string value, or empty if not a String node. */
+    virtual string_view as_string() const = 0;
+    /** @brief Array and object: number of elements/entries. */
+    virtual size_t count() const = 0;
+    /** @brief Array: indexed element. Object: value at index (insertion order). */
+    virtual const IImportData& at(size_t index) const = 0;
+    /** @brief Object: value for key. Returns static null node if missing. */
+    virtual const IImportData& find(string_view key) const = 0;
+    /** @brief Object: key name at index (for iteration). */
+    virtual string_view key_at(size_t index) const = 0;
 };
 ```
 
 `IImportData` uses the null object pattern: `find()` on a missing key and `at()` out of bounds return a static null node that returns zero/empty for all accessors and itself for further `find`/`at` calls. This makes chaining safe without null checks:
 
 ```cpp
-auto duration = entry->find("duration")->as_number();  // 0.0 if missing
-auto name = entry->find("config")->find("name")->as_string();  // "" if either key missing
+auto duration = entry.find("duration").as_number();  // 0.0 if missing
+auto name = entry.find("config").find("name").as_string();  // "" if either key missing
 ```
 
 ### IImportResolver
@@ -266,9 +263,16 @@ auto name = entry->find("config")->find("name")->as_string();  // "" if either k
 Extensions receive an `IImportResolver` that provides the same path resolution as the core importer:
 
 ```cpp
-class IImportResolver {
+class IImportResolver : public Interface<IImportResolver> {
 public:
-    IObject::Ptr resolve(string_view path) const;
+    /**
+     * @brief Resolves a path to an object or property.
+     * @param path Direct id ("w1"), hierarchy path ("/scene/root/child"),
+     *             or property path ("w1.width"). Property paths return the
+     *             IProperty wrapped as IObject::Ptr.
+     * @return The resolved object, or nullptr if not found.
+     */
+    virtual IObject::Ptr resolve(string_view path) const = 0;
 };
 ```
 
@@ -297,8 +301,8 @@ public:
                  const IImportResolver& resolver) const override
     {
         for (size_t i = 0; i < data.count(); i++) {
-            auto* entry = data.at(i);
-            auto target_path = entry->find("target")->as_string();
+            auto& entry = data.at(i);
+            auto target_path = entry.find("target").as_string();
             auto obj = resolver.resolve(target_path);
             // ... use the resolved object ...
         }
@@ -355,3 +359,33 @@ Tracks play automatically by default. Set `"autoplay": false` to create the trac
 Both types support multi-target: a single animation entry can target multiple properties. All path formats supported by the resolver work in `"targets"` arrays.
 
 See [Animator plugin](animator.md) for the full list of easing function names and details on how transitions and tracks work.
+
+## Advanced
+
+### Class aliases
+
+Class names are normally resolved automatically from the type registry. If you need custom name mappings:
+
+```cpp
+velk::register_import_alias("myapp.Widget", MyWidget::static_class_id());
+```
+
+Aliases are registered on the importer plugin and apply to all importers.
+
+### Direct interface access
+
+The `Importer` wrapper is a thin handle around `IStoreImporter`. For direct interface access:
+
+```cpp
+#include <velk/plugins/importer/interface/intf_importer_plugin.h>
+#include <velk/plugins/importer/plugin.h>
+
+// Create via type registry
+auto importer = instance().create<IStoreImporter>(ClassId::JsonImporter);
+auto result = importer->import_from(json_string);
+
+// Access the plugin directly
+auto plugin = instance().plugin_registry().find_plugin(PluginId::ImporterPlugin);
+auto* ip = interface_cast<IImporterPlugin>(plugin);
+ip->register_class_alias("myapp.Widget", uid);
+```

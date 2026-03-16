@@ -50,12 +50,7 @@ const MemberDesc* find_property_desc(const ClassInfo& info, string_view name)
 
 } // namespace
 
-void JsonImporter::register_class_alias(string_view import_name, Uid class_uid)
-{
-    aliases_[std::string(import_name.data(), import_name.size())] = class_uid;
-}
-
-ImportResult JsonImporter::import_from_json(string_view json) const
+ImportResult JsonImporter::import_from(string_view json) const
 {
     ImportResult result;
 
@@ -123,25 +118,14 @@ ImportResult JsonImporter::import_from_json(string_view json) const
 
 Uid JsonImporter::resolve_class(const std::string& class_str, ImportResult& result) const
 {
-    // Try UUID format first
-    auto class_sv = sv(class_str);
-    if (is_valid_uid_format(class_sv)) {
-        Uid uid(class_sv);
-        if (::velk::instance().type_registry().get_class_info(uid)) {
+    // Delegate to the plugin which handles UUID, aliases, and class name lookup
+    auto plugin = ::velk::instance().plugin_registry().find_plugin(PluginId::ImporterPlugin);
+    auto* ip = interface_cast<IImporterPlugin>(plugin);
+    if (ip) {
+        Uid uid = ip->resolve_class(sv(class_str));
+        if (uid != Uid{}) {
             return uid;
         }
-    }
-
-    // Try registered aliases
-    auto it = aliases_.find(class_str);
-    if (it != aliases_.end()) {
-        return it->second;
-    }
-
-    // Look up by registered class name
-    Uid found = ::velk::instance().type_registry().find_class_by_name(class_sv);
-    if (found != Uid{}) {
-        return found;
     }
 
     add_error(result, "unknown class: " + class_str);

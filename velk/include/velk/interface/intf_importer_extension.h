@@ -25,12 +25,18 @@ namespace velk {
 class IImportData : public Interface<IImportData>
 {
 public:
+    /** @brief Type discriminator for data nodes. */
     enum class Kind : uint8_t { Null, Bool, Number, String, Array, Object };
 
+    /** @brief Returns the type of this node. */
     virtual Kind kind() const = 0;
+    /** @brief Returns true if this is a null node. */
     virtual bool is_null() const = 0;
+    /** @brief Returns the boolean value, or false if not a Bool node. */
     virtual bool as_bool() const = 0;
+    /** @brief Returns the numeric value, or 0.0 if not a Number node. */
     virtual double as_number() const = 0;
+    /** @brief Returns the string value, or empty if not a String node. */
     virtual string_view as_string() const = 0;
 
     /** @brief Array and object: number of elements/entries. */
@@ -60,6 +66,13 @@ public:
 class IImportResolver : public Interface<IImportResolver>
 {
 public:
+    /**
+     * @brief Resolves a path to an object or property.
+     * @param path Direct id ("w1"), hierarchy path ("/scene/root/child"),
+     *             or property path ("w1.width"). Property paths return the
+     *             IProperty wrapped as IObject::Ptr.
+     * @return The resolved object, or nullptr if not found.
+     */
     virtual IObject::Ptr resolve(string_view path) const = 0;
 };
 

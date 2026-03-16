@@ -119,28 +119,33 @@ protected:
         reg.load_plugin_from_path(TEST_IMPORTER_DLL_PATH);
         auto plugin = reg.find_plugin(PluginId::ImporterPlugin);
         ASSERT_TRUE(plugin);
-        importer_ = interface_cast<IImporterPlugin>(plugin);
-        ASSERT_NE(nullptr, importer_);
-        importer_->register_class_alias("test.Widget", TestImportWidget::static_class_id());
-        importer_->register_class_alias("test.Panel", TestImportPanel::static_class_id());
-        importer_->register_class_alias("test.Container", TestImportContainer::static_class_id());
+        auto* ip = interface_cast<IImporterPlugin>(plugin);
+        ASSERT_NE(nullptr, ip);
+        ip->register_class_alias("test.Widget", TestImportWidget::static_class_id());
+        ip->register_class_alias("test.Panel", TestImportPanel::static_class_id());
+        ip->register_class_alias("test.Container", TestImportContainer::static_class_id());
+
+        auto obj = ::velk::instance().create<IStoreImporter>(ClassId::JsonImporter);
+        ASSERT_TRUE(obj);
+        importer_ = obj;
     }
 
     void TearDown() override
     {
+        importer_ = nullptr;
         auto& reg = ::velk::instance().plugin_registry();
         if (reg.find_plugin(PluginId::ImporterPlugin)) {
             reg.unload_plugin(PluginId::ImporterPlugin);
         }
     }
 
-    IImporterPlugin* importer_ = nullptr;
+    IStoreImporter::Ptr importer_;
 };
 
 TEST_F(ImporterTest, ImportSingleObject)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -176,7 +181,7 @@ TEST_F(ImporterTest, ImportSingleObject)
 TEST_F(ImporterTest, ImportMultipleObjects)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -208,7 +213,7 @@ TEST_F(ImporterTest, ImportMultipleObjects)
 TEST_F(ImporterTest, ImportWithHierarchy)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "root", "class": "test.Widget", "properties": { "width": 1.0 } },
@@ -245,7 +250,7 @@ TEST_F(ImporterTest, ImportWithHierarchy)
 TEST_F(ImporterTest, ImportByClassUid)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -269,7 +274,7 @@ TEST_F(ImporterTest, ImportByClassUid)
 TEST_F(ImporterTest, UnknownClassReportsError)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "unknown", "class": "test.Unknown", "properties": {} },
@@ -289,7 +294,7 @@ TEST_F(ImporterTest, UnknownClassReportsError)
 TEST_F(ImporterTest, InvalidJsonReportsError)
 {
     load_importer();
-    auto result = importer_->import_from_json("{invalid");
+    auto result = importer_->import_from("{invalid");
     EXPECT_FALSE(result.store);
     ASSERT_FALSE(result.errors.empty());
 }
@@ -297,7 +302,7 @@ TEST_F(ImporterTest, InvalidJsonReportsError)
 TEST_F(ImporterTest, UnknownPropertyReportsError)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -321,7 +326,7 @@ TEST_F(ImporterTest, UnknownPropertyReportsError)
 TEST_F(ImporterTest, PropertyObjectForm)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -344,7 +349,7 @@ TEST_F(ImporterTest, PropertyObjectForm)
 TEST_F(ImporterTest, DefaultValues)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": {} }
@@ -365,7 +370,7 @@ TEST_F(ImporterTest, DefaultValues)
 TEST_F(ImporterTest, EmptyStore)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({ "version": 1, "objects": [] })");
+    auto result = importer_->import_from(R"({ "version": 1, "objects": [] })");
 
     ASSERT_TRUE(result.store);
     EXPECT_TRUE(result.errors.empty());
@@ -381,7 +386,7 @@ TEST_F(ImporterTest, ImportByScopedFriendlyName)
     ::velk::instance().plugin_registry().load_plugin(plugin);
 
     // Import using "velk-ui.Widget" with no alias registration
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -413,7 +418,7 @@ TEST_F(ImporterTest, ImportByScopedFriendlyName)
 TEST_F(ImporterTest, ObjectRefByDirectName)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 10.0 } },
@@ -448,7 +453,7 @@ TEST_F(ImporterTest, ObjectRefByDirectName)
 TEST_F(ImporterTest, ObjectRefByHierarchyPath)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "root", "name": "root", "class": "test.Widget", "properties": { "width": 1.0 } },
@@ -487,7 +492,7 @@ TEST_F(ImporterTest, ObjectRefByHierarchyPath)
 TEST_F(ImporterTest, ObjectRefWeak)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 10.0 } },
@@ -516,7 +521,7 @@ TEST_F(ImporterTest, ObjectRefWeak)
 TEST_F(ImporterTest, ObjectRefNonexistentReportsError)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -543,7 +548,7 @@ TEST_F(ImporterTest, ObjectRefNonexistentReportsError)
 TEST_F(ImporterTest, TopLevelBindingSourceDrivesTarget)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "src", "class": "test.Widget", "properties": { "width": 100.0 } },
@@ -573,7 +578,7 @@ TEST_F(ImporterTest, TopLevelBindingSourceDrivesTarget)
 TEST_F(ImporterTest, TopLevelBindingMultiTarget)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "src", "class": "test.Widget", "properties": { "width": 50.0 } },
@@ -598,7 +603,7 @@ TEST_F(ImporterTest, TopLevelBindingMultiTarget)
 TEST_F(ImporterTest, InlineBindCreatesBinding)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "src", "class": "test.Widget", "properties": { "width": 42.0 } },
@@ -629,7 +634,7 @@ TEST_F(ImporterTest, InlineBindCreatesBinding)
 TEST_F(ImporterTest, BindingNonexistentSourceReportsError)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "dst", "class": "test.Widget", "properties": { "width": 0.0 } }
@@ -653,7 +658,7 @@ TEST_F(ImporterTest, BindingNonexistentSourceReportsError)
 TEST_F(ImporterTest, BindingNonexistentTargetReportsError)
 {
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "src", "class": "test.Widget", "properties": { "width": 10.0 } }
@@ -721,7 +726,7 @@ TEST_F(ImporterTest, ExtensionDispatch)
     ::velk::instance().type_registry().register_type<::velk::MockImportExtension>();
 
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [],
         "custom_data": [
@@ -747,7 +752,7 @@ TEST_F(ImporterTest, ExtensionNotCalledWhenKeyAbsent)
     ::velk::instance().type_registry().register_type<::velk::MockImportExtension>();
 
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": []
     })");
@@ -764,7 +769,7 @@ TEST_F(ImporterTest, NullImportDataChaining)
     ::velk::instance().type_registry().register_type<::velk::MockImportExtension>();
 
     load_importer();
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [],
         "custom_data": []
@@ -801,13 +806,17 @@ protected:
         reg.load_plugin_from_path(TEST_IMPORTER_DLL_PATH);
         auto plugin = reg.find_plugin(PluginId::ImporterPlugin);
         ASSERT_TRUE(plugin);
-        importer_ = interface_cast<IImporterPlugin>(plugin);
-        ASSERT_NE(nullptr, importer_);
-        importer_->register_class_alias("test.Widget", TestImportWidget::static_class_id());
+        auto* ip = interface_cast<IImporterPlugin>(plugin);
+        ASSERT_NE(nullptr, ip);
+        ip->register_class_alias("test.Widget", TestImportWidget::static_class_id());
+
+        importer_ = ::velk::instance().create<IStoreImporter>(ClassId::JsonImporter);
+        ASSERT_TRUE(importer_);
     }
 
     void TearDown() override
     {
+        importer_ = nullptr;
         auto& reg = ::velk::instance().plugin_registry();
         if (reg.find_plugin(PluginId::ImporterPlugin)) {
             reg.unload_plugin(PluginId::ImporterPlugin);
@@ -820,16 +829,15 @@ protected:
     static bool has_animation_extension(const IProperty::Ptr& prop)
     {
         auto chain = get_any_chain(*prop);
-        // If there's more than one node in the chain, an extension is installed
         return chain.size() > 1;
     }
 
-    IImporterPlugin* importer_ = nullptr;
+    IStoreImporter::Ptr importer_;
 };
 
 TEST_F(AnimatorImportTest, TransitionCreatedFromAnimationsKey)
 {
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -861,7 +869,7 @@ TEST_F(AnimatorImportTest, TransitionCreatedFromAnimationsKey)
 
 TEST_F(AnimatorImportTest, MultipleTransitions)
 {
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -901,7 +909,7 @@ TEST_F(AnimatorImportTest, MultiTargetTransition)
     // Seed the clock
     ::velk::instance().update({1'000'000});
 
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             {
@@ -952,7 +960,7 @@ TEST_F(AnimatorImportTest, MultiTargetTransition)
 
 TEST_F(AnimatorImportTest, UnknownTargetSilentlySkipped)
 {
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 1.0 } }
@@ -971,7 +979,7 @@ TEST_F(AnimatorImportTest, UnknownTargetSilentlySkipped)
 
 TEST_F(AnimatorImportTest, EmptyAnimationsArray)
 {
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 1.0 } }
@@ -991,7 +999,7 @@ TEST_F(AnimatorImportTest, EmptyAnimationsArray)
 
 TEST_F(AnimatorImportTest, DefaultEasingIsLinear)
 {
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 1.0 } }
@@ -1017,7 +1025,7 @@ TEST_F(AnimatorImportTest, TransitionAnimatesProperty)
     // Seed the clock
     ::velk::instance().update({1'000'000});
 
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
@@ -1059,7 +1067,7 @@ TEST_F(AnimatorImportTest, TrackAnimatesProperty)
     // Seed the clock
     ::velk::instance().update({3'000'000});
 
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
@@ -1099,7 +1107,7 @@ TEST_F(AnimatorImportTest, TrackMultipleKeyframes)
     // Seed the clock
     ::velk::instance().update({5'000'000});
 
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
@@ -1136,7 +1144,7 @@ TEST_F(AnimatorImportTest, TrackMultiTarget)
     // Seed the clock
     ::velk::instance().update({7'000'000});
 
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0, "height": 0.0 } }
@@ -1169,7 +1177,7 @@ TEST_F(AnimatorImportTest, TrackAutoplayFalse)
     // Seed the clock
     ::velk::instance().update({9'000'000});
 
-    auto result = importer_->import_from_json(R"({
+    auto result = importer_->import_from(R"({
         "version": 1,
         "objects": [
             { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }

@@ -1,6 +1,6 @@
 ---
 name: velk
-description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path, importer plugin, IImporterExtension, IImportData, IImportResolver, JSON import, animations"
+description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path, importer plugin, IStoreImporter, IImporterExtension, IImportData, IImportResolver, JSON import, animations"
 ---
 
 # Velk Usage Guide
@@ -134,6 +134,8 @@ The importer plugin (`velk_importer`) loads JSON scene files. Other plugins can 
 
 | Interface | Purpose |
 |-----------|---------|
+| `IStoreImporter` | Base interface for importers. `import_from(source) -> ImportResult`. Create via `instance().create<IStoreImporter>(ClassId::JsonImporter)` |
+| `IImporterPlugin` | Plugin interface. `register_class_alias()` for global alias config, `resolve_class()` for name lookup |
 | `IImportData` | Format-neutral read-only data tree. Null object pattern: `find()`/`at()` return a null node (never null pointer). All pure virtual, implementations use `ext::InterfaceDispatch<IImportData>` |
 | `IImportResolver` | Resolves paths to objects/properties. `resolve("w1.width")` returns `IObject::Ptr` (cast to `IProperty` via `interface_pointer_cast`). Supports direct ids, hierarchy paths (`/scene/root/child`), property paths (`w1.width`) |
 | `IImporterExtension` | Extension point. `collection_key()` returns the JSON key, `process(data, store, resolver)` handles the data |
