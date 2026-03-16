@@ -67,6 +67,7 @@ add_library(velk SHARED
     include/velk/interface/intf_object_storage.h
     include/velk/interface/intf_store.h
     include/velk/interface/intf_hierarchy.h
+    include/velk/interface/intf_importer_extension.h
     include/velk/interface/intf_thread_context.h
     include/velk/interface/member_desc.h
     include/velk/interface/types.h

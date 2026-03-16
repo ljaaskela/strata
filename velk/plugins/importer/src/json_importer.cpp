@@ -1,9 +1,11 @@
+#include "json_import_data.h"
 #include "json_importer.h"
 
 #include <velk/api/binding.h>
 #include <velk/api/hierarchy.h>
 #include <velk/api/store.h>
 #include <velk/api/velk.h>
+#include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/intf_object_ref.h>
 #include <velk/interface/intf_property.h>
@@ -109,6 +111,9 @@ ImportResult JsonImporter::import_from_json(string_view json) const
 
     // Create bindings (top-level array + inline scalar refs handled in resolve_references)
     create_bindings(store, root, ctx, result);
+
+    // Dispatch remaining top-level keys to registered importer extensions
+    dispatch_extensions(root, store);
 
     return result;
 }
@@ -708,6 +713,55 @@ void JsonImporter::parse_binding(const JsonValue& binding_node, IStore& store,
         }
 
         binding.add_target(target_prop);
+    }
+}
+
+void JsonImporter::dispatch_extensions(const JsonValue& root, IStore& store) const
+{
+    struct ExtensionEntry
+    {
+        IInterface::Ptr instance;
+        IImporterExtension* ext;
+    };
+
+    // Discover all classes implementing IImporterExtension
+    std::vector<ExtensionEntry> extensions;
+    auto& registry = ::velk::instance().type_registry();
+
+    struct VisitorCtx
+    {
+        ITypeRegistry* registry;
+        std::vector<ExtensionEntry>* extensions;
+    };
+    VisitorCtx vctx{&registry, &extensions};
+
+    registry.for_each_class(&vctx, [](void* ctx, const ClassInfo& info) -> bool {
+        auto* vc = static_cast<VisitorCtx*>(ctx);
+        // Check if this class implements IImporterExtension
+        for (size_t i = 0; i < info.interfaces.size(); i++) {
+            if (info.interfaces[i].uid == IImporterExtension::UID) {
+                auto instance = vc->registry->create(info.uid);
+                if (instance) {
+                    auto* ext = interface_cast<IImporterExtension>(instance);
+                    if (ext) {
+                        vc->extensions->push_back({instance, ext});
+                    }
+                }
+                break;
+            }
+        }
+        return true;
+    });
+
+    // Dispatch each extension's collection key
+    for (auto& entry : extensions) {
+        auto key = entry.ext->collection_key();
+        std::string key_str(key.data(), key.size());
+        auto* json_node = root.find(key_str);
+        if (json_node) {
+            JsonImportData wrapped(*json_node);
+            entry.ext->process(wrapped, store);
+        }
     }
 }
 

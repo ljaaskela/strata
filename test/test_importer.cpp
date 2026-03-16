@@ -2,8 +2,10 @@
 #include <velk/api/object_ref.h>
 #include <velk/api/store.h>
 #include <velk/api/velk.h>
+#include <velk/ext/core_object.h>
 #include <velk/ext/object.h>
 #include <velk/ext/plugin.h>
+#include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_object_ref.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
@@ -671,4 +673,107 @@ TEST_F(ImporterTest, BindingNonexistentTargetReportsError)
         }
     }
     EXPECT_TRUE(found);
+}
+
+namespace velk {
+
+// Static storage for mock extension test results
+struct MockExtensionResult
+{
+    bool was_called = false;
+    size_t item_count = 0;
+    double first_value = 0.0;
+    std::string first_name;
+};
+
+static MockExtensionResult g_mock_result;
+
+class MockImportExtension : public ext::ObjectCore<MockImportExtension, IImporterExtension>
+{
+public:
+    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000099", "MockImportExtension");
+
+    string_view collection_key() const override { return "custom_data"; }
+
+    void process(const IImportData& data, IStore&) const override
+    {
+        g_mock_result.was_called = true;
+        g_mock_result.item_count = data.count();
+        if (data.count() > 0) {
+            auto* first = data.at(0);
+            auto* name_node = first->find("name");
+            auto* value_node = first->find("value");
+            if (!name_node->is_null()) {
+                auto sv = name_node->as_string();
+                g_mock_result.first_name = std::string(sv.data(), sv.size());
+            }
+            if (!value_node->is_null()) {
+                g_mock_result.first_value = value_node->as_number();
+            }
+        }
+    }
+};
+
+} // namespace velk
+
+TEST_F(ImporterTest, ExtensionDispatch)
+{
+    ::velk::g_mock_result = {};
+    ::velk::instance().type_registry().register_type<::velk::MockImportExtension>();
+
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [],
+        "custom_data": [
+            { "name": "alpha", "value": 42.0 },
+            { "name": "beta", "value": 7.0 }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    EXPECT_TRUE(::velk::g_mock_result.was_called);
+    EXPECT_EQ(2u, ::velk::g_mock_result.item_count);
+    EXPECT_EQ("alpha", ::velk::g_mock_result.first_name);
+    EXPECT_DOUBLE_EQ(42.0, ::velk::g_mock_result.first_value);
+
+    ::velk::instance().type_registry().unregister_type<::velk::MockImportExtension>();
+}
+
+TEST_F(ImporterTest, ExtensionNotCalledWhenKeyAbsent)
+{
+    ::velk::g_mock_result = {};
+    ::velk::instance().type_registry().register_type<::velk::MockImportExtension>();
+
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": []
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_FALSE(::velk::g_mock_result.was_called);
+
+    ::velk::instance().type_registry().unregister_type<::velk::MockImportExtension>();
+}
+
+TEST_F(ImporterTest, NullImportDataChaining)
+{
+    ::velk::g_mock_result = {};
+    ::velk::instance().type_registry().register_type<::velk::MockImportExtension>();
+
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [],
+        "custom_data": []
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(::velk::g_mock_result.was_called);
+    EXPECT_EQ(0u, ::velk::g_mock_result.item_count);
+
+    ::velk::instance().type_registry().unregister_type<::velk::MockImportExtension>();
 }

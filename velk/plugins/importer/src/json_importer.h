@@ -53,6 +53,7 @@ private:
                                         const std::string& path) const;
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
                                     const std::string& path) const;
+    void dispatch_extensions(const JsonValue& root, IStore& store) const;
 
     std::unordered_map<std::string, Uid> aliases_;
 };
