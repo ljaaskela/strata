@@ -19,6 +19,10 @@ ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
     if (failed(rv)) {
         return rv;
     }
+    rv = ::velk::register_type<AnimatorImportHandler>(velk);
+    if (failed(rv)) {
+        return rv;
+    }
     auto& types = velk.type_registry();
     types.register_type<ext::AnyValue<KeyframeEntry>>();
     types.register_interpolator<float>(&detail::typed_interpolator<float>);

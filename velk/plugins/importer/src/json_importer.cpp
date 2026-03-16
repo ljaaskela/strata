@@ -1,6 +1,8 @@
 #include "json_import_data.h"
 #include "json_importer.h"
 
+#include <velk/ext/interface_dispatch.h>
+
 #include <velk/api/binding.h>
 #include <velk/api/hierarchy.h>
 #include <velk/api/store.h>
@@ -12,6 +14,7 @@
 #include <velk/interface/intf_type_registry.h>
 #include <velk/string.h>
 
+#include <unordered_set>
 #include <vector>
 
 namespace velk {
@@ -113,7 +116,7 @@ ImportResult JsonImporter::import_from_json(string_view json) const
     create_bindings(store, root, ctx, result);
 
     // Dispatch remaining top-level keys to registered importer extensions
-    dispatch_extensions(root, store);
+    dispatch_extensions(root, store, ctx);
 
     return result;
 }
@@ -214,7 +217,7 @@ void JsonImporter::set_properties(IObject& obj, const JsonValue& props, const Cl
         // Handle object form: { "value": ..., "flags": ... }
         const JsonValue* value_node = &val;
         if (val.type() == JsonType::Object) {
-            if (val.find("ref")) {
+            if (val.find("ref") || val.find("bind")) {
                 continue;
             }
             auto* inner = val.find("value");
@@ -300,15 +303,15 @@ void JsonImporter::build_hierarchies(const JsonValue& hierarchies, IStore& store
                                      ImportResult& result) const
 {
     for (auto& [name, hierarchy_val] : hierarchies.as_object()) {
-        if (hierarchy_val.type() != JsonType::Array) {
-            add_error(result, "hierarchy '" + name + "' is not an array");
+        if (hierarchy_val.type() != JsonType::Object) {
+            add_error(result, "hierarchy '" + name + "' is not an object");
             continue;
         }
         build_hierarchy(name, hierarchy_val, store, result);
     }
 }
 
-void JsonImporter::build_hierarchy(const std::string& name, const JsonValue& edges_json,
+void JsonImporter::build_hierarchy(const std::string& name, const JsonValue& tree_json,
                                    IStore& store, ImportResult& result) const
 {
     auto hierarchy = ::velk::create_hierarchy();
@@ -317,44 +320,32 @@ void JsonImporter::build_hierarchy(const std::string& name, const JsonValue& edg
         return;
     }
 
-    // Parse edges: array of { "parent": "id", "child": "id" }
-    // First pass: collect all edges and determine root
-    struct Edge
-    {
-        std::string parent;
-        std::string child;
-    };
-    std::vector<Edge> edges;
-    std::unordered_map<std::string, bool> has_parent;
-
-    for (auto& edge : edges_json.as_array()) {
-        if (edge.type() != JsonType::Object) {
+    // Format: { "parent_id": ["child_id", ...], ... }
+    // Root is a node that appears as a key but never in any child array.
+    std::unordered_set<std::string> all_children;
+    for (auto& [parent_id, children_val] : tree_json.as_object()) {
+        if (children_val.type() != JsonType::Array) {
             continue;
         }
-        auto* parent_val = edge.find("parent");
-        auto* child_val = edge.find("child");
-        if (!parent_val || parent_val->type() != JsonType::String || !child_val ||
-            child_val->type() != JsonType::String) {
-            continue;
-        }
-        edges.push_back({parent_val->as_string(), child_val->as_string()});
-        has_parent[child_val->as_string()] = true;
-        if (has_parent.find(parent_val->as_string()) == has_parent.end()) {
-            has_parent[parent_val->as_string()] = false;
+        for (auto& child_val : children_val.as_array()) {
+            if (child_val.type() == JsonType::String) {
+                all_children.insert(child_val.as_string());
+            }
         }
     }
 
-    // Find root: a node that appears as parent but never as child
     std::string root_id;
-    for (auto& [id, is_child] : has_parent) {
-        if (!is_child) {
-            root_id = id;
+    for (auto& [parent_id, children_val] : tree_json.as_object()) {
+        if (all_children.find(parent_id) == all_children.end()) {
+            root_id = parent_id;
             break;
         }
     }
 
-    if (root_id.empty() && !edges.empty()) {
-        root_id = edges[0].parent;
+    if (root_id.empty()) {
+        if (!tree_json.as_object().empty()) {
+            root_id = tree_json.as_object()[0].first;
+        }
     }
 
     if (!root_id.empty()) {
@@ -362,19 +353,26 @@ void JsonImporter::build_hierarchy(const std::string& name, const JsonValue& edg
         if (root_obj) {
             hierarchy.set_root(root_obj);
 
-            for (auto& edge : edges) {
-                auto parent_obj = store.find(sv(edge.parent));
-                auto child_obj = store.find(sv(edge.child));
-                if (parent_obj && child_obj) {
-                    hierarchy.add(parent_obj, child_obj);
-                } else {
-                    if (!parent_obj) {
-                        add_error(result, "hierarchy '" + name +
-                                          "': parent object not found: " + edge.parent);
+            for (auto& [parent_id, children_val] : tree_json.as_object()) {
+                if (children_val.type() != JsonType::Array) {
+                    continue;
+                }
+                auto parent_obj = store.find(sv(parent_id));
+                if (!parent_obj) {
+                    add_error(result, "hierarchy '" + name +
+                                      "': parent object not found: " + parent_id);
+                    continue;
+                }
+                for (auto& child_val : children_val.as_array()) {
+                    if (child_val.type() != JsonType::String) {
+                        continue;
                     }
-                    if (!child_obj) {
+                    auto child_obj = store.find(sv(child_val.as_string()));
+                    if (child_obj) {
+                        hierarchy.add(parent_obj, child_obj);
+                    } else {
                         add_error(result, "hierarchy '" + name +
-                                          "': child object not found: " + edge.child);
+                                          "': child object not found: " + child_val.as_string());
                     }
                 }
             }
@@ -557,28 +555,28 @@ void JsonImporter::resolve_references(IStore& store, const JsonValue& objects,
                 continue;
             }
 
-            auto* ref_val = val.find("ref");
-            if (!ref_val || ref_val->type() != JsonType::String) {
-                continue;
-            }
-
-            const std::string& ref_path = ref_val->as_string();
             auto name_sv = sv(name);
 
-            const MemberDesc* desc = find_property_desc(*info, name_sv);
-            if (!desc) {
-                continue;
-            }
-
-            auto* pk = desc->propertyKind();
-            if (!pk) {
-                continue;
-            }
-
-            if (pk->typeUid == ClassId::ObjectRef) {
+            // "ref" is for object references only (ObjectRef properties)
+            auto* ref_val = val.find("ref");
+            if (ref_val && ref_val->type() == JsonType::String) {
+                const MemberDesc* desc = find_property_desc(*info, name_sv);
+                if (!desc) {
+                    continue;
+                }
+                auto* pk = desc->propertyKind();
+                if (!pk || pk->typeUid != ClassId::ObjectRef) {
+                    add_error(result, "property '" + name + "' is not an ObjectRef, use 'bind' for bindings");
+                    continue;
+                }
                 resolve_object_ref(*meta, name, val, store, ctx, result);
-            } else {
-                resolve_inline_binding(*meta, name, ref_path, store, ctx, result);
+                continue;
+            }
+
+            // "bind" creates an inline one-way binding
+            auto* bind_val = val.find("bind");
+            if (bind_val && bind_val->type() == JsonType::String) {
+                resolve_inline_binding(*meta, name, bind_val->as_string(), store, ctx, result);
             }
         }
     }
@@ -716,51 +714,80 @@ void JsonImporter::parse_binding(const JsonValue& binding_node, IStore& store,
     }
 }
 
-void JsonImporter::dispatch_extensions(const JsonValue& root, IStore& store) const
+class ImportResolver final : public ext::InterfaceDispatch<IImportResolver>
 {
-    struct ExtensionEntry
+public:
+    ImportResolver(const JsonImporter& importer, IStore& store, const JsonImporter::ImportContext& ctx)
+        : importer_(importer), store_(store), ctx_(ctx) {}
+
+    IObject::Ptr resolve(string_view path) const override
     {
-        IInterface::Ptr instance;
-        IImporterExtension* ext;
-    };
+        std::string p(path.data(), path.size());
 
-    // Discover all classes implementing IImporterExtension
-    std::vector<ExtensionEntry> extensions;
-    auto& registry = ::velk::instance().type_registry();
+        // Check for a dot suffix indicating a property path
+        auto dot = p.rfind('.');
+        if (dot != std::string::npos && dot > 0) {
+            // Could be "obj.prop" or "/hierarchy/path.prop"
+            auto obj_path = p.substr(0, dot);
+            auto prop_name = p.substr(dot + 1);
 
-    struct VisitorCtx
-    {
-        ITypeRegistry* registry;
-        std::vector<ExtensionEntry>* extensions;
-    };
-    VisitorCtx vctx{&registry, &extensions};
-
-    registry.for_each_class(&vctx, [](void* ctx, const ClassInfo& info) -> bool {
-        auto* vc = static_cast<VisitorCtx*>(ctx);
-        // Check if this class implements IImporterExtension
-        for (size_t i = 0; i < info.interfaces.size(); i++) {
-            if (info.interfaces[i].uid == IImporterExtension::UID) {
-                auto instance = vc->registry->create(info.uid);
-                if (instance) {
-                    auto* ext = interface_cast<IImporterExtension>(instance);
-                    if (ext) {
-                        vc->extensions->push_back({instance, ext});
+            auto obj = importer_.resolve_object(store_, ctx_, obj_path);
+            if (obj) {
+                auto* meta = interface_cast<IMetadata>(obj);
+                if (meta) {
+                    auto prop = meta->get_property(string_view(prop_name.c_str(), prop_name.size()));
+                    if (prop) {
+                        return interface_pointer_cast<IObject>(prop);
                     }
                 }
+                // Dot didn't yield a property; fall through to try full path as object
+            }
+        }
+
+        return importer_.resolve_object(store_, ctx_, p);
+    }
+
+private:
+    const JsonImporter& importer_;
+    IStore& store_;
+    const JsonImporter::ImportContext& ctx_;
+};
+
+void JsonImporter::dispatch_extensions(const JsonValue& root, IStore& store,
+                                       const ImportContext& ctx) const
+{
+    // Discover all classes implementing IImporterExtension
+    std::vector<Uid> extension_uids;
+    auto& registry = ::velk::instance().type_registry();
+
+    registry.for_each_class(&extension_uids, [](void* ctx, const ClassInfo& info) -> bool {
+        auto* uids = static_cast<std::vector<Uid>*>(ctx);
+        for (size_t i = 0; i < info.interfaces.size(); i++) {
+            if (info.interfaces[i].uid == IImporterExtension::UID) {
+                uids->push_back(info.uid);
                 break;
             }
         }
         return true;
     });
 
-    // Dispatch each extension's collection key
-    for (auto& entry : extensions) {
-        auto key = entry.ext->collection_key();
+    // Instantiate each extension, check if its key exists, and dispatch
+    ImportResolver resolver(*this, store, ctx);
+    for (auto uid : extension_uids) {
+        auto instance = registry.create(uid);
+        if (!instance) {
+            continue;
+        }
+        auto* ext = interface_cast<IImporterExtension>(instance);
+        if (!ext) {
+            continue;
+        }
+        auto key = ext->collection_key();
         std::string key_str(key.data(), key.size());
         auto* json_node = root.find(key_str);
         if (json_node) {
             JsonImportData wrapped(*json_node);
-            entry.ext->process(wrapped, store);
+            ext->process(wrapped, store, resolver);
         }
     }
 }

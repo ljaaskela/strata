@@ -19,15 +19,16 @@ namespace velk {
  * Uses the null object pattern: find() on a missing key and at() out of bounds
  * return a static null node. The null node returns zero/empty for all accessors
  * and returns itself for find/at, making chaining safe without null checks.
+ *
+ * Chain: IInterface -> IImportData
  */
-class IImportData
+class IImportData : public Interface<IImportData>
 {
 public:
-    virtual ~IImportData() = default;
-
     enum class Kind : uint8_t { Null, Bool, Number, String, Array, Object };
 
     virtual Kind kind() const = 0;
+    virtual bool is_null() const = 0;
     virtual bool as_bool() const = 0;
     virtual double as_number() const = 0;
     virtual string_view as_string() const = 0;
@@ -36,15 +37,30 @@ public:
     virtual size_t count() const = 0;
 
     /** @brief Array: indexed element. Object: value at index (insertion order). */
-    virtual const IImportData* at(size_t index) const = 0;
+    virtual const IImportData& at(size_t index) const = 0;
 
     /** @brief Object: value for key. Returns static null node if missing. */
-    virtual const IImportData* find(string_view key) const = 0;
+    virtual const IImportData& find(string_view key) const = 0;
 
     /** @brief Object: key name at index (for iteration). */
     virtual string_view key_at(size_t index) const = 0;
+};
 
-    bool is_null() const { return kind() == Kind::Null; }
+/**
+ * @brief Resolves object and property paths during import.
+ *
+ * Supports direct ids ("widget_1"), hierarchy paths ("/scene/root/child"),
+ * and property paths ("widget_1.width", "/scene/root/child.width").
+ * When the path contains a dot suffix, resolves the property from the
+ * parent object's metadata. The returned IObject::Ptr can be cast to
+ * IProperty via interface_pointer_cast when a property path was used.
+ *
+ * Chain: IInterface -> IImportResolver
+ */
+class IImportResolver : public Interface<IImportResolver>
+{
+public:
+    virtual IObject::Ptr resolve(string_view path) const = 0;
 };
 
 /**
@@ -65,7 +81,8 @@ public:
     /** @brief Returns the top-level collection key this extension handles (e.g. "animations"). */
     virtual string_view collection_key() const = 0;
     /** @brief Processes the data subtree for this extension's collection key. */
-    virtual void process(const IImportData& data, IStore& store) const = 0;
+    virtual void process(const IImportData& data, IStore& store,
+                         const IImportResolver& resolver) const = 0;
 };
 
 } // namespace velk

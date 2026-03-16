@@ -20,6 +20,8 @@ public:
     ImportResult import_from_json(string_view json) const;
 
 private:
+    friend class ImportResolver;
+
     struct ImportContext
     {
         std::unordered_map<std::string, IObject::Ptr> name_to_object;
@@ -35,7 +37,7 @@ private:
     void register_imported_object(ImportContext& ctx, IObject::Ptr obj, const JsonValue& obj_node,
                                   ImportResult& result) const;
     void build_hierarchies(const JsonValue& hierarchies, IStore& store, ImportResult& result) const;
-    void build_hierarchy(const std::string& name, const JsonValue& edges_json, IStore& store,
+    void build_hierarchy(const std::string& name, const JsonValue& tree_json, IStore& store,
                          ImportResult& result) const;
     void resolve_references(IStore& store, const JsonValue& objects, const ImportContext& ctx,
                             ImportResult& result) const;
@@ -53,7 +55,7 @@ private:
                                         const std::string& path) const;
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
                                     const std::string& path) const;
-    void dispatch_extensions(const JsonValue& root, IStore& store) const;
+    void dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const;
 
     std::unordered_map<std::string, Uid> aliases_;
 };

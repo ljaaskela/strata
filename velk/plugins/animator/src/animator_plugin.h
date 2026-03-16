@@ -3,6 +3,7 @@
 
 #include "animation_track.h"
 #include "animator.h"
+#include "animator_import_handler.h"
 #include "transition.h"
 
 #include <velk/ext/plugin.h>

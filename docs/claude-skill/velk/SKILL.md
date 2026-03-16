@@ -1,6 +1,6 @@
 ---
 name: velk
-description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path"
+description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path, importer plugin, IImporterExtension, IImportData, IImportResolver, JSON import, animations"
 ---
 
 # Velk Usage Guide
@@ -125,6 +125,76 @@ target_compile_definitions(my_plugin PRIVATE VELK_EXPORTS)
 - **`VELK_PLUGIN()` must be outside any namespace** (it defines an `extern "C"` function)
 - Types registered during `initialize()` are auto-swept on unload unless `retainTypesOnUnload` is set
 - Dependencies are enforced at load time; a plugin cannot load if its deps are missing or too old
+
+## Importer Extension System
+
+The importer plugin (`velk_importer`) loads JSON scene files. Other plugins can handle custom top-level JSON keys by implementing `IImporterExtension`.
+
+### Core interfaces (in `velk/include/velk/interface/intf_importer_extension.h`)
+
+| Interface | Purpose |
+|-----------|---------|
+| `IImportData` | Format-neutral read-only data tree. Null object pattern: `find()`/`at()` return a null node (never null pointer). All pure virtual, implementations use `ext::InterfaceDispatch<IImportData>` |
+| `IImportResolver` | Resolves paths to objects/properties. `resolve("w1.width")` returns `IObject::Ptr` (cast to `IProperty` via `interface_pointer_cast`). Supports direct ids, hierarchy paths (`/scene/root/child`), property paths (`w1.width`) |
+| `IImporterExtension` | Extension point. `collection_key()` returns the JSON key, `process(data, store, resolver)` handles the data |
+
+### Writing an extension
+
+```cpp
+class MyHandler : public ext::ObjectCore<MyHandler, IImporterExtension>
+{
+public:
+    VELK_CLASS_UID("...", "MyHandler");
+    string_view collection_key() const override { return "my_data"; }
+    void process(const IImportData& data, IStore& store,
+                 const IImportResolver& resolver) const override
+    {
+        for (size_t i = 0; i < data.count(); i++) {
+            auto& entry = data.at(i);
+            auto target = entry.find("target").as_string();
+            auto prop = interface_pointer_cast<IProperty>(resolver.resolve(target));
+            // ...
+        }
+    }
+};
+```
+
+Register in plugin `initialize()`: `::velk::register_type<MyHandler>(velk);`
+
+The importer discovers extensions via `for_each_class` at import time. No coupling between plugins needed.
+
+### JSON format summary
+
+```json
+{
+    "version": 1,
+    "objects": [
+        { "id": "w1", "class": "plugin.ClassName", "properties": { "width": 100.0 } }
+    ],
+    "hierarchies": {
+        "scene": { "root": ["child_a", "child_b"] }
+    },
+    "bindings": [
+        { "source": "w1.width", "targets": ["w2.width"] }
+    ]
+}
+```
+
+Property values: bare value (`100.0`), object form (`{ "value": 100.0 }`), object ref (`{ "ref": "w1" }`), inline binding (`{ "bind": "w1.width" }`).
+
+`"ref"` is for ObjectRef properties only. `"bind"` creates a one-way binding (equivalent to a top-level binding with one target).
+
+### Built-in extension: animator
+
+Handles `"animations"` key with `"type": "transition"` and `"type": "track"`:
+
+```json
+"animations": [
+    { "type": "transition", "targets": ["w1.width"], "duration": 0.3, "easing": "out_cubic" },
+    { "type": "track", "targets": ["w1.opacity"],
+      "keyframes": [{ "time": 0.0, "value": 0.0 }, { "time": 1.0, "value": 1.0 }] }
+]
+```
 
 ## Detailed Examples
 

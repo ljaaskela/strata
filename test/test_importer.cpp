@@ -7,6 +7,7 @@
 #include <velk/ext/plugin.h>
 #include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_object_ref.h>
+#include <velk/plugins/animator/plugin.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
 #include <velk/string.h>
@@ -215,10 +216,9 @@ TEST_F(ImporterTest, ImportWithHierarchy)
             { "id": "child_b", "class": "test.Widget", "properties": { "width": 3.0 } }
         ],
         "hierarchies": {
-            "scene": [
-                { "parent": "root", "child": "child_a" },
-                { "parent": "root", "child": "child_b" }
-            ]
+            "scene": {
+                "root": ["child_a", "child_b"]
+            }
         }
     })");
 
@@ -463,10 +463,9 @@ TEST_F(ImporterTest, ObjectRefByHierarchyPath)
             }
         ],
         "hierarchies": {
-            "scene": [
-                { "parent": "root", "child": "child_a" },
-                { "parent": "root", "child": "c1" }
-            ]
+            "scene": {
+                "root": ["child_a", "c1"]
+            }
         }
     })");
 
@@ -596,7 +595,7 @@ TEST_F(ImporterTest, TopLevelBindingMultiTarget)
     EXPECT_FLOAT_EQ(50.0f, dst2_w->width().get_value());
 }
 
-TEST_F(ImporterTest, InlineScalarRefCreatesBinding)
+TEST_F(ImporterTest, InlineBindCreatesBinding)
 {
     load_importer();
     auto result = importer_->import_from_json(R"({
@@ -607,7 +606,7 @@ TEST_F(ImporterTest, InlineScalarRefCreatesBinding)
                 "id": "dst",
                 "class": "test.Widget",
                 "properties": {
-                    "width": { "ref": "src.width" }
+                    "width": { "bind": "src.width" }
                 }
             }
         ]
@@ -695,20 +694,20 @@ public:
 
     string_view collection_key() const override { return "custom_data"; }
 
-    void process(const IImportData& data, IStore&) const override
+    void process(const IImportData& data, IStore&, const IImportResolver&) const override
     {
         g_mock_result.was_called = true;
         g_mock_result.item_count = data.count();
         if (data.count() > 0) {
-            auto* first = data.at(0);
-            auto* name_node = first->find("name");
-            auto* value_node = first->find("value");
-            if (!name_node->is_null()) {
-                auto sv = name_node->as_string();
+            auto& first = data.at(0);
+            auto& name_node = first.find("name");
+            auto& value_node = first.find("value");
+            if (!name_node.is_null()) {
+                auto sv = name_node.as_string();
                 g_mock_result.first_name = std::string(sv.data(), sv.size());
             }
-            if (!value_node->is_null()) {
-                g_mock_result.first_value = value_node->as_number();
+            if (!value_node.is_null()) {
+                g_mock_result.first_value = value_node.as_number();
             }
         }
     }
@@ -776,4 +775,424 @@ TEST_F(ImporterTest, NullImportDataChaining)
     EXPECT_EQ(0u, ::velk::g_mock_result.item_count);
 
     ::velk::instance().type_registry().unregister_type<::velk::MockImportExtension>();
+}
+
+// ============================================================================
+// Animator extension tests (require both velk_importer.dll and velk_animator.dll)
+// ============================================================================
+
+class AnimatorImportTest : public ::testing::Test
+{
+protected:
+    static void SetUpTestSuite()
+    {
+        ::velk::instance().type_registry().register_type<TestImportWidget>();
+    }
+
+    static void TearDownTestSuite()
+    {
+        ::velk::instance().type_registry().unregister_type<TestImportWidget>();
+    }
+
+    void SetUp() override
+    {
+        auto& reg = ::velk::instance().plugin_registry();
+        reg.load_plugin_from_path(TEST_ANIMATOR_DLL_PATH);
+        reg.load_plugin_from_path(TEST_IMPORTER_DLL_PATH);
+        auto plugin = reg.find_plugin(PluginId::ImporterPlugin);
+        ASSERT_TRUE(plugin);
+        importer_ = interface_cast<IImporterPlugin>(plugin);
+        ASSERT_NE(nullptr, importer_);
+        importer_->register_class_alias("test.Widget", TestImportWidget::static_class_id());
+    }
+
+    void TearDown() override
+    {
+        auto& reg = ::velk::instance().plugin_registry();
+        if (reg.find_plugin(PluginId::ImporterPlugin)) {
+            reg.unload_plugin(PluginId::ImporterPlugin);
+        }
+        // Do not unload the animator plugin here: other test suites may still
+        // hold properties with transition extensions whose vtables live in the
+        // animator DLL. The plugin stays loaded for the process lifetime.
+    }
+
+    static bool has_animation_extension(const IProperty::Ptr& prop)
+    {
+        auto chain = get_any_chain(*prop);
+        // If there's more than one node in the chain, an extension is installed
+        return chain.size() > 1;
+    }
+
+    IImporterPlugin* importer_ = nullptr;
+};
+
+TEST_F(AnimatorImportTest, TransitionCreatedFromAnimationsKey)
+{
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            {
+                "id": "w1",
+                "class": "test.Widget",
+                "properties": { "width": 100.0 }
+            }
+        ],
+        "animations": [
+            {
+                "type": "transition",
+                "targets": ["w1.width"],
+                "duration": 0.5,
+                "easing": "out_cubic"
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    auto obj = result.store->find("w1");
+    ASSERT_TRUE(obj);
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    EXPECT_TRUE(has_animation_extension(IProperty::Ptr(tw->width())));
+}
+
+TEST_F(AnimatorImportTest, MultipleTransitions)
+{
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            {
+                "id": "w1",
+                "class": "test.Widget",
+                "properties": { "width": 10.0, "height": 20.0 }
+            }
+        ],
+        "animations": [
+            {
+                "type": "transition",
+                "targets": ["w1.width"],
+                "duration": 0.3
+            },
+            {
+                "type": "transition",
+                "targets": ["w1.height"],
+                "duration": 0.7,
+                "easing": "in_quad"
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    EXPECT_TRUE(has_animation_extension(IProperty::Ptr(tw->width())));
+    EXPECT_TRUE(has_animation_extension(IProperty::Ptr(tw->height())));
+}
+
+TEST_F(AnimatorImportTest, MultiTargetTransition)
+{
+    // Seed the clock
+    ::velk::instance().update({1'000'000});
+
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            {
+                "id": "w1",
+                "class": "test.Widget",
+                "properties": { "width": 0.0, "height": 0.0 }
+            }
+        ],
+        "animations": [
+            {
+                "type": "transition",
+                "targets": ["w1.width", "w1.height"],
+                "duration": 1.0,
+                "easing": "linear"
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    // Both properties should have a transition installed
+    ASSERT_TRUE(has_animation_extension(IProperty::Ptr(tw->width())));
+    ASSERT_TRUE(has_animation_extension(IProperty::Ptr(tw->height())));
+
+    // Trigger both transitions
+    tw->width().set_value(100.0f);
+    tw->height().set_value(200.0f);
+
+    // Advance halfway
+    ::velk::instance().update({1'500'000});
+    float mid_w = tw->width().get_value();
+    float mid_h = tw->height().get_value();
+    EXPECT_GT(mid_w, 10.f);
+    EXPECT_LT(mid_w, 90.f);
+    EXPECT_GT(mid_h, 20.f);
+    EXPECT_LT(mid_h, 180.f);
+
+    // Advance past the end
+    ::velk::instance().update({2'100'000});
+    EXPECT_FLOAT_EQ(100.0f, tw->width().get_value());
+    EXPECT_FLOAT_EQ(200.0f, tw->height().get_value());
+}
+
+TEST_F(AnimatorImportTest, UnknownTargetSilentlySkipped)
+{
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 1.0 } }
+        ],
+        "animations": [
+            {
+                "type": "transition",
+                "targets": ["nonexistent.width"],
+                "duration": 0.5
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+}
+
+TEST_F(AnimatorImportTest, EmptyAnimationsArray)
+{
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 1.0 } }
+        ],
+        "animations": []
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    EXPECT_FALSE(has_animation_extension(IProperty::Ptr(tw->width())));
+}
+
+TEST_F(AnimatorImportTest, DefaultEasingIsLinear)
+{
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 1.0 } }
+        ],
+        "animations": [
+            {
+                "type": "transition",
+                "targets": ["w1.width"],
+                "duration": 1.0
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+
+    EXPECT_TRUE(has_animation_extension(IProperty::Ptr(tw->width())));
+}
+
+TEST_F(AnimatorImportTest, TransitionAnimatesProperty)
+{
+    // Seed the clock
+    ::velk::instance().update({1'000'000});
+
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "animations": [
+            {
+                "type": "transition",
+                "targets": ["w1.width"],
+                "duration": 1.0,
+                "easing": "linear"
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    // Set a new value to trigger the transition
+    tw->width().set_value(100.0f);
+
+    // Value should not jump immediately
+    EXPECT_NEAR(0.f, tw->width().get_value(), 0.1f);
+
+    // Advance halfway through the 1s transition
+    ::velk::instance().update({1'500'000});
+    float mid = tw->width().get_value();
+    EXPECT_GT(mid, 10.f);
+    EXPECT_LT(mid, 90.f);
+
+    // Advance past the end
+    ::velk::instance().update({2'100'000});
+    EXPECT_FLOAT_EQ(100.0f, tw->width().get_value());
+}
+
+TEST_F(AnimatorImportTest, TrackAnimatesProperty)
+{
+    // Seed the clock
+    ::velk::instance().update({3'000'000});
+
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "animations": [
+            {
+                "type": "track",
+                "targets": ["w1.width"],
+                "keyframes": [
+                    { "time": 0.0, "value": 0.0 },
+                    { "time": 1.0, "value": 100.0 }
+                ]
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty());
+
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    // Track autoplays by default, advance halfway
+    ::velk::instance().update({3'500'000});
+    float mid = tw->width().get_value();
+    EXPECT_GT(mid, 10.f);
+    EXPECT_LT(mid, 90.f);
+
+    // Advance past the end
+    ::velk::instance().update({4'100'000});
+    EXPECT_FLOAT_EQ(100.0f, tw->width().get_value());
+}
+
+TEST_F(AnimatorImportTest, TrackMultipleKeyframes)
+{
+    // Seed the clock
+    ::velk::instance().update({5'000'000});
+
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "animations": [
+            {
+                "type": "track",
+                "targets": ["w1.width"],
+                "keyframes": [
+                    { "time": 0.0, "value": 0.0 },
+                    { "time": 0.5, "value": 200.0 },
+                    { "time": 1.0, "value": 100.0 }
+                ]
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    // At t=0.5s the value should be near 200 (peak of the V shape)
+    ::velk::instance().update({5'500'000});
+    EXPECT_NEAR(200.f, tw->width().get_value(), 5.f);
+
+    // At t=1.0s the value should be back to 100
+    ::velk::instance().update({6'100'000});
+    EXPECT_FLOAT_EQ(100.0f, tw->width().get_value());
+}
+
+TEST_F(AnimatorImportTest, TrackMultiTarget)
+{
+    // Seed the clock
+    ::velk::instance().update({7'000'000});
+
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0, "height": 0.0 } }
+        ],
+        "animations": [
+            {
+                "type": "track",
+                "targets": ["w1.width", "w1.height"],
+                "keyframes": [
+                    { "time": 0.0, "value": 0.0 },
+                    { "time": 1.0, "value": 50.0 }
+                ]
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    // Both properties should be animated to 50
+    ::velk::instance().update({8'100'000});
+    EXPECT_FLOAT_EQ(50.0f, tw->width().get_value());
+    EXPECT_FLOAT_EQ(50.0f, tw->height().get_value());
+}
+
+TEST_F(AnimatorImportTest, TrackAutoplayFalse)
+{
+    // Seed the clock
+    ::velk::instance().update({9'000'000});
+
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "animations": [
+            {
+                "type": "track",
+                "targets": ["w1.width"],
+                "keyframes": [
+                    { "time": 0.0, "value": 0.0 },
+                    { "time": 1.0, "value": 100.0 }
+                ],
+                "autoplay": false
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    auto obj = result.store->find("w1");
+    auto* tw = interface_cast<ITestImportWidget>(obj);
+    ASSERT_NE(nullptr, tw);
+
+    // Advance time but track should not play
+    ::velk::instance().update({10'100'000});
+    EXPECT_FLOAT_EQ(0.0f, tw->width().get_value());
 }

@@ -3,6 +3,7 @@
 
 #include "json_parser.h"
 
+#include <velk/ext/interface_dispatch.h>
 #include <velk/interface/intf_importer_extension.h>
 
 namespace velk {
@@ -12,16 +13,17 @@ namespace velk {
  *
  * Returns zero/empty for all accessors and returns itself for find/at.
  */
-class NullImportData final : public IImportData
+class NullImportData final : public ext::InterfaceDispatch<IImportData>
 {
 public:
     Kind kind() const override { return Kind::Null; }
+    bool is_null() const override { return true; }
     bool as_bool() const override { return false; }
     double as_number() const override { return 0.0; }
     string_view as_string() const override { return {}; }
     size_t count() const override { return 0; }
-    const IImportData* at(size_t) const override { return &instance(); }
-    const IImportData* find(string_view) const override { return &instance(); }
+    const IImportData& at(size_t) const override { return instance(); }
+    const IImportData& find(string_view) const override { return instance(); }
     string_view key_at(size_t) const override { return {}; }
 
     static const NullImportData& instance()
@@ -34,7 +36,7 @@ public:
 /**
  * @brief Thin adapter wrapping a const JsonValue& as IImportData.
  */
-class JsonImportData final : public IImportData
+class JsonImportData final : public ext::InterfaceDispatch<IImportData>
 {
 public:
     explicit JsonImportData(const JsonValue& value) : value_(value) {}
@@ -52,6 +54,7 @@ public:
         return Kind::Null;
     }
 
+    bool is_null() const override { return value_.type() == JsonType::Null; }
     bool as_bool() const override { return value_.as_bool(); }
     double as_number() const override { return value_.as_number(); }
 
@@ -72,7 +75,7 @@ public:
         return 0;
     }
 
-    const IImportData* at(size_t index) const override
+    const IImportData& at(size_t index) const override
     {
         if (value_.type() == JsonType::Array) {
             auto& arr = value_.as_array();
@@ -85,13 +88,13 @@ public:
                 return get_or_create(index, obj[index].second);
             }
         }
-        return &NullImportData::instance();
+        return NullImportData::instance();
     }
 
-    const IImportData* find(string_view key) const override
+    const IImportData& find(string_view key) const override
     {
         if (value_.type() != JsonType::Object) {
-            return &NullImportData::instance();
+            return NullImportData::instance();
         }
         auto& obj = value_.as_object();
         for (size_t i = 0; i < obj.size(); i++) {
@@ -99,7 +102,7 @@ public:
                 return get_or_create(i, obj[i].second);
             }
         }
-        return &NullImportData::instance();
+        return NullImportData::instance();
     }
 
     string_view key_at(size_t index) const override
@@ -114,7 +117,7 @@ public:
     }
 
 private:
-    const IImportData* get_or_create(size_t index, const JsonValue& val) const
+    const IImportData& get_or_create(size_t index, const JsonValue& val) const
     {
         if (index >= children_.size()) {
             children_.resize(index + 1);
@@ -122,7 +125,7 @@ private:
         if (!children_[index]) {
             children_[index] = std::make_unique<JsonImportData>(val);
         }
-        return children_[index].get();
+        return *children_[index];
     }
 
     const JsonValue& value_;
