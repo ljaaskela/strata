@@ -6,7 +6,7 @@
 
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Concrete implementation of IHiveStore.
@@ -17,7 +17,7 @@ namespace velk {
 class HiveStore final : public ext::ObjectCore<HiveStore, IHiveStore>
 {
 public:
-    VELK_CLASS_UID(ClassId::HiveStore);
+    VELK_CLASS_UID(ClassId::HiveStore, "HiveStore");
 
     // IHiveStore overrides
     IObjectHive::Ptr get_hive(Uid classUid) override;
@@ -38,6 +38,6 @@ private:
     vector<HiveEntry> hives_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_PLUGINS_HIVE_STORE_H

@@ -59,7 +59,7 @@ protected:
     }
 
     /** @brief Returns a fresh hive for HiveGadget (never used by other tests). */
-    IObjectHive::Ptr fresh_hive() { return registry_->get_hive(HiveGadget::class_id()); }
+    IObjectHive::Ptr fresh_hive() { return registry_->get_hive(HiveGadget::static_class_id()); }
 
     IHiveStore::Ptr registry_;
 };
@@ -69,15 +69,15 @@ protected:
 TEST_F(HiveTest, GetHiveCreatesHive)
 {
     auto initial = registry_->hive_count();
-    auto hive = registry_->get_hive(HiveWidget::class_id());
+    auto hive = registry_->get_hive(HiveWidget::static_class_id());
     ASSERT_TRUE(hive);
     EXPECT_GE(registry_->hive_count(), initial);
 }
 
 TEST_F(HiveTest, GetHiveReturnsSameInstance)
 {
-    auto hive1 = registry_->get_hive(HiveWidget::class_id());
-    auto hive2 = registry_->get_hive(HiveWidget::class_id());
+    auto hive1 = registry_->get_hive(HiveWidget::static_class_id());
+    auto hive2 = registry_->get_hive(HiveWidget::static_class_id());
     EXPECT_EQ(hive1.get(), hive2.get());
 }
 
@@ -89,8 +89,8 @@ TEST_F(HiveTest, FindHiveReturnsNullForUnregistered)
 
 TEST_F(HiveTest, FindHiveReturnsExisting)
 {
-    auto hive = registry_->get_hive(HiveWidget::class_id());
-    auto found = registry_->find_hive(HiveWidget::class_id());
+    auto hive = registry_->get_hive(HiveWidget::static_class_id());
+    auto found = registry_->find_hive(HiveWidget::static_class_id());
     ASSERT_TRUE(found);
     EXPECT_EQ(hive.get(), found.get());
 }
@@ -105,13 +105,13 @@ TEST_F(HiveTest, GetHiveTyped)
 {
     auto hive = registry_->get_hive<HiveWidget>();
     ASSERT_TRUE(hive);
-    EXPECT_EQ(HiveWidget::class_id(), hive->get_element_uid());
+    EXPECT_EQ(HiveWidget::static_class_id(), hive->get_element_uid());
 }
 
 TEST_F(HiveTest, ForEachHive)
 {
     // Ensure at least one hive exists
-    registry_->get_hive(HiveWidget::class_id());
+    registry_->get_hive(HiveWidget::static_class_id());
 
     int count = 0;
     registry_->for_each_hive(&count, [](void* ctx, IHive&) -> bool {
@@ -133,7 +133,7 @@ TEST_F(HiveTest, NewHiveIsEmpty)
 TEST_F(HiveTest, ElementClassUid)
 {
     auto hive = fresh_hive();
-    EXPECT_EQ(HiveGadget::class_id(), hive->get_element_uid());
+    EXPECT_EQ(HiveGadget::static_class_id(), hive->get_element_uid());
 }
 
 TEST_F(HiveTest, AddCreatesObject)
@@ -149,7 +149,7 @@ TEST_F(HiveTest, AddedObjectHasCorrectType)
 {
     auto hive = fresh_hive();
     auto obj = hive->add();
-    EXPECT_EQ(HiveGadget::class_id(), obj->get_class_uid());
+    EXPECT_EQ(HiveGadget::static_class_id(), obj->get_class_uid());
 
     auto* gadget = interface_cast<IObjectHiveGadget>(obj);
     ASSERT_NE(nullptr, gadget);
@@ -177,7 +177,7 @@ TEST_F(HiveTest, ContainsFindsAddedObject)
 TEST_F(HiveTest, ContainsReturnsFalseForUnknownObject)
 {
     auto hive = fresh_hive();
-    auto standalone = velk_.create<IObject>(HiveGadget::class_id());
+    auto standalone = velk_.create<IObject>(HiveGadget::static_class_id());
     EXPECT_FALSE(hive->contains(*standalone));
 }
 
@@ -193,7 +193,7 @@ TEST_F(HiveTest, RemoveSucceeds)
 TEST_F(HiveTest, RemoveNotFoundFails)
 {
     auto hive = fresh_hive();
-    auto standalone = velk_.create<IObject>(HiveGadget::class_id());
+    auto standalone = velk_.create<IObject>(HiveGadget::static_class_id());
     EXPECT_EQ(ReturnValue::Fail, hive->remove(*standalone));
 }
 
@@ -215,7 +215,7 @@ TEST_F(HiveTest, ObjectSurvivesRemoveWhileReferenced)
 
     // Object should still be alive because we hold a reference
     EXPECT_NE(nullptr, held.get());
-    EXPECT_EQ(HiveGadget::class_id(), held->get_class_uid());
+    EXPECT_EQ(HiveGadget::static_class_id(), held->get_class_uid());
 }
 
 TEST_F(HiveTest, SlotReuse)
@@ -316,7 +316,7 @@ TEST_F(HiveTest, CreateHiveStoreViaClassId)
     auto reg2 = velk_.create<IHiveStore>(ClassId::HiveStore);
     ASSERT_TRUE(reg2);
 
-    auto hive = reg2->get_hive(HiveWidget::class_id());
+    auto hive = reg2->get_hive(HiveWidget::static_class_id());
     EXPECT_TRUE(hive);
 
     // The two registries are independent instances.
@@ -408,7 +408,7 @@ TEST_F(HiveTest, GetSelfWorksForHiveObjects)
 
 TEST_F(HiveTest, MetadataAvailableOnHiveObjects)
 {
-    auto hive = registry_->get_hive(HiveWidget::class_id());
+    auto hive = registry_->get_hive(HiveWidget::static_class_id());
     auto obj = hive->add();
 
     auto* widget = interface_cast<IObjectHiveWidget>(obj);
@@ -425,7 +425,7 @@ TEST_F(HiveTest, MetadataAvailableOnHiveObjects)
 
 TEST_F(HiveTest, ForEachStateVisitsAllWithCorrectValues)
 {
-    auto hive = registry_->get_hive(HiveWidget::class_id());
+    auto hive = registry_->get_hive(HiveWidget::static_class_id());
     std::vector<IObject::Ptr> refs;
     for (int i = 0; i < 5; ++i) {
         auto obj = hive->add();
@@ -488,7 +488,7 @@ TEST_F(HiveTest, ForEachStateEmptyHive)
 
 TEST_F(HiveTest, ForEachHiveTypedAccess)
 {
-    auto hive = registry_->get_hive(HiveWidget::class_id());
+    auto hive = registry_->get_hive(HiveWidget::static_class_id());
     std::vector<IObject::Ptr> refs;
     for (int i = 0; i < 3; ++i) {
         auto obj = hive->add();
@@ -792,7 +792,7 @@ TEST_F(HiveTest, ExtRawHiveNullSafety)
 
 TEST_F(HiveTest, ForEachHiveVisitsBothTypes)
 {
-    registry_->get_hive(HiveWidget::class_id());
+    registry_->get_hive(HiveWidget::static_class_id());
     registry_->get_raw_hive<RawPoint>();
 
     int count = 0;

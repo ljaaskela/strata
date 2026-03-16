@@ -7,7 +7,7 @@
 
 #include <algorithm>
 
-namespace velk {
+namespace velk::impl {
 
 IObjectHive::Ptr HiveStore::get_hive(Uid classUid)
 {
@@ -53,8 +53,8 @@ IRawHive::Ptr HiveStore::get_raw_hive(Uid uid, size_t element_size, size_t eleme
     }
 
     // Create and initialize a new raw hive.
-    auto hive_obj = ext::make_object<RawHiveImpl>();
-    auto* hive = static_cast<RawHiveImpl*>(hive_obj.get());
+    auto hive_obj = ext::make_object<RawHive>();
+    auto* hive = static_cast<RawHive*>(hive_obj.get());
     hive->init(uid, element_size, element_align);
     auto hive_ptr = interface_pointer_cast<IHive>(hive_obj);
 
@@ -87,4 +87,4 @@ void HiveStore::for_each_hive(void* context, HiveVisitorFn visitor) const
     }
 }
 
-} // namespace velk
+} // namespace velk::impl

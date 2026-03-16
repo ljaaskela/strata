@@ -62,7 +62,7 @@ static void ensureRegistered()
 static void BM_PropertyGetValue(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto prop = iw->value();
     for (auto _ : state) {
@@ -74,7 +74,7 @@ BENCHMARK(BM_PropertyGetValue);
 static void BM_PropertySetValue(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto prop = iw->value();
     float v = 0.f;
@@ -92,7 +92,7 @@ BENCHMARK(BM_PropertySetValue);
 static void BM_DirectStateRead(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* ps = interface_cast<IPropertyState>(obj);
     auto* s = ps->get_property_state<IBenchWidget>();
     s->value = 42.f;
@@ -105,7 +105,7 @@ BENCHMARK(BM_DirectStateRead);
 static void BM_DirectStateWrite(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* ps = interface_cast<IPropertyState>(obj);
     auto* s = ps->get_property_state<IBenchWidget>();
     float v = 0.f;
@@ -124,7 +124,7 @@ BENCHMARK(BM_DirectStateWrite);
 static void BM_FunctionInvoke(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto fn = iw->do_nothing();
     for (auto _ : state) {
@@ -136,7 +136,7 @@ BENCHMARK(BM_FunctionInvoke);
 static void BM_FunctionInvokeTypedArgs(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto fn = iw->add();
     Any<int> arg0(10);
@@ -150,7 +150,7 @@ BENCHMARK(BM_FunctionInvokeTypedArgs);
 static void BM_FunctionInvokeRaw(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto fn = iw->raw_fn();
     for (auto _ : state) {
@@ -166,7 +166,7 @@ BENCHMARK(BM_FunctionInvokeRaw);
 static void BM_EventDispatchImmediate(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     Event evt = iw->on_changed();
     evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::Success; }, Immediate);
@@ -179,7 +179,7 @@ BENCHMARK(BM_EventDispatchImmediate);
 static void BM_EventDispatchDeferred(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     Event evt = iw->on_changed();
     evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::Success; }, Deferred);
@@ -196,7 +196,7 @@ BENCHMARK(BM_EventDispatchDeferred);
 static void BM_InterfaceCast(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     for (auto _ : state) {
         benchmark::DoNotOptimize(interface_cast<IBenchWidget>(obj));
     }
@@ -212,7 +212,7 @@ static void BM_MetadataLookupCold(benchmark::State& state)
     ensureRegistered();
     for (auto _ : state) {
         state.PauseTiming();
-        auto obj = instance().create<IObject>(BenchWidget::class_id());
+        auto obj = instance().create<IObject>(BenchWidget::static_class_id());
         auto* meta = interface_cast<IMetadata>(obj);
         state.ResumeTiming();
         benchmark::DoNotOptimize(meta->get_property("value"));
@@ -223,7 +223,7 @@ BENCHMARK(BM_MetadataLookupCold);
 static void BM_MetadataLookupCached(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::class_id());
+    auto obj = instance().create<IObject>(BenchWidget::static_class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     meta->get_property("value"); // prime the cache
     for (auto _ : state) {
@@ -239,7 +239,7 @@ BENCHMARK(BM_MetadataLookupCached);
 static void BM_ObjectCreate(benchmark::State& state)
 {
     ensureRegistered();
-    auto uid = BenchWidget::class_id();
+    auto uid = BenchWidget::static_class_id();
     for (auto _ : state) {
         auto obj = instance().create<IObject>(uid);
         benchmark::DoNotOptimize(obj.get());
@@ -403,7 +403,7 @@ static void BM_CreateVelkVector(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    auto uid = HiveData::class_id();
+    auto uid = HiveData::static_class_id();
 
     for (auto _ : state) {
         std::vector<IObject::Ptr> vec;
@@ -495,7 +495,7 @@ static void BM_IterateVelkVector(benchmark::State& state)
     std::vector<IObject::Ptr> vec;
     vec.reserve(kHiveCount);
     for (size_t i = 0; i < kHiveCount; ++i) {
-        auto obj = instance().create<IObject>(HiveData::class_id());
+        auto obj = instance().create<IObject>(HiveData::static_class_id());
         auto* ps = interface_cast<IPropertyState>(obj);
         auto* s = ps->get_property_state<IHiveData>();
         s->f0 = static_cast<float>(i);
@@ -650,7 +650,7 @@ static void BM_IterateWriteVelkVector(benchmark::State& state)
     std::vector<IObject::Ptr> vec;
     vec.reserve(kHiveCount);
     for (size_t i = 0; i < kHiveCount; ++i) {
-        vec.push_back(instance().create<IObject>(HiveData::class_id()));
+        vec.push_back(instance().create<IObject>(HiveData::static_class_id()));
     }
 
     float counter = 0.f;
@@ -810,7 +810,7 @@ static void BM_ChurnVelkVector(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    auto uid = HiveData::class_id();
+    auto uid = HiveData::static_class_id();
 
     std::vector<IObject::Ptr> vec;
     vec.reserve(kHiveCount);
@@ -1052,11 +1052,11 @@ static Hierarchy build_tree(size_t count)
     if (count == 0) {
         return h;
     }
-    auto root = instance().create<IObject>(BenchWidget::class_id());
+    auto root = instance().create<IObject>(BenchWidget::static_class_id());
     h.set_root(root);
     std::vector<IObject::Ptr> nodes = {root};
     for (size_t i = 1; i < count; ++i) {
-        auto child = instance().create<IObject>(BenchWidget::class_id());
+        auto child = instance().create<IObject>(BenchWidget::static_class_id());
         h.add(nodes[(i - 1) / 2], child);
         nodes.push_back(child);
     }
@@ -1068,7 +1068,7 @@ static void BM_HierarchySetRoot(benchmark::State& state)
     ensureRegistered();
     for (auto _ : state) {
         auto h = create_hierarchy();
-        auto root = instance().create<IObject>(BenchWidget::class_id());
+        auto root = instance().create<IObject>(BenchWidget::static_class_id());
         h.set_root(root);
         benchmark::DoNotOptimize(h.root());
     }
@@ -1109,10 +1109,10 @@ static void BM_HierarchyChildrenOf(benchmark::State& state)
     ensureRegistered();
     // Build a wide tree: root with 512 direct children
     auto h = create_hierarchy();
-    auto root = instance().create<IObject>(BenchWidget::class_id());
+    auto root = instance().create<IObject>(BenchWidget::static_class_id());
     h.set_root(root);
     for (size_t i = 0; i < 512; ++i) {
-        auto child = instance().create<IObject>(BenchWidget::class_id());
+        auto child = instance().create<IObject>(BenchWidget::static_class_id());
         h.add(root, child);
     }
     for (auto _ : state) {
@@ -1142,10 +1142,10 @@ static void BM_HierarchyForEachChild(benchmark::State& state)
     ensureRegistered();
     // Wide tree: root with 512 direct children
     auto h = create_hierarchy();
-    auto root = instance().create<IObject>(BenchWidget::class_id());
+    auto root = instance().create<IObject>(BenchWidget::static_class_id());
     h.set_root(root);
     for (size_t i = 0; i < 512; ++i) {
-        auto child = instance().create<IObject>(BenchWidget::class_id());
+        auto child = instance().create<IObject>(BenchWidget::static_class_id());
         h.add(root, child);
     }
     size_t count = 0;
@@ -1163,7 +1163,7 @@ static void BM_HierarchyAddRemoveLeaf(benchmark::State& state)
     auto h = build_tree(256);
     auto root_obj = h.root().object();
     for (auto _ : state) {
-        auto leaf = instance().create<IObject>(BenchWidget::class_id());
+        auto leaf = instance().create<IObject>(BenchWidget::static_class_id());
         h.add(root_obj, leaf);
         h.remove(leaf);
     }
@@ -1177,7 +1177,7 @@ static void BM_HierarchyReplace(benchmark::State& state)
     // Pick a mid-level node (index 1 = first child of root)
     auto target = h.root().child_at(0).object();
     for (auto _ : state) {
-        auto replacement = instance().create<IObject>(BenchWidget::class_id());
+        auto replacement = instance().create<IObject>(BenchWidget::static_class_id());
         h.replace(target, replacement);
         // Swap back for next iteration
         h.replace(replacement, target);
@@ -1191,7 +1191,7 @@ static void BM_HierarchyAddNoHandler(benchmark::State& state)
     auto h = build_tree(64);
     auto root_obj = h.root().object();
     for (auto _ : state) {
-        auto leaf = instance().create<IObject>(BenchWidget::class_id());
+        auto leaf = instance().create<IObject>(BenchWidget::static_class_id());
         h.add(root_obj, leaf);
         h.remove(leaf);
     }
@@ -1207,7 +1207,7 @@ static void BM_HierarchyAddWithHandler(benchmark::State& state)
     Event evt = ih->on_changed();
     evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::Success; }, Immediate);
     for (auto _ : state) {
-        auto leaf = instance().create<IObject>(BenchWidget::class_id());
+        auto leaf = instance().create<IObject>(BenchWidget::static_class_id());
         h.add(root_obj, leaf);
         h.remove(leaf);
     }
@@ -1247,7 +1247,7 @@ static void ensureVariantRegistered()
 static void BM_VariantGetSameType(benchmark::State& state)
 {
     ensureVariantRegistered();
-    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto obj = instance().create<IObject>(BenchVariant::static_class_id());
     auto* iv = interface_cast<IBenchVariant>(obj);
     auto prop = iv->value();
     Any<float> initial(42.f);
@@ -1261,7 +1261,7 @@ BENCHMARK(BM_VariantGetSameType);
 static void BM_VariantSetSameType(benchmark::State& state)
 {
     ensureVariantRegistered();
-    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto obj = instance().create<IObject>(BenchVariant::static_class_id());
     auto* iv = interface_cast<IBenchVariant>(obj);
     auto prop = iv->value();
     Any<float> val(0.f);
@@ -1282,7 +1282,7 @@ BENCHMARK(BM_VariantSetSameType);
 static void BM_VariantGetConversion(benchmark::State& state)
 {
     ensureVariantRegistered();
-    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto obj = instance().create<IObject>(BenchVariant::static_class_id());
     auto* iv = interface_cast<IBenchVariant>(obj);
     auto prop = iv->value();
     Any<float> initial(42.f);
@@ -1303,7 +1303,7 @@ BENCHMARK(BM_VariantGetConversion);
 static void BM_VariantSetTypeChange(benchmark::State& state)
 {
     ensureVariantRegistered();
-    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto obj = instance().create<IObject>(BenchVariant::static_class_id());
     auto* iv = interface_cast<IBenchVariant>(obj);
     auto prop = iv->value();
     Any<float> fval(1.f);
@@ -1333,7 +1333,7 @@ BENCHMARK(BM_VariantSetTypeChange);
 static void BM_VariantStateRead(benchmark::State& state)
 {
     ensureVariantRegistered();
-    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto obj = instance().create<IObject>(BenchVariant::static_class_id());
     {
         auto writer = write_state<IBenchVariant>(obj);
         writer->value.set<float>(42.f);
@@ -1348,7 +1348,7 @@ BENCHMARK(BM_VariantStateRead);
 static void BM_VariantStateWrite(benchmark::State& state)
 {
     ensureVariantRegistered();
-    auto obj = instance().create<IObject>(BenchVariant::class_id());
+    auto obj = instance().create<IObject>(BenchVariant::static_class_id());
     {
         auto writer = write_state<IBenchVariant>(obj);
         writer->value.set<float>(0.f);

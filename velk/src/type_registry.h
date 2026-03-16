@@ -47,6 +47,8 @@ public:
     IFunction::Ptr create_callback(IFunction::CallableFn* fn) const override;
     IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
                                          IFunction::ContextDeleter* deleter) const override;
+    Uid find_class_by_name(string_view name) const override;
+    void for_each_class(void* ctx, ClassVisitorFn visitor) const override;
 
 private:
     /** @brief Registry entry mapping a class UID to its factory. */

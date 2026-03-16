@@ -14,7 +14,7 @@
 
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 enum class SlotState : uint8_t
 {
@@ -53,7 +53,7 @@ struct HivePage
 class ObjectHive final : public ext::ObjectCore<ObjectHive, IObjectHive>
 {
 public:
-    VELK_CLASS_UID(ClassId::ObjectHive);
+    VELK_CLASS_UID(ClassId::ObjectHive, "ObjectHive");
 
     ObjectHive() = default;
     ~ObjectHive() override;
@@ -112,6 +112,6 @@ private:
     HivePageCapacity capacity_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_PLUGINS_OBJECT_HIVE_H

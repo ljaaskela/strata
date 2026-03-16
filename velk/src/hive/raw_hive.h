@@ -12,7 +12,7 @@
 
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Page for simple pool allocators (RawHiveImpl).
@@ -40,13 +40,13 @@ struct RawHivePage
  * responsible for placement-new and explicit destructor calls
  * (or use RawHive<T> for automatic lifetime).
  */
-class RawHiveImpl final : public ext::ObjectCore<RawHiveImpl, IRawHive>
+class RawHive final : public ext::ObjectCore<RawHive, IRawHive>
 {
 public:
-    VELK_CLASS_UID(ClassId::RawHive);
+    VELK_CLASS_UID(ClassId::RawHive, "RawHive");
 
-    RawHiveImpl() = default;
-    ~RawHiveImpl() override;
+    RawHive() = default;
+    ~RawHive() override;
 
     /** @brief Initializes the hive for the given element UID, size, and alignment. */
     void init(Uid elementUid, size_t elementSize, size_t elementAlign);
@@ -82,6 +82,6 @@ private:
     HivePageCapacity capacity_;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_SRC_RAW_HIVE_H

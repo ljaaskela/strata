@@ -12,7 +12,7 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 1. **Define interface** with `VELK_INTERFACE` (generates static metadata, State struct, typed accessors)
 2. **Implement** with `ext::Object<MyClass, IFace1, IFace2, ...>` (collects metadata from all interfaces)
 3. **Register** with `instance().type_registry().register_type<MyClass>()`
-4. **Create** with `instance().create<IObject>(MyClass::class_id())`
+4. **Create** with `instance().create<IObject>(MyClass::static_class_id())`
 5. **Use** via `interface_cast<IMyInterface>(obj)->member()` or `velk::Object` wrapper. For state access prefer the free functions `read_state<T>(obj)` / `write_state<T>(obj)` (from `velk/api/state.h`)
 
 ## VELK_INTERFACE Member Types

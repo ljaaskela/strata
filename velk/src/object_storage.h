@@ -13,7 +13,7 @@ namespace velk {
  *        and supports arbitrary attachments.
  *
  * Holds a static array_view<MemberDesc> (from VELK_INTERFACE) and creates runtime
- * PropertyImpl/FunctionImpl instances on first access via get_property()/get_event()/
+ * impl::Property/impl::Function instances on first access via get_property()/get_event()/
  * get_function(). Created instances are cached for subsequent lookups.
  *
  * The instances_ vector is partitioned: [0, attachment_end_) holds attachments,
@@ -67,7 +67,7 @@ private:
 
     /** @brief Finds a static member by name and kind, creating its runtime instance if needed. */
     IInterface::Ptr find_or_create(string_view name, MemberKind kind, Resolve mode) const;
-    /** @brief Creates a runtime instance (PropertyImpl or FunctionImpl) from a member descriptor. */
+    /** @brief Creates a runtime instance (impl::Property or impl::Function) from a member descriptor. */
     IInterface::Ptr create(MemberDesc desc) const;
     /** @brief Binds a function instance to the owner's virtual trampoline. */
     void bind(const MemberDesc& m, const IInterface::Ptr& fn) const;

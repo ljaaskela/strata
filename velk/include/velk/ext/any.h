@@ -193,7 +193,7 @@ public:
     }
 
     /** @brief Returns the UID for the combined type pack. */
-    static constexpr Uid class_id() { return TYPE_UID; }
+    static constexpr Uid static_class_id() { return TYPE_UID; }
 };
 
 /**
@@ -223,7 +223,7 @@ public:
     }
 
     /** @brief Returns the UID for type T. */
-    static constexpr Uid class_id() { return TYPE_UID; }
+    static constexpr Uid static_class_id() { return TYPE_UID; }
 
     /** @brief Returns a single-element list containing TYPE_UID. */
     array_view<Uid> get_compatible_types() const override
@@ -366,7 +366,7 @@ protected:
     const vec_type& vec() const { return static_cast<const Derived*>(this)->vec(); }
 
 public:
-    static constexpr Uid class_id() { return VEC_UID; }
+    static constexpr Uid static_class_id() { return VEC_UID; }
 
     // IAny
     array_view<Uid> get_compatible_types() const override

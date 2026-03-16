@@ -9,7 +9,7 @@
 
 #include <memory>
 
-namespace velk {
+namespace velk::impl {
 
 struct BindingData
 {
@@ -34,12 +34,12 @@ struct BindingData
  * Writes (set_data/copy_from) return Fail while the binding is active.
  * Subscribes to source on_changed events and propagates them to all targets.
  */
-class BindingImpl final : public ext::ObjectCore<BindingImpl, IBindingInternal>
+class Binding final : public ext::ObjectCore<Binding, IBindingInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Binding);
+    VELK_CLASS_UID(ClassId::Binding, "Binding");
 
-    ~BindingImpl();
+    ~Binding();
 
     // IBinding
     IProperty::Ptr get_source_property() const override;
@@ -92,6 +92,6 @@ private:
     bool pending_writeback_ = false;
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // VELK_BINDING_IMPL_H

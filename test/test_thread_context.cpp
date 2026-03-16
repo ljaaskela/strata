@@ -143,7 +143,7 @@ TEST(ThreadContext, ReaderWriterExclusion)
     instance().type_registry().register_type<ThreadTestWidget>();
 
     auto ctx = create_thread_context();
-    auto obj = instance().create<IThreadTestWidget>(ThreadTestWidget::class_id());
+    auto obj = instance().create<IThreadTestWidget>(ThreadTestWidget::static_class_id());
 
     std::atomic<bool> stop{false};
     std::atomic<int> read_count{0};

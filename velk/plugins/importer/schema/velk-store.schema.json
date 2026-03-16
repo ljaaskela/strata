@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Velk Store",
+  "description": "Schema for a velk store file: flat object collection with hierarchies and extensible top-level collections.",
+
+  "type": "object",
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "objects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/object" }
+    },
+    "hierarchies": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/hierarchy" }
+    }
+  },
+  "required": ["version", "objects"],
+  "additionalProperties": true,
+
+  "$defs": {
+    "uid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+
+    "class": {
+      "type": "string",
+      "description": "Class name, optionally plugin-scoped with dot notation (e.g. 'velk-ui.Window'), or a UUID string."
+    },
+
+    "value": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "boolean" },
+        { "type": "integer" },
+        { "type": "array", "items": { "type": "number" } }
+      ]
+    },
+
+    "reference": {
+      "type": "object",
+      "properties": {
+        "ref": { "type": "string", "description": "Path to the referenced object/property (e.g. 'panel_a1' or 'panel_a1.width')." },
+        "type": {
+          "type": "string",
+          "enum": ["strong", "weak"],
+          "default": "strong"
+        }
+      },
+      "required": ["ref"]
+    },
+
+    "property_value": {
+      "description": "Property value: either a bare value (shorthand) or an object with value and optional flags.",
+      "oneOf": [
+        { "$ref": "#/$defs/value" },
+        { "$ref": "#/$defs/reference" },
+        {
+          "type": "object",
+          "properties": {
+            "value": { "$ref": "#/$defs/value" },
+            "flags": { "type": "integer", "default": 0 }
+          },
+          "required": ["value"]
+        }
+      ]
+    },
+
+    "object": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier within this store." },
+        "name": { "type": "string", "description": "Optional human-readable name." },
+        "class": { "$ref": "#/$defs/class" },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/property_value" }
+        }
+      },
+      "required": ["id", "class"]
+    },
+
+    "hierarchy": {
+      "type": "object",
+      "description": "Map of parent id to array of child ids.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

@@ -44,6 +44,10 @@ public:
                                     IFunction::ContextDeleter* deleter) = 0;
 };
 
+} // namespace velk
+
+namespace velk::impl {
+
 /**
  * @brief Lightweight IFunction/IFunctionInternal implementation.
  *
@@ -57,13 +61,13 @@ public:
  * Does not support event handlers. Use EventImpl (ClassId::Event) for event
  * functionality with add_handler/remove_handler support.
  */
-class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal>
+class Function final : public ext::ObjectCore<Function, IFunctionInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Function);
+    VELK_CLASS_UID(ClassId::Function, "Function");
 
-    FunctionImpl() = default;
-    ~FunctionImpl();
+    Function() = default;
+    ~Function();
 
 public: // IFunction
     IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const override;
@@ -92,6 +96,6 @@ private:
     IFunction::ContextDeleter* context_deleter_{}; ///< Deleter for owned_context_.
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // FUNCTION_H

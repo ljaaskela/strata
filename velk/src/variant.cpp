@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <cstring>
 
-namespace velk {
+namespace velk::impl {
 
 namespace {
 
@@ -113,7 +113,7 @@ bool is_numeric(Uid type)
 
 } // namespace
 
-Uid VariantImpl::stored_type() const
+Uid Variant::stored_type() const
 {
     if (!stored_) {
         return {};
@@ -122,7 +122,7 @@ Uid VariantImpl::stored_type() const
     return types.empty() ? Uid{} : types[0];
 }
 
-bool VariantImpl::can_convert_to(Uid type) const
+bool Variant::can_convert_to(Uid type) const
 {
     if (!stored_) {
         return false;
@@ -134,7 +134,7 @@ bool VariantImpl::can_convert_to(Uid type) const
     return is_numeric(from) && is_numeric(type);
 }
 
-array_view<Uid> VariantImpl::get_compatible_types() const
+array_view<Uid> Variant::get_compatible_types() const
 {
     if (!stored_) {
         return {};
@@ -146,7 +146,7 @@ array_view<Uid> VariantImpl::get_compatible_types() const
     return stored_->get_compatible_types();
 }
 
-size_t VariantImpl::get_data_size(Uid type) const
+size_t Variant::get_data_size(Uid type) const
 {
     if (!stored_) {
         return 0;
@@ -158,7 +158,7 @@ size_t VariantImpl::get_data_size(Uid type) const
     return entry ? entry->toSize : 0;
 }
 
-ReturnValue VariantImpl::get_data(void* to, size_t toSize, Uid type) const
+ReturnValue Variant::get_data(void* to, size_t toSize, Uid type) const
 {
     if (!stored_ || !to) {
         return ReturnValue::Fail;
@@ -185,7 +185,7 @@ ReturnValue VariantImpl::get_data(void* to, size_t toSize, Uid type) const
     return ReturnValue::Success;
 }
 
-ReturnValue VariantImpl::set_data(const void* from, size_t fromSize, Uid type)
+ReturnValue Variant::set_data(const void* from, size_t fromSize, Uid type)
 {
     if (!from) {
         return ReturnValue::Fail;
@@ -217,7 +217,7 @@ static Uid primary_type(const IAny& any)
     return types.empty() ? Uid{} : types[0];
 }
 
-ReturnValue VariantImpl::copy_from(const IAny& other)
+ReturnValue Variant::copy_from(const IAny& other)
 {
     Uid src_type = primary_type(other);
 
@@ -254,14 +254,14 @@ ReturnValue VariantImpl::copy_from(const IAny& other)
     return stored_ ? ReturnValue::Success : ReturnValue::Fail;
 }
 
-IAny::Ptr VariantImpl::clone() const
+IAny::Ptr Variant::clone() const
 {
-    auto obj = ext::make_object<VariantImpl>();
+    auto obj = ext::make_object<Variant>();
     if (stored_) {
-        auto* impl = static_cast<VariantImpl*>(obj.get());
+        auto* impl = static_cast<Variant*>(obj.get());
         impl->stored_ = stored_->clone();
     }
     return interface_pointer_cast<IAny>(obj);
 }
 
-} // namespace velk
+} // namespace velk::impl

@@ -2,16 +2,16 @@
 
 #include <cstring>
 
-namespace velk {
+namespace velk::impl {
 
-RawHiveImpl::~RawHiveImpl()
+RawHive::~RawHive()
 {
     // Free all page allocations without calling destructors (type-erased).
-    // Callers using RawHiveImpl<T> get automatic cleanup via its destructor.
+    // Callers using RawHive<T> get automatic cleanup via its destructor.
     clear(nullptr, nullptr);
 }
 
-void RawHiveImpl::init(Uid elementUid, size_t elementSize, size_t elementAlign)
+void RawHive::init(Uid elementUid, size_t elementSize, size_t elementAlign)
 {
     element_uid_ = elementUid;
     slot_size_ = align_up(elementSize, elementAlign);
@@ -21,37 +21,37 @@ void RawHiveImpl::init(Uid elementUid, size_t elementSize, size_t elementAlign)
     slot_align_ = elementAlign;
 }
 
-Uid RawHiveImpl::get_element_uid() const
+Uid RawHive::get_element_uid() const
 {
     return element_uid_;
 }
 
-size_t RawHiveImpl::size() const
+size_t RawHive::size() const
 {
     return live_count_;
 }
 
-bool RawHiveImpl::empty() const
+bool RawHive::empty() const
 {
     return live_count_ == 0;
 }
 
-HivePageCapacity RawHiveImpl::get_page_capacity() const
+HivePageCapacity RawHive::get_page_capacity() const
 {
     return capacity_;
 }
 
-void RawHiveImpl::set_page_capacity(const HivePageCapacity& capacity)
+void RawHive::set_page_capacity(const HivePageCapacity& capacity)
 {
     capacity_ = check_capacity(capacity);
 }
 
-void* RawHiveImpl::slot_ptr(const RawHivePage& page, size_t index) const
+void* RawHive::slot_ptr(const RawHivePage& page, size_t index) const
 {
     return static_cast<char*>(page.slots) + index * slot_size_;
 }
 
-void RawHiveImpl::alloc_page(size_t capacity)
+void RawHive::alloc_page(size_t capacity)
 {
     auto page = std::make_unique<RawHivePage>();
     page->capacity = capacity;
@@ -80,7 +80,7 @@ void RawHiveImpl::alloc_page(size_t capacity)
     pages_.push_back(std::move(page));
 }
 
-void* RawHiveImpl::allocate()
+void* RawHive::allocate()
 {
     check_iteration_guard(mutex_, "allocate");
 
@@ -116,7 +116,7 @@ void* RawHiveImpl::allocate()
     return slot_ptr(*target, slot_idx);
 }
 
-void RawHiveImpl::deallocate(void* ptr)
+void RawHive::deallocate(void* ptr)
 {
     check_iteration_guard(mutex_, "deallocate");
 
@@ -145,7 +145,7 @@ void RawHiveImpl::deallocate(void* ptr)
     }
 }
 
-bool RawHiveImpl::contains(const void* ptr) const
+bool RawHive::contains(const void* ptr) const
 {
     std::shared_lock lock(mutex_);
     auto ptr_addr = reinterpret_cast<uintptr_t>(ptr);
@@ -167,7 +167,7 @@ bool RawHiveImpl::contains(const void* ptr) const
     return false;
 }
 
-void RawHiveImpl::for_each(void* context, RawVisitorFn visitor) const
+void RawHive::for_each(void* context, RawVisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);
     IterationGuard guard(&mutex_);
@@ -220,7 +220,7 @@ void RawHiveImpl::for_each(void* context, RawVisitorFn visitor) const
     }
 }
 
-void RawHiveImpl::clear(void* context, DestroyFn destroy)
+void RawHive::clear(void* context, DestroyFn destroy)
 {
     check_iteration_guard(mutex_, "clear");
 
@@ -246,9 +246,9 @@ void RawHiveImpl::clear(void* context, DestroyFn destroy)
     live_count_ = 0;
 }
 
-void RawHiveImpl::clear()
+void RawHive::clear()
 {
     clear(nullptr, nullptr);
 }
 
-} // namespace velk
+} // namespace velk::impl

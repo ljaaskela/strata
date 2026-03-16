@@ -37,7 +37,7 @@ protected:
 
 TEST_F(ArrayPropertyTest, EmptyArrayDefault)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -49,7 +49,7 @@ TEST_F(ArrayPropertyTest, EmptyArrayDefault)
 
 TEST_F(ArrayPropertyTest, NonEmptyDefault)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -67,7 +67,7 @@ TEST_F(ArrayPropertyTest, NonEmptyDefault)
 
 TEST_F(ArrayPropertyTest, PushBackAndAt)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -84,7 +84,7 @@ TEST_F(ArrayPropertyTest, PushBackAndAt)
 
 TEST_F(ArrayPropertyTest, SetAt)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -99,7 +99,7 @@ TEST_F(ArrayPropertyTest, SetAt)
 
 TEST_F(ArrayPropertyTest, EraseAt)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -112,7 +112,7 @@ TEST_F(ArrayPropertyTest, EraseAt)
 
 TEST_F(ArrayPropertyTest, Clear)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -127,7 +127,7 @@ TEST_F(ArrayPropertyTest, Clear)
 
 TEST_F(ArrayPropertyTest, ReadOnlyDefault)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -140,7 +140,7 @@ TEST_F(ArrayPropertyTest, ReadOnlyDefault)
 
 TEST_F(ArrayPropertyTest, ReadOnlyRejectsSetAt)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -163,7 +163,7 @@ TEST_F(ArrayPropertyTest, ReadOnlyRejectsSetAt)
 
 TEST_F(ArrayPropertyTest, GetAtOutOfBounds)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -174,7 +174,7 @@ TEST_F(ArrayPropertyTest, GetAtOutOfBounds)
 
 TEST_F(ArrayPropertyTest, SetAtOutOfBounds)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
     auto prop = meta->get_property("items");
@@ -187,7 +187,7 @@ TEST_F(ArrayPropertyTest, SetAtOutOfBounds)
 
 TEST_F(ArrayPropertyTest, EraseAtOutOfBounds)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
     auto prop = meta->get_property("items");
@@ -201,7 +201,7 @@ TEST_F(ArrayPropertyTest, EraseAtOutOfBounds)
 
 TEST_F(ArrayPropertyTest, StateStructAccess)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     auto* ps = interface_cast<IPropertyState>(obj);
     ASSERT_NE(iw, nullptr);
@@ -229,7 +229,7 @@ TEST_F(ArrayPropertyTest, StateStructAccess)
 
 TEST_F(ArrayPropertyTest, GetValueReturnsCopy)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -245,7 +245,7 @@ TEST_F(ArrayPropertyTest, GetValueReturnsCopy)
 
 TEST_F(ArrayPropertyTest, OnChangedFiresOnPushBack)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -267,7 +267,7 @@ TEST_F(ArrayPropertyTest, OnChangedFiresOnPushBack)
 
 TEST_F(ArrayPropertyTest, OnChangedFiresOnSetAt)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -288,7 +288,7 @@ TEST_F(ArrayPropertyTest, OnChangedFiresOnSetAt)
 
 TEST_F(ArrayPropertyTest, StaticMetadataKind)
 {
-    auto* info = instance().type_registry().get_class_info(ArrayWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(ArrayWidget::static_class_id());
     ASSERT_NE(info, nullptr);
 
     // items, presets, ids are ArrayProperty; count is Property
@@ -376,7 +376,7 @@ TEST_F(ArrayPropertyTest, OwningGetSetValue)
 
 TEST_F(ArrayPropertyTest, MixedPropertiesWork)
 {
-    auto obj = instance().create<IObject>(ArrayWidget::class_id());
+    auto obj = instance().create<IObject>(ArrayWidget::static_class_id());
     auto* iw = interface_cast<IArrayWidget>(obj);
     ASSERT_NE(iw, nullptr);
 

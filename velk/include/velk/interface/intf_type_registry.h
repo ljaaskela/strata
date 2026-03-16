@@ -99,14 +99,25 @@ public:
         return unregister_type(T::get_factory());
     }
     /**
-     * @brief Returns the ClassInfo for a type using its static class_id() method.
-     * @tparam T An Object-derived class with a static class_id() method.
+     * @brief Returns the ClassInfo for a type using its static static_class_id() method.
+     * @tparam T An Object-derived class with a static static_class_id() method.
      */
     template <class T>
     const ClassInfo* get_class_info() const
     {
-        return get_class_info(T::class_id());
+        return get_class_info(T::static_class_id());
     }
+
+    /** @brief Returns the class UID for a registered type by name, or zero Uid if not found. */
+    virtual Uid find_class_by_name(string_view name) const = 0;
+
+    /**
+     * @brief Iterates all registered classes.
+     * @param ctx Opaque pointer forwarded to the visitor.
+     * @param visitor Called for each registered class. Return false to stop early.
+     */
+    using ClassVisitorFn = bool (*)(void* ctx, const ClassInfo&);
+    virtual void for_each_class(void* ctx, ClassVisitorFn visitor) const = 0;
 };
 
 } // namespace velk

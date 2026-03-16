@@ -2,9 +2,9 @@
 
 #include <velk/plugins/animator/interface/intf_animation.h>
 
-namespace velk {
+namespace velk::impl {
 
-void AnimatorImpl::tick(const UpdateInfo& info)
+void Animator::tick(const UpdateInfo& info)
 {
     size_t write = 0;
     for (size_t i = 0; i < animations_.size(); ++i) {
@@ -18,7 +18,7 @@ void AnimatorImpl::tick(const UpdateInfo& info)
     animations_.resize(write); // Removes any IAnimation::WeakPtrs whose .lock() failed above.
 }
 
-void AnimatorImpl::add(const IAnimation::Ptr& animation)
+void Animator::add(const IAnimation::Ptr& animation)
 {
     if (!animation) {
         return;
@@ -32,7 +32,7 @@ void AnimatorImpl::add(const IAnimation::Ptr& animation)
     animations_.push_back(IAnimation::WeakPtr(animation));
 }
 
-void AnimatorImpl::remove(const IAnimation::Ptr& animation)
+void Animator::remove(const IAnimation::Ptr& animation)
 {
     if (!animation) {
         return;
@@ -46,7 +46,7 @@ void AnimatorImpl::remove(const IAnimation::Ptr& animation)
     }
 }
 
-void AnimatorImpl::cancel_all()
+void Animator::cancel_all()
 {
     for (auto& weak : animations_) {
         auto anim = weak.lock();
@@ -57,7 +57,7 @@ void AnimatorImpl::cancel_all()
     animations_.clear();
 }
 
-size_t AnimatorImpl::active_count() const
+size_t Animator::active_count() const
 {
     size_t n = 0;
     for (auto& weak : animations_) {
@@ -69,7 +69,7 @@ size_t AnimatorImpl::active_count() const
     return n;
 }
 
-size_t AnimatorImpl::count() const
+size_t Animator::count() const
 {
     size_t n = 0;
     for (auto& weak : animations_) {
@@ -80,4 +80,4 @@ size_t AnimatorImpl::count() const
     return n;
 }
 
-} // namespace velk
+} // namespace velk::impl
