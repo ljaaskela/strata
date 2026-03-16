@@ -5,6 +5,9 @@
 
 #include <velk/ext/interface_dispatch.h>
 #include <velk/interface/intf_importer_extension.h>
+#include <velk/vector.h>
+
+#include <memory>
 
 namespace velk {
 
@@ -129,7 +132,7 @@ private:
     }
 
     const JsonValue& value_;
-    mutable std::vector<std::unique_ptr<JsonImportData>> children_;
+    mutable vector<std::unique_ptr<JsonImportData>> children_;
 };
 
 } // namespace velk

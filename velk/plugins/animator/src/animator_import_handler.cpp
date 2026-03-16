@@ -171,7 +171,7 @@ void process_track(const IImportData& entry, IStore& store, const IImportResolve
     }
 
     // Build keyframes
-    std::vector<KeyframeEntry> keyframes;
+    vector<KeyframeEntry> keyframes;
     for (size_t k = 0; k < keyframes_node.count(); k++) {
         auto& kf_node = keyframes_node.at(k);
 

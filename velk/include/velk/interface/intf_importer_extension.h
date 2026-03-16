@@ -38,16 +38,12 @@ public:
     virtual double as_number() const = 0;
     /** @brief Returns the string value, or empty if not a String node. */
     virtual string_view as_string() const = 0;
-
     /** @brief Array and object: number of elements/entries. */
     virtual size_t count() const = 0;
-
     /** @brief Array: indexed element. Object: value at index (insertion order). */
     virtual const IImportData& at(size_t index) const = 0;
-
     /** @brief Object: value for key. Returns static null node if missing. */
     virtual const IImportData& find(string_view key) const = 0;
-
     /** @brief Object: key name at index (for iteration). */
     virtual string_view key_at(size_t index) const = 0;
 };

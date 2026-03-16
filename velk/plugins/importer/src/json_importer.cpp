@@ -741,11 +741,11 @@ void JsonImporter::dispatch_extensions(const JsonValue& root, IStore& store,
                                        const ImportContext& ctx) const
 {
     // Discover all classes implementing IImporterExtension
-    std::vector<Uid> extension_uids;
+    vector<Uid> extension_uids;
     auto& registry = ::velk::instance().type_registry();
 
     registry.for_each_class(&extension_uids, [](void* ctx, const ClassInfo& info) -> bool {
-        auto* uids = static_cast<std::vector<Uid>*>(ctx);
+        auto* uids = static_cast<vector<Uid>*>(ctx);
         for (size_t i = 0; i < info.interfaces.size(); i++) {
             if (info.interfaces[i].uid == IImporterExtension::UID) {
                 uids->push_back(info.uid);
