@@ -778,3 +778,126 @@ auto* widget = velk::interface_cast<mylib::IWidget>(obj);
 auto& reg = ::velk::instance().plugin_registry();
 auto plugin = reg.get_or_load_plugin(mylib::PluginId::MyPlugin); // IPlugin::Ptr
 ```
+
+## 12. Importer Extensions
+
+### Extension class
+
+```cpp
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_importer_extension.h>
+
+namespace mylib {
+
+class MyImportHandler : public velk::ext::ObjectCore<MyImportHandler, velk::IImporterExtension>
+{
+public:
+    VELK_CLASS_UID("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "MyImportHandler");
+
+    velk::string_view collection_key() const override { return "my_data"; }
+
+    void process(const velk::IImportData& data, velk::IStore& store,
+                 const velk::IImportResolver& resolver) const override
+    {
+        for (size_t i = 0; i < data.count(); i++) {
+            auto& entry = data.at(i);
+
+            // IImportData uses null object pattern: safe to chain without null checks
+            auto name = entry.find("name").as_string();     // "" if missing
+            double value = entry.find("value").as_number();  // 0.0 if missing
+
+            // Resolve objects and properties via the resolver
+            auto target_path = entry.find("target").as_string();
+            if (!target_path.empty()) {
+                // Returns IObject::Ptr; cast to IProperty for property paths
+                auto resolved = resolver.resolve(target_path);
+                auto prop = velk::interface_pointer_cast<velk::IProperty>(resolved);
+                if (prop) {
+                    // ... use the property ...
+                }
+            }
+
+            // Check for null explicitly when needed
+            auto& optional = entry.find("optional_field");
+            if (!optional.is_null()) {
+                // field exists
+            }
+        }
+    }
+};
+
+} // namespace mylib
+```
+
+### Registration (in plugin initialize)
+
+```cpp
+velk::ReturnValue MyPlugin::initialize(velk::IVelk& velk, velk::PluginConfig&) override
+{
+    return ::velk::register_type<MyImportHandler>(velk);
+}
+```
+
+### Using the importer
+
+```cpp
+#include <velk/plugins/importer/api/importer.h>
+
+// Register class aliases (optional)
+::velk::register_import_alias("mylib.Widget", MyWidget::static_class_id());
+
+// Create a JSON importer (loads plugin automatically) and import
+auto importer = ::velk::create_json_importer();
+auto result = importer.import_from(R"({
+    "version": 1,
+    "objects": [
+        { "id": "w1", "class": "mylib.Widget", "properties": { "width": 100.0 } }
+    ],
+    "my_data": [
+        { "target": "w1.width", "value": 42.0 }
+    ]
+})");
+
+// Check result
+if (result.store) {
+    auto obj = result.store->find("w1");
+    // ...
+}
+for (auto& err : result.errors) {
+    // handle errors (non-fatal, import continues past errors)
+}
+```
+
+### JSON property value forms
+
+```json
+{
+    "properties": {
+        "width": 100.0,
+        "height": { "value": 200.0, "flags": 1 },
+        "target": { "ref": "other_object" },
+        "target": { "ref": "other_object", "type": "weak" },
+        "source_width": { "bind": "other_object.width" }
+    }
+}
+```
+
+- Bare value: `100.0` (type inferred from class metadata)
+- Object form: `{ "value": ..., "flags": ... }`
+- Object ref: `{ "ref": "id_or_path" }` (ObjectRef properties only, error on other types)
+- Inline binding: `{ "bind": "object.property" }` (one-way, auto invoke)
+
+### Hierarchy format
+
+```json
+{
+    "hierarchies": {
+        "scene": {
+            "root": ["panel", "button"],
+            "panel": ["label_a", "label_b"]
+        }
+    }
+}
+```
+
+Keys are parent ids, values are arrays of child ids. Root is auto-detected (appears as key but never as child).

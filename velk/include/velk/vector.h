@@ -113,7 +113,7 @@ protected:
 template <class T>
 class vector : private vector_base
 {
-    static constexpr bool trivial = std::is_trivially_copyable_v<T>;
+    static constexpr bool is_trivial() { return std::is_trivially_copyable_v<T>; }
 
 public:
     using value_type = T; ///< The element type.
@@ -127,7 +127,7 @@ public:
         if (count == 0) {
             return;
         }
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             data_ = alloc_raw(count * sizeof(T));
             capacity_ = count;
             std::memset(data_, 0, count * sizeof(T));
@@ -149,7 +149,7 @@ public:
         grow_to(count);
         T* d = typed_data();
         for (size_t i = 0; i < count; ++i) {
-            if constexpr (trivial) {
+            if constexpr (is_trivial()) {
                 d[i] = value;
             } else {
                 new (d + i) T(value);
@@ -168,7 +168,7 @@ public:
         }
         data_ = alloc_raw(count * sizeof(T));
         capacity_ = count;
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             std::memcpy(data_, first, count * sizeof(T));
         } else {
             for (size_t i = 0; i < count; ++i) {
@@ -192,7 +192,7 @@ public:
         }
         data_ = alloc_raw(other.size_ * sizeof(T));
         capacity_ = other.size_;
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             std::memcpy(data_, other.data_, other.size_ * sizeof(T));
         } else {
             for (size_t i = 0; i < other.size_; ++i) {
@@ -291,7 +291,7 @@ public:
             return;
         }
         void* new_buf = alloc_raw(size_ * sizeof(T));
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             std::memcpy(new_buf, data_, size_ * sizeof(T));
         } else {
             T* dst = static_cast<T*>(new_buf);
@@ -317,7 +317,7 @@ public:
     {
         T tmp(value);
         ensure_capacity(size_ + 1);
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             typed_data()[size_] = tmp;
         } else {
             new (typed_data() + size_) T(std::move(tmp));
@@ -326,7 +326,7 @@ public:
     }
 
     /** @brief Appends @p value by move (non-trivial types only). */
-    template <bool NT = !trivial, std::enable_if_t<NT, int> = 0>
+    template <class U = T, std::enable_if_t<!std::is_trivially_copyable_v<U>, int> = 0>
     void push_back(T&& value)
     {
         ensure_capacity(size_ + 1);
@@ -341,7 +341,7 @@ public:
         T tmp(std::forward<Args>(args)...);
         ensure_capacity(size_ + 1);
         T* p = typed_data() + size_;
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             *p = tmp;
         } else {
             new (p) T(std::move(tmp));
@@ -355,7 +355,7 @@ public:
     {
         assert(size_ > 0);
         --size_;
-        if constexpr (!trivial) {
+        if constexpr (!is_trivial()) {
             typed_data()[size_].~T();
         }
     }
@@ -371,7 +371,7 @@ public:
         T tmp(value);
         ensure_capacity(size_ + 1);
         T* d = typed_data();
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             insert_trivial(idx, &tmp, 1);
         } else {
             if (size_ > idx) {
@@ -389,7 +389,7 @@ public:
     }
 
     /** @brief Inserts @p value by move before the element at @p pos (non-trivial types only). */
-    template <bool NT = !trivial, std::enable_if_t<NT, int> = 0>
+    template <class U = T, std::enable_if_t<!std::is_trivially_copyable_v<U>, int> = 0>
     T* insert(const T* pos, T&& value)
     {
         size_t idx = static_cast<size_t>(pos - typed_data());
@@ -422,7 +422,7 @@ public:
         if (count == 0) {
             return typed_data() + idx;
         }
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             void* tmp = alloc_raw(count * sizeof(T));
             std::memcpy(tmp, first, count * sizeof(T));
             ensure_capacity(size_ + count);
@@ -470,7 +470,7 @@ public:
     {
         size_t idx = static_cast<size_t>(pos - typed_data());
         assert(idx < size_);
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             erase_trivial(idx, 1);
         } else {
             T* d = typed_data();
@@ -497,7 +497,7 @@ public:
         if (count == 0) {
             return d + idx;
         }
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             erase_trivial(idx, count);
         } else {
             for (size_t i = idx; i + count < size_; ++i) {
@@ -515,7 +515,7 @@ public:
     void resize(size_t count)
     {
         if (count < size_) {
-            if constexpr (!trivial) {
+            if constexpr (!is_trivial()) {
                 T* d = typed_data();
                 for (size_t i = count; i < size_; ++i) {
                     d[i].~T();
@@ -523,7 +523,7 @@ public:
             }
         } else if (count > size_) {
             ensure_capacity(count);
-            if constexpr (trivial) {
+            if constexpr (is_trivial()) {
                 std::memset(static_cast<char*>(data_) + size_ * sizeof(T), 0, (count - size_) * sizeof(T));
             } else {
                 T* d = typed_data();
@@ -539,14 +539,14 @@ public:
     void resize(size_t count, const T& value)
     {
         if (count < size_) {
-            if constexpr (!trivial) {
+            if constexpr (!is_trivial()) {
                 T* d = typed_data();
                 for (size_t i = count; i < size_; ++i) {
                     d[i].~T();
                 }
             }
         } else if (count > size_) {
-            if constexpr (trivial) {
+            if constexpr (is_trivial()) {
                 ensure_capacity(count);
                 T* d = typed_data();
                 for (size_t i = size_; i < count; ++i) {
@@ -576,7 +576,7 @@ public:
         if (size_ != other.size_) {
             return false;
         }
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             return size_ == 0 || std::memcmp(data_, other.data_, size_ * sizeof(T)) == 0;
         } else {
             const T* a = typed_data();
@@ -622,7 +622,7 @@ private:
     {
         size_t new_cap = grow_capacity(capacity_, required);
         void* new_buf = alloc_raw(new_cap * sizeof(T));
-        if constexpr (trivial) {
+        if constexpr (is_trivial()) {
             if (size_ > 0) {
                 std::memcpy(new_buf, data_, size_ * sizeof(T));
             }

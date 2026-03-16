@@ -13,24 +13,45 @@ struct ImportResult
 {
     IStore::Ptr store;       ///< The imported store, or null if parsing failed entirely.
     vector<string> errors;   ///< Collected errors (unknown classes, bad properties, parse errors, etc.).
+
+    /** @brief Returns true if the ImportResult contains a valid IStore::Ptr and no errors. */
+    explicit operator bool() const { return store && errors.empty(); }
 };
 
-/** @brief Extended plugin interface for the importer. */
+/**
+ * @brief Interface for a store importer.
+ *
+ * Chain: IInterface -> IStoreImporter
+ */
+class IStoreImporter : public Interface<IStoreImporter>
+{
+public:
+    /** @brief Imports from a source string and returns a populated IStore with any errors. */
+    virtual ImportResult import_from(string_view source) const = 0;
+};
+
+/**
+ * @brief Extended plugin interface for the importer plugin.
+ *
+ * Provides global configuration that applies to all importers.
+ *
+ * Chain: IInterface -> IImporterPlugin
+ */
 class IImporterPlugin : public Interface<IImporterPlugin>
 {
 public:
-    /** @brief Parses a JSON string and returns a populated IStore with any errors. */
-    virtual ImportResult import_from_json(string_view json) const = 0;
     /**
-     * @brief Registers a custom class name alias for use in JSON class fields.
+     * @brief Registers a custom class name alias for use in import class fields.
      *
-     * Not needed for normal use. The importer resolves class names automatically
+     * Not needed for normal use. Importers resolve class names automatically
      * via the type registry (UUID strings and ClassInfo::name). This method exists
-     * for application-level code that drives imports directly and needs to map
-     * custom names (e.g. "myapp.Widget") to class UIDs that have different
-     * registered names.
+     * for application-level code that needs to map custom names (e.g. "myapp.Widget")
+     * to class UIDs that have different registered names.
      */
     virtual void register_class_alias(string_view alias, Uid class_uid) = 0;
+
+    /** @brief Resolves a class name or UUID string to a class UID, or zero Uid if not found. */
+    virtual Uid resolve_class(string_view name) const = 0;
 };
 
 } // namespace velk
