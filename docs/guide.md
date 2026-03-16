@@ -120,7 +120,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 Invocation works the same for all variants, callers always go through `IFunction::invoke()`:
 
 ```cpp
-auto widget = instance().create<IObject>(MyWidget::class_id());
+auto widget = instance().create<IObject>(MyWidget::static_class_id());
 if (auto* iw = interface_cast<IMyWidget>(widget)) {
     // Scalar property
     iw->width().set_value(100.f);
@@ -247,7 +247,7 @@ struct FunctionKind {
 Access via `MemberDesc::functionKind()->args`:
 
 ```cpp
-if (auto* info = instance().type_registry().get_class_info(MyWidget::class_id())) {
+if (auto* info = instance().type_registry().get_class_info(MyWidget::static_class_id())) {
     for (auto& m : info->members) {
         if (auto* fk = m.functionKind(); fk && !fk->args.empty()) {
             for (auto& arg : fk->args) {
@@ -262,7 +262,7 @@ For the full hand-written equivalent of what `VELK_INTERFACE` generates, see [Ad
 
 ## Class UIDs
 
-Every class that inherits from `ObjectCore` or `Object` has a class UID returned by `class_id()` (compile-time) or `get_class_uid()` (virtual, on IObject). By default this is auto-generated from the class name via constexpr FNV-1a hashing. You can override it with a stable, user-specified UID using the `VELK_CLASS_UID` macro:
+Every class that inherits from `ObjectCore` or `Object` has a class UID returned by `static_class_id()` (compile-time) or `get_class_uid()` (virtual, on IObject). By default this is auto-generated from the class name via constexpr FNV-1a hashing. You can override it with a stable, user-specified UID using the `VELK_CLASS_UID` macro. The macro also accepts an optional second parameter to set a friendly class name:
 
 ```cpp
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
@@ -348,7 +348,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget>
 };
 
 // All forms are invoked through IFunction::invoke()
-auto widget = instance().create<IObject>(MyWidget::class_id());
+auto widget = instance().create<IObject>(MyWidget::static_class_id());
 if (auto* iw = interface_cast<IMyWidget>(widget)) {
     invoke_function(iw->reset());                               // zero-arg
     invoke_function(iw, "add", Any<int>(10), Any<float>(3.f));  // typed
@@ -799,7 +799,7 @@ The accessor returns `Property<ObjectRef>`. Write a reference by creating an `Ob
 auto* node = interface_cast<INode>(obj);
 
 // Create a target object
-auto target = instance().create<IObject>(SomeClass::class_id());
+auto target = instance().create<IObject>(SomeClass::static_class_id());
 
 // Write via property accessor
 auto ref = create_object_ref();
@@ -851,10 +851,10 @@ Constrain which objects can be stored by requiring a specific interface:
 auto writer = write_state<INode>(node);
 writer->child.set_constraint<IMyWidget>();  // only accept IMyWidget implementors
 
-auto good = instance().create<IObject>(MyWidget::class_id());
+auto good = instance().create<IObject>(MyWidget::static_class_id());
 writer->child.set(good);   // Success
 
-auto bad = instance().create<IObject>(OtherClass::class_id());
+auto bad = instance().create<IObject>(OtherClass::static_class_id());
 writer->child.set(bad);    // InvalidArgument
 ```
 
@@ -882,7 +882,7 @@ Each interface that declares `PROP` members gets a `State` struct with one field
 `read_state<T>` and `write_state<T>` provide RAII accessors to the state struct. `read_state` returns a read-only view. `write_state` returns a writable view that automatically fires `on_changed` on all instantiated properties of that interface when it goes out of scope. Both return a null-safe handle that converts to `false` if the interface is not implemented by the object or the object pointer is null.
 
 ```cpp
-auto widget = instance().create<IObject>(MyWidget::class_id());
+auto widget = instance().create<IObject>(MyWidget::static_class_id());
 auto* iw = interface_cast<IMyWidget>(widget);
 
 // Read current state (const access)
@@ -1235,11 +1235,11 @@ Use cases include decorating objects with extra interfaces and associating arbit
 Reach the storage layer with `interface_cast<IObjectStorage>`, then use `add_attachment` and `remove_attachment`:
 
 ```cpp
-auto obj = instance().create<IObject>(MyWidget::class_id());
+auto obj = instance().create<IObject>(MyWidget::static_class_id());
 auto* storage = interface_cast<IObjectStorage>(obj);
 
 // Create something to attach
-auto child = instance().create<IObject>(MyWidget::class_id());
+auto child = instance().create<IObject>(MyWidget::static_class_id());
 
 // Add
 storage->add_attachment(child);
@@ -1310,9 +1310,9 @@ Why external rather than baked into objects?
 
 auto h = create_hierarchy();
 
-auto root = instance().create<IObject>(MyWidget::class_id());
-auto child1 = instance().create<IObject>(MyWidget::class_id());
-auto child2 = instance().create<IObject>(MyWidget::class_id());
+auto root = instance().create<IObject>(MyWidget::static_class_id());
+auto child1 = instance().create<IObject>(MyWidget::static_class_id());
+auto child2 = instance().create<IObject>(MyWidget::static_class_id());
 
 h.set_root(root);
 h.add(root, child1);

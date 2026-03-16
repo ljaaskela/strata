@@ -258,7 +258,7 @@ Unload by UID or by class type:
 ```cpp
 auto& reg = velk::instance().plugin_registry();
 
-reg.unload_plugin(MyPlugin::class_id());
+reg.unload_plugin(MyPlugin::static_class_id());
 // or
 reg.unload_plugin<MyPlugin>();
 ```
@@ -296,7 +296,7 @@ public:
 
     velk::ReturnValue shutdown(velk::IVelk& velk) override
     {
-        velk.plugin_registry().unload_plugin(SubPlugin::class_id());
+        velk.plugin_registry().unload_plugin(SubPlugin::static_class_id());
         return velk::ReturnValue::Success;
     }
 };

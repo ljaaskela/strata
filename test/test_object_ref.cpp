@@ -177,7 +177,7 @@ public:
 class ConstraintTestImpl : public ::velk::ext::Object<ConstraintTestImpl, IConstraintTest>
 {
 public:
-    VELK_CLASS_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    VELK_CLASS_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "TestObjRef1");
 };
 
 TEST(ObjectRef, ConstraintAcceptsMatchingInterface)
@@ -188,7 +188,7 @@ TEST(ObjectRef, ConstraintAcceptsMatchingInterface)
     ref->set_constraint(IConstraintTest::UID);
     EXPECT_EQ(ref->constraint_uid(), IConstraintTest::UID);
 
-    auto target = ::velk::instance().create<velk::IObject>(ConstraintTestImpl::class_id());
+    auto target = ::velk::instance().create<velk::IObject>(ConstraintTestImpl::static_class_id());
     ASSERT_TRUE(target);
 
     EXPECT_EQ(ref->set_object(target), velk::ReturnValue::Success);
@@ -221,14 +221,14 @@ public:
 class ObjectRefPropTestImpl : public ::velk::ext::Object<ObjectRefPropTestImpl, IObjectRefPropTest>
 {
 public:
-    VELK_CLASS_UID("d1e2f3a4-b5c6-7890-abcd-ef1234560002");
+    VELK_CLASS_UID("d1e2f3a4-b5c6-7890-abcd-ef1234560002", "TestObjRef2");
 };
 
 TEST(ObjectRefProperty, SetAndGetViaProperty)
 {
     ::velk::register_type<ObjectRefPropTestImpl>(::velk::instance());
 
-    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
     ASSERT_TRUE(obj);
 
     auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
@@ -256,7 +256,7 @@ TEST(ObjectRefProperty, SetAndGetViaProperty)
 
 TEST(ObjectRefProperty, StateStructAccess)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
     auto* meta = velk::interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 
@@ -283,7 +283,7 @@ TEST(ObjectRefProperty, StateStructAccess)
 
 TEST(ObjectRefProperty, OnChangedFires)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
     auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
     ASSERT_TRUE(intf);
 
@@ -320,7 +320,7 @@ TEST(ObjectRefProperty, OnChangedFires)
 
 TEST(ObjectRefProperty, OwningModeViaWrapper)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
     auto* meta = velk::interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 
@@ -343,7 +343,7 @@ TEST(ObjectRefProperty, OwningModeViaWrapper)
 
 TEST(ObjectRefProperty, ConstraintViaWrapper)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
     auto* meta = velk::interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 
@@ -359,7 +359,7 @@ TEST(ObjectRefProperty, ConstraintViaWrapper)
     EXPECT_EQ(reader->child.constraint_uid(), IConstraintTest::UID);
 
     // Set an object that implements IConstraintTest
-    auto good_target = ::velk::instance().create<velk::IObject>(ConstraintTestImpl::class_id());
+    auto good_target = ::velk::instance().create<velk::IObject>(ConstraintTestImpl::static_class_id());
     {
         auto writer = meta->write<IObjectRefPropTest>();
         EXPECT_EQ(writer->child.set(good_target), velk::ReturnValue::Success);

@@ -2,11 +2,11 @@
 
 #include <velk/ext/any.h>
 
-namespace velk {
+namespace velk::impl {
 
 // Looks up a named event (on_changing / on_changed) and invokes it with the change
 // descriptor wrapped as a single IAny argument. Skips work if no handlers are registered.
-void HierarchyImpl::fire_event(string_view name, HierarchyChange change)
+void Hierarchy::fire_event(string_view name, HierarchyChange change)
 {
     auto evt = get_event(name, Resolve::Existing);
     if (evt && evt->has_handlers()) {
@@ -20,7 +20,7 @@ void HierarchyImpl::fire_event(string_view name, HierarchyChange change)
 
 // Gathers owning pointers to every node. Used before clear() or set_root() to
 // keep objects alive for post-mutation IHierarchyAware notifications.
-void HierarchyImpl::collect_all(vector<IObject::Ptr>& out) const
+void Hierarchy::collect_all(vector<IObject::Ptr>& out) const
 {
     out.reserve(entries_.size());
     for (auto& [_, entry] : entries_) {
@@ -30,7 +30,7 @@ void HierarchyImpl::collect_all(vector<IObject::Ptr>& out) const
 
 // Resolves the raw parent backlink to an owning Ptr. Two lookups: find the
 // entry to get the raw parent, then find the parent's entry for its Ptr.
-IObject::Ptr HierarchyImpl::lookup_parent(IObject* obj) const
+IObject::Ptr Hierarchy::lookup_parent(IObject* obj) const
 {
     auto it = entries_.find(obj);
     if (it != entries_.end() && it->second.parent) {
@@ -44,7 +44,7 @@ IObject::Ptr HierarchyImpl::lookup_parent(IObject* obj) const
 
 // Clears any existing tree, sets the new root. Veto via IHierarchyAware::on_hierarchy_joining.
 // Removed nodes get on_hierarchy_left; new root gets on_hierarchy_joined.
-ReturnValue HierarchyImpl::set_root(const IObject::Ptr& root)
+ReturnValue Hierarchy::set_root(const IObject::Ptr& root)
 {
     if (!root) {
         return ReturnValue::InvalidArgument;
@@ -81,7 +81,7 @@ ReturnValue HierarchyImpl::set_root(const IObject::Ptr& root)
 
 // Appends child to parent's children list. Rejects if parent is not in the tree
 // or child is already present. Veto via IHierarchyAware::on_hierarchy_joining.
-ReturnValue HierarchyImpl::add(const IObject::Ptr& parent, const IObject::Ptr& child)
+ReturnValue Hierarchy::add(const IObject::Ptr& parent, const IObject::Ptr& child)
 {
     if (!parent || !child) {
         return ReturnValue::InvalidArgument;
@@ -120,7 +120,7 @@ ReturnValue HierarchyImpl::add(const IObject::Ptr& parent, const IObject::Ptr& c
 
 // Inserts child at a specific index in parent's children list. Same validation
 // and veto logic as add(), but also rejects out-of-range indices.
-ReturnValue HierarchyImpl::insert(const IObject::Ptr& parent, size_t index, const IObject::Ptr& child)
+ReturnValue Hierarchy::insert(const IObject::Ptr& parent, size_t index, const IObject::Ptr& child)
 {
     if (!parent || !child) {
         return ReturnValue::InvalidArgument;
@@ -164,7 +164,7 @@ ReturnValue HierarchyImpl::insert(const IObject::Ptr& parent, size_t index, cons
 // Removes the object and its entire subtree. If the object is the root, the
 // whole tree is cleared. Detaches from parent's children list, then recursively
 // erases descendants. Veto only on the directly removed object, not descendants.
-ReturnValue HierarchyImpl::remove(const IObject::Ptr& object)
+ReturnValue Hierarchy::remove(const IObject::Ptr& object)
 {
     if (!object) {
         return ReturnValue::InvalidArgument;
@@ -231,7 +231,7 @@ ReturnValue HierarchyImpl::remove(const IObject::Ptr& object)
 // Swaps old_child for new_child in-place: new_child inherits old_child's parent
 // slot and children. Old child's children get their parent backlinks repointed.
 // If old_child is root, root_ is updated. Veto via on_hierarchy_joining on new_child.
-ReturnValue HierarchyImpl::replace(const IObject::Ptr& old_child, const IObject::Ptr& new_child)
+ReturnValue Hierarchy::replace(const IObject::Ptr& old_child, const IObject::Ptr& new_child)
 {
     if (!old_child || !new_child) {
         return ReturnValue::InvalidArgument;
@@ -312,7 +312,7 @@ ReturnValue HierarchyImpl::replace(const IObject::Ptr& old_child, const IObject:
 }
 
 // Removes all nodes. No per-object veto; on_hierarchy_left fires for each.
-void HierarchyImpl::clear()
+void Hierarchy::clear()
 {
     fire_event("on_changing", {HierarchyChange::Type::Clear});
 
@@ -330,14 +330,14 @@ void HierarchyImpl::clear()
 }
 
 // Returns the root object under a shared lock.
-IObject::Ptr HierarchyImpl::root() const
+IObject::Ptr Hierarchy::root() const
 {
     std::shared_lock lock(mutex_);
     return root_;
 }
 
 // Returns a Node snapshot binding the object to this hierarchy via weak_ptr.
-IHierarchy::Node HierarchyImpl::node_of(const IObject::Ptr& object) const
+IHierarchy::Node Hierarchy::node_of(const IObject::Ptr& object) const
 {
     if (!object) {
         return {};
@@ -351,7 +351,7 @@ IHierarchy::Node HierarchyImpl::node_of(const IObject::Ptr& object) const
 }
 
 // Looks up the parent of the given object under a shared lock.
-IObject::Ptr HierarchyImpl::parent_of(const IObject::Ptr& object) const
+IObject::Ptr Hierarchy::parent_of(const IObject::Ptr& object) const
 {
     if (!object) {
         return {};
@@ -361,7 +361,7 @@ IObject::Ptr HierarchyImpl::parent_of(const IObject::Ptr& object) const
 }
 
 // Returns a copy of the children vector. Ref-count bumps dominate cost for wide nodes.
-vector<IObject::Ptr> HierarchyImpl::children_of(const IObject::Ptr& object) const
+vector<IObject::Ptr> Hierarchy::children_of(const IObject::Ptr& object) const
 {
     if (!object) {
         return {};
@@ -380,7 +380,7 @@ vector<IObject::Ptr> HierarchyImpl::children_of(const IObject::Ptr& object) cons
 }
 
 // Returns the child at the given index, or null if out of range.
-IObject::Ptr HierarchyImpl::child_at(const IObject::Ptr& object, size_t index) const
+IObject::Ptr Hierarchy::child_at(const IObject::Ptr& object, size_t index) const
 {
     if (!object) {
         return {};
@@ -394,7 +394,7 @@ IObject::Ptr HierarchyImpl::child_at(const IObject::Ptr& object, size_t index) c
 }
 
 // Returns the number of direct children. O(1) via vector::size().
-size_t HierarchyImpl::child_count(const IObject::Ptr& object) const
+size_t Hierarchy::child_count(const IObject::Ptr& object) const
 {
     if (!object) {
         return 0;
@@ -406,7 +406,7 @@ size_t HierarchyImpl::child_count(const IObject::Ptr& object) const
 
 // Snapshots children under shared lock, then iterates outside the lock so the
 // visitor can safely mutate the hierarchy. Visitor returns false to stop early.
-void HierarchyImpl::for_each_child(const IObject::Ptr& object, void* context, ChildVisitorFn visitor) const
+void Hierarchy::for_each_child(const IObject::Ptr& object, void* context, ChildVisitorFn visitor) const
 {
     if (!object || !visitor) {
         return;
@@ -430,7 +430,7 @@ void HierarchyImpl::for_each_child(const IObject::Ptr& object, void* context, Ch
 }
 
 // O(1) hash lookup to check membership.
-bool HierarchyImpl::contains(const IObject::Ptr& object) const
+bool Hierarchy::contains(const IObject::Ptr& object) const
 {
     if (!object) {
         return false;
@@ -440,7 +440,7 @@ bool HierarchyImpl::contains(const IObject::Ptr& object) const
 }
 
 // Returns total node count. O(1) via unordered_map::size().
-size_t HierarchyImpl::size() const
+size_t Hierarchy::size() const
 {
     std::shared_lock lock(mutex_);
     return entries_.size();
@@ -448,7 +448,7 @@ size_t HierarchyImpl::size() const
 
 // DFS removal: erases the entry, takes ownership of its children, then recurses.
 // Collected objects are kept alive in removed for post-mutation notifications.
-void HierarchyImpl::remove_recursive(IObject* obj, vector<IObject::Ptr>& removed)
+void Hierarchy::remove_recursive(IObject* obj, vector<IObject::Ptr>& removed)
 {
     auto it = entries_.find(obj);
     if (it == entries_.end()) {
@@ -464,7 +464,7 @@ void HierarchyImpl::remove_recursive(IObject* obj, vector<IObject::Ptr>& removed
 
 // Notifies each removed object via IHierarchyAware::on_hierarchy_left.
 // Called outside the lock so callbacks can safely interact with the hierarchy.
-void HierarchyImpl::notify_left(const vector<IObject::Ptr>& removed)
+void Hierarchy::notify_left(const vector<IObject::Ptr>& removed)
 {
     auto self = get_self<IHierarchy>();
     for (auto& obj : removed) {
@@ -474,4 +474,4 @@ void HierarchyImpl::notify_left(const vector<IObject::Ptr>& removed)
     }
 }
 
-} // namespace velk
+} // namespace velk::impl

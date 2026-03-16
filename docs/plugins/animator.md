@@ -50,7 +50,7 @@ Explicit animations drive a property from one value to another over a specified 
 `create_tween()` creates a simple from-to animation on a property:
 
 ```cpp
-auto widget = instance().create<IMyWidget>(MyWidget::class_id());
+auto widget = instance().create<IMyWidget>(MyWidget::static_class_id());
 
 // Animate width from 0 to 100 over 500ms
 auto anim = velk::create_tween(

@@ -5,12 +5,20 @@
 
 namespace velk::detail {
 
-/** @brief Check if class has a static 'class_id()' method. */
+/** @brief Check if class has a static 'static_class_id()' method. */
 template <class T, class = void>
 struct has_class_id : std::false_type
 {};
 template <class T>
-struct has_class_id<T, std::void_t<decltype(T::class_id())>> : std::true_type
+struct has_class_id<T, std::void_t<decltype(T::static_class_id())>> : std::true_type
+{};
+
+/** @brief Check if class has a 'class_name' static member. */
+template <class T, class = void>
+struct has_class_name : std::false_type
+{};
+template <class T>
+struct has_class_name<T, std::void_t<decltype(T::class_name)>> : std::true_type
 {};
 
 /** @brief Check if class has 'class_uid' member. */

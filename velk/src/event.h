@@ -6,7 +6,7 @@
 #include <velk/interface/types.h>
 #include <velk/vector.h>
 
-namespace velk {
+namespace velk::impl {
 
 /**
  * @brief Default IEvent implementation with handler management.
@@ -15,13 +15,13 @@ namespace velk {
  * list: [0, deferred_begin_) for immediate handlers, [deferred_begin_, size())
  * for deferred handlers.
  */
-class EventImpl final : public ext::ObjectCore<EventImpl, IFunctionInternal>
+class Event final : public ext::ObjectCore<Event, IFunctionInternal>
 {
 public:
-    VELK_CLASS_UID(ClassId::Event);
+    VELK_CLASS_UID(ClassId::Event, "Event");
 
-    EventImpl() = default;
-    ~EventImpl();
+    Event() = default;
+    ~Event();
 
 public: // IFunction
     IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const override;
@@ -54,6 +54,6 @@ private:
     mutable uint32_t deferred_begin_{};
 };
 
-} // namespace velk
+} // namespace velk::impl
 
 #endif // EVENT_H

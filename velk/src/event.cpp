@@ -2,14 +2,14 @@
 
 #include <velk/api/velk.h>
 
-namespace velk {
+namespace velk::impl {
 
-EventImpl::~EventImpl()
+Event::~Event()
 {
     release_owned_context();
 }
 
-void EventImpl::release_owned_context()
+void Event::release_owned_context()
 {
     if (context_deleter_ && owned_context_) {
         context_deleter_(owned_context_);
@@ -18,12 +18,12 @@ void EventImpl::release_owned_context()
     context_deleter_ = nullptr;
 }
 
-IAny::Ptr EventImpl::callback_trampoline(void* ctx, FnArgs args)
+IAny::Ptr Event::callback_trampoline(void* ctx, FnArgs args)
 {
     return reinterpret_cast<IFunction::CallableFn*>(ctx)(args);
 }
 
-IAny::Ptr EventImpl::invoke(FnArgs args, InvokeType type) const
+IAny::Ptr Event::invoke(FnArgs args, InvokeType type) const
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (type == Deferred) {
@@ -42,17 +42,17 @@ IAny::Ptr EventImpl::invoke(FnArgs args, InvokeType type) const
     return result;
 }
 
-array_view<IFunction::ConstPtr> EventImpl::immediate_handlers() const
+array_view<IFunction::ConstPtr> Event::immediate_handlers() const
 {
     return {handlers_.data(), deferred_begin_};
 }
 
-array_view<IFunction::ConstPtr> EventImpl::deferred_handlers() const
+array_view<IFunction::ConstPtr> Event::deferred_handlers() const
 {
     return {handlers_.data() + deferred_begin_, handlers_.size() - deferred_begin_};
 }
 
-void EventImpl::invoke_handlers(FnArgs args) const
+void Event::invoke_handlers(FnArgs args) const
 {
     // Snapshot handlers: a handler may add/remove handlers on this event
     // during invocation, which would invalidate iterators into handlers_.
@@ -79,21 +79,21 @@ void EventImpl::invoke_handlers(FnArgs args) const
     instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
 }
 
-void EventImpl::set_invoke_callback(IFunction::CallableFn* fn)
+void Event::set_invoke_callback(IFunction::CallableFn* fn)
 {
     release_owned_context();
     target_context_ = reinterpret_cast<void*>(fn);
     target_fn_ = fn ? &callback_trampoline : nullptr;
 }
 
-void EventImpl::bind(void* context, IFunction::BoundFn* fn)
+void Event::bind(void* context, IFunction::BoundFn* fn)
 {
     release_owned_context();
     target_context_ = context;
     target_fn_ = fn;
 }
 
-void EventImpl::set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter)
+void Event::set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter)
 {
     release_owned_context();
     owned_context_ = context;
@@ -102,7 +102,7 @@ void EventImpl::set_owned_callback(void* context, IFunction::BoundFn* fn, IFunct
     target_fn_ = fn;
 }
 
-ReturnValue EventImpl::add_handler(const IFunction::ConstPtr& fn, InvokeType type) const
+ReturnValue Event::add_handler(const IFunction::ConstPtr& fn, InvokeType type) const
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (!fn) {
@@ -122,7 +122,7 @@ ReturnValue EventImpl::add_handler(const IFunction::ConstPtr& fn, InvokeType typ
     return ReturnValue::Success;
 }
 
-ReturnValue EventImpl::remove_handler(const IFunction::ConstPtr& fn) const
+ReturnValue Event::remove_handler(const IFunction::ConstPtr& fn) const
 {
     for (size_t i = 0; i < handlers_.size(); ++i) {
         if (handlers_[i] == fn) {
@@ -136,9 +136,9 @@ ReturnValue EventImpl::remove_handler(const IFunction::ConstPtr& fn) const
     return ReturnValue::NothingToDo;
 }
 
-bool EventImpl::has_handlers() const
+bool Event::has_handlers() const
 {
     return !handlers_.empty();
 }
 
-} // namespace velk
+} // namespace velk::impl

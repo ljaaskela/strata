@@ -397,7 +397,7 @@ void demo_direct_state()
     // --- State-backed property storage ---
     cout << "State-backed property storage:" << endl;
     {
-        auto widget2 = r.create<IObject>(MyWidget::class_id());
+        auto widget2 = r.create<IObject>(MyWidget::static_class_id());
         auto* iw = interface_cast<IMyWidget>(widget2);
         auto* ps = interface_cast<IPropertyState>(widget2);
         if (iw && ps) {
@@ -533,7 +533,7 @@ int main()
     demo_change_notifications();
     demo_static_metadata();
 
-    auto widget = r.create<IObject>(MyWidget::class_id());
+    auto widget = r.create<IObject>(MyWidget::static_class_id());
     demo_runtime_metadata(widget);
     demo_interfaces(widget);
     demo_uid();

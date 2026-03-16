@@ -7,15 +7,15 @@ namespace velk {
 ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
 {
     config.enableUpdate = true;
-    auto rv = register_type<AnimationTrackImpl>(velk);
+    auto rv = register_type<impl::AnimationTrack>(velk);
     if (failed(rv)) {
         return rv;
     }
-    rv = register_type<AnimatorImpl>(velk);
+    rv = register_type<impl::Animator>(velk);
     if (failed(rv)) {
         return rv;
     }
-    rv = register_type<TransitionImpl>(velk);
+    rv = register_type<impl::Transition>(velk);
     if (failed(rv)) {
         return rv;
     }

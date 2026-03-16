@@ -2,6 +2,7 @@
 #include <velk/ext/object.h>
 #include <velk/ext/plugin.h>
 #include <velk/interface/types.h>
+#include <velk/string.h>
 
 #include <gtest/gtest.h>
 
@@ -204,8 +205,47 @@ TEST_F(PluginTest, PluginTypesRegistered)
 
     reg.load_plugin(plugin_);
 
-    auto obj = velk_.create<IObject>(PluginWidget::class_id());
+    auto obj = velk_.create<IObject>(PluginWidget::static_class_id());
     ASSERT_TRUE(obj);
+}
+
+TEST_F(PluginTest, FindClassByNameUnscoped)
+{
+    auto& reg = velk_.plugin_registry();
+    reg.load_plugin(plugin_);
+
+    auto uid = velk_.type_registry().find_class_by_name(PluginWidget::static_class_name());
+    EXPECT_EQ(PluginWidget::static_class_id(), uid);
+}
+
+TEST_F(PluginTest, FindClassByNameScoped)
+{
+    auto& reg = velk_.plugin_registry();
+    reg.load_plugin(plugin_);
+
+    // "TestPlugin.<class_name>" should resolve via plugin name + class name
+    auto scoped = ::velk::string(tp_->get_name());
+    scoped += ::velk::string(".");
+    scoped += ::velk::string(PluginWidget::static_class_name());
+    auto uid = velk_.type_registry().find_class_by_name(scoped);
+    EXPECT_EQ(PluginWidget::static_class_id(), uid);
+}
+
+TEST_F(PluginTest, FindClassByNameScopedWrongPlugin)
+{
+    auto& reg = velk_.plugin_registry();
+    reg.load_plugin(plugin_);
+
+    auto scoped = ::velk::string("WrongPlugin.");
+    scoped += ::velk::string(PluginWidget::static_class_name());
+    auto uid = velk_.type_registry().find_class_by_name(string_view(scoped));
+    EXPECT_EQ(Uid{}, uid);
+}
+
+TEST_F(PluginTest, FindClassByNameNotFound)
+{
+    auto uid = velk_.type_registry().find_class_by_name("NonExistentClass");
+    EXPECT_EQ(Uid{}, uid);
 }
 
 TEST_F(PluginTest, UnloadPlugin)
@@ -225,11 +265,11 @@ TEST_F(PluginTest, UnloadAutoUnregistersTypes)
 
     reg.load_plugin(plugin_);
 
-    ASSERT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
+    ASSERT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::static_class_id()));
 
     reg.unload_plugin<TestPlugin>();
 
-    EXPECT_EQ(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
+    EXPECT_EQ(nullptr, velk_.type_registry().get_class_info(PluginWidget::static_class_id()));
 }
 
 TEST_F(PluginTest, DoubleLoadReturnsNothingToDo)
@@ -303,7 +343,7 @@ TEST_F(PluginTest, PluginInfoCollectsStaticMetadata)
 {
     // Accessible without an instance via the static function
     auto& info = TestPlugin::plugin_info();
-    EXPECT_EQ(TestPlugin::class_id(), info.uid());
+    EXPECT_EQ(TestPlugin::static_class_id(), info.uid());
     EXPECT_EQ(string_view("TestPlugin"), info.name);
     EXPECT_TRUE(info.dependencies.empty());
 
@@ -315,17 +355,17 @@ TEST_F(PluginTest, PluginInfoCollectsDependencies)
 {
     auto dp = ext::make_object<DependentPlugin, IPlugin>();
     auto& info = dp->get_plugin_info();
-    EXPECT_EQ(DependentPlugin::class_id(), info.uid());
+    EXPECT_EQ(DependentPlugin::static_class_id(), info.uid());
     ASSERT_EQ(1u, info.dependencies.size());
-    EXPECT_EQ(TestPlugin::class_id(), info.dependencies[0].uid);
+    EXPECT_EQ(TestPlugin::static_class_id(), info.dependencies[0].uid);
 }
 
 TEST_F(PluginTest, PluginInfoDefaultName)
 {
-    // FailingPlugin has no plugin_name, so name defaults to class_name()
+    // FailingPlugin has no plugin_name, so name defaults to static_class_name()
     auto fp = ext::make_object<FailingPlugin, IPlugin>();
     auto& info = fp->get_plugin_info();
-    EXPECT_EQ(FailingPlugin::class_name(), info.name);
+    EXPECT_EQ(FailingPlugin::static_class_name(), info.name);
 }
 
 TEST_F(PluginTest, PluginVersion)
@@ -406,12 +446,12 @@ TEST_F(PluginTest, RetainTypesOnUnload)
     auto rp = ext::make_object<RetainingPlugin, IPlugin>();
 
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin(rp));
-    ASSERT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
+    ASSERT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::static_class_id()));
 
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<RetainingPlugin>());
 
     // Types should still be registered because retainTypesOnUnload was set
-    EXPECT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
+    EXPECT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::static_class_id()));
 }
 
 TEST_F(PluginTest, UpdateNotifiesOptedInPlugins)

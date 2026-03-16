@@ -134,7 +134,7 @@ auto& r = instance();
 r.type_registry().register_type<MyWidget>();
 
 // Create an object
-auto obj = r.create<IObject>(MyWidget::class_id());
+auto obj = r.create<IObject>(MyWidget::static_class_id());
 
 // Cast to interface
 auto* iw = interface_cast<IMyWidget>(obj);
@@ -172,7 +172,7 @@ auto fn   = meta->get_function("reset");   // IFunction::ConstPtr
 ### Via velk::Object wrapper
 
 ```cpp
-::velk::Object obj(instance().create<IObject>(MyWidget::class_id()));
+::velk::Object obj(instance().create<IObject>(MyWidget::static_class_id()));
 
 auto prop = obj.get_property("width");
 auto evt  = obj.get_event("on_clicked");
@@ -613,7 +613,7 @@ protected:
 
 TEST_F(MyTest, CreateAndUse)
 {
-    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto obj = instance().create<IObject>(TestWidget::static_class_id());
     ASSERT_TRUE(obj);
 
     auto* iw = interface_cast<ITestWidget>(obj);
@@ -628,7 +628,7 @@ TEST_F(MyTest, CreateAndUse)
 
 TEST_F(MyTest, ObjectWrapper)
 {
-    ::velk::Object obj(instance().create<IObject>(TestWidget::class_id()));
+    ::velk::Object obj(instance().create<IObject>(TestWidget::static_class_id()));
     ASSERT_TRUE(obj);
 
     auto prop = obj.get_property("width");

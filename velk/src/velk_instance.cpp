@@ -9,8 +9,8 @@ namespace velk {
 
 static IRawHive::Ptr create_metadata_hive()
 {
-    auto obj = ext::make_object<RawHiveImpl>();
-    auto* hive = static_cast<RawHiveImpl*>(obj.get());
+    auto obj = ext::make_object<impl::RawHive>();
+    auto* hive = static_cast<impl::RawHive*>(obj.get());
     hive->init(type_uid<ObjectStorage>(), sizeof(ObjectStorage), alignof(ObjectStorage));
     return interface_pointer_cast<IRawHive>(obj);
 }

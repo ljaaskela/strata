@@ -3,14 +3,14 @@
 #include <velk/api/callback.h>
 #include <velk/api/velk.h>
 
-namespace velk {
+namespace velk::impl {
 
-bool FutureImpl::is_ready() const
+bool Future::is_ready() const
 {
     return ready_.load(std::memory_order_acquire);
 }
 
-void FutureImpl::wait() const
+void Future::wait() const
 {
     if (ready_.load(std::memory_order_acquire)) {
         return;
@@ -19,13 +19,13 @@ void FutureImpl::wait() const
     cv_.wait(lock, [this] { return ready_.load(std::memory_order_relaxed); });
 }
 
-const IAny* FutureImpl::get_result() const
+const IAny* Future::get_result() const
 {
     wait();
     return result_.get();
 }
 
-ReturnValue FutureImpl::set_result(const IAny* result)
+ReturnValue Future::set_result(const IAny* result)
 {
     vector<Continuation> continuations;
     {
@@ -45,7 +45,7 @@ ReturnValue FutureImpl::set_result(const IAny* result)
     return ReturnValue::Success;
 }
 
-void FutureImpl::add_continuation(const IFunction::ConstPtr& fn, InvokeType type)
+void Future::add_continuation(const IFunction::ConstPtr& fn, InvokeType type)
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (!fn) {
@@ -63,7 +63,7 @@ void FutureImpl::add_continuation(const IFunction::ConstPtr& fn, InvokeType type
     fire_continuation({fn, type}, result_.get());
 }
 
-void FutureImpl::fire_continuation(const Continuation& cont, const IAny* result) const
+void Future::fire_continuation(const Continuation& cont, const IAny* result) const
 {
     FnArgs args;
     if (result) {
@@ -80,7 +80,7 @@ void FutureImpl::fire_continuation(const Continuation& cont, const IAny* result)
     }
 }
 
-IFuture::Ptr FutureImpl::then(const IFunction::ConstPtr& fn, InvokeType type)
+IFuture::Ptr Future::then(const IFunction::ConstPtr& fn, InvokeType type)
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     auto chained = instance().create_future();
@@ -96,4 +96,4 @@ IFuture::Ptr FutureImpl::then(const IFunction::ConstPtr& fn, InvokeType type)
     return chained;
 }
 
-} // namespace velk
+} // namespace velk::impl

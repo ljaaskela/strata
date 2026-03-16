@@ -29,7 +29,7 @@ namespace velk::ext {
  * Use VELK_CLASS_UID to specify a stable plugin identifier.
  *
  * Static metadata is collected automatically from optional members on FinalClass:
- *  - `static constexpr string_view plugin_name` (defaults to class_name())
+ *  - `static constexpr string_view plugin_name` (defaults to static_class_name())
  *  - `static constexpr Uid plugin_deps[]` (defaults to none)
  *
  * Derived classes implement initialize and shutdown.
@@ -45,7 +45,7 @@ class Plugin : public Object<FinalClass, IPlugin, ExtraInterfaces...>
         if constexpr (detail::has_plugin_name<FinalClass>::value) {
             return FinalClass::plugin_name;
         } else {
-            return FinalClass::class_name();
+            return FinalClass::static_class_name();
         }
     }
 

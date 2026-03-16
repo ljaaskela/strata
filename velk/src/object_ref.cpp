@@ -2,7 +2,7 @@
 
 #include <velk/interface/intf_object_ref.h>
 
-namespace velk {
+namespace velk::impl {
 
 namespace {
 
@@ -15,18 +15,18 @@ Uid object_ptr_type()
 
 // IAny
 
-array_view<Uid> ObjectRefImpl::get_compatible_types() const
+array_view<Uid> ObjectRef::get_compatible_types() const
 {
     static const Uid types[] = {object_ptr_type()};
     return {types, 1};
 }
 
-size_t ObjectRefImpl::get_data_size(Uid type) const
+size_t ObjectRef::get_data_size(Uid type) const
 {
     return type == object_ptr_type() ? sizeof(IObject::Ptr) : 0;
 }
 
-ReturnValue ObjectRefImpl::get_data(void* to, size_t toSize, Uid type) const
+ReturnValue ObjectRef::get_data(void* to, size_t toSize, Uid type) const
 {
     if (!to || type != object_ptr_type() || toSize < sizeof(IObject::Ptr)) {
         return ReturnValue::Fail;
@@ -41,7 +41,7 @@ ReturnValue ObjectRefImpl::get_data(void* to, size_t toSize, Uid type) const
     return ReturnValue::Success;
 }
 
-ReturnValue ObjectRefImpl::set_data(const void* from, size_t fromSize, Uid type)
+ReturnValue ObjectRef::set_data(const void* from, size_t fromSize, Uid type)
 {
     if (!from || type != object_ptr_type() || fromSize < sizeof(IObject::Ptr)) {
         return ReturnValue::Fail;
@@ -50,7 +50,7 @@ ReturnValue ObjectRefImpl::set_data(const void* from, size_t fromSize, Uid type)
     return set_object(obj);
 }
 
-ReturnValue ObjectRefImpl::copy_from(const IAny& other)
+ReturnValue ObjectRef::copy_from(const IAny& other)
 {
     // If the other is also an ObjectRef, copy the object pointer directly
     if (auto* ref = interface_cast<const IObjectRef>(&other)) {
@@ -75,10 +75,10 @@ ReturnValue ObjectRefImpl::copy_from(const IAny& other)
     return ReturnValue::Fail;
 }
 
-IAny::Ptr ObjectRefImpl::clone() const
+IAny::Ptr ObjectRef::clone() const
 {
-    auto obj = ext::make_object<ObjectRefImpl>();
-    auto* impl = static_cast<ObjectRefImpl*>(obj.get());
+    auto obj = ext::make_object<ObjectRef>();
+    auto* impl = static_cast<ObjectRef*>(obj.get());
     impl->constraint_ = constraint_;
     impl->owning_ = owning_;
     impl->strong_ = strong_;
@@ -88,7 +88,7 @@ IAny::Ptr ObjectRefImpl::clone() const
 
 // IObjectRef
 
-IObject::Ptr ObjectRefImpl::get_object() const
+IObject::Ptr ObjectRef::get_object() const
 {
     if (owning_) {
         return strong_;
@@ -96,7 +96,7 @@ IObject::Ptr ObjectRefImpl::get_object() const
     return weak_.lock();
 }
 
-ReturnValue ObjectRefImpl::set_object(const IObject::Ptr& obj)
+ReturnValue ObjectRef::set_object(const IObject::Ptr& obj)
 {
     if (obj) {
         // Validate constraint
@@ -128,12 +128,12 @@ ReturnValue ObjectRefImpl::set_object(const IObject::Ptr& obj)
     return ReturnValue::Success;
 }
 
-bool ObjectRefImpl::is_owning() const
+bool ObjectRef::is_owning() const
 {
     return owning_;
 }
 
-ReturnValue ObjectRefImpl::set_owning(bool owning)
+ReturnValue ObjectRef::set_owning(bool owning)
 {
     if (owning_ == owning) {
         return ReturnValue::NothingToDo;
@@ -153,15 +153,15 @@ ReturnValue ObjectRefImpl::set_owning(bool owning)
     return ReturnValue::Success;
 }
 
-Uid ObjectRefImpl::constraint_uid() const
+Uid ObjectRef::constraint_uid() const
 {
     return constraint_;
 }
 
-ReturnValue ObjectRefImpl::set_constraint(Uid uid)
+ReturnValue ObjectRef::set_constraint(Uid uid)
 {
     constraint_ = uid;
     return ReturnValue::Success;
 }
 
-} // namespace velk
+} // namespace velk::impl

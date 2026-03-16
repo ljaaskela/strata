@@ -89,7 +89,7 @@ public:
  *
  * Used by ObjectCore and AnyBase where no compile-time metadata array is needed.
  *
- * @tparam FinalClass The concrete class whose class_id()/class_name() are used.
+ * @tparam FinalClass The concrete class whose static_class_id()/static_class_name() are used.
  */
 template <class FinalClass>
 class DefaultFactory : public ObjectFactory<FinalClass>
@@ -97,17 +97,27 @@ class DefaultFactory : public ObjectFactory<FinalClass>
     const ClassInfo& get_class_info() const override
     {
         static constexpr ClassInfo info{
-            FinalClass::class_id(), FinalClass::class_name(), FinalClass::class_interfaces};
+            FinalClass::static_class_id(), FinalClass::static_class_name(), FinalClass::class_interfaces};
         return info;
     }
 };
 
-/** @brief Declares a static constexpr class UID from a UUID string literal. */
-#define VELK_CLASS_UID(str)                \
-    static constexpr ::velk::Uid class_uid \
-    {                                      \
-        str                                \
+/** @brief Declares a static constexpr class UID, with an optional friendly name. */
+#define VELK_CLASS_UID_1(uid_)              \
+    static constexpr ::velk::Uid class_uid  \
+    {                                       \
+        uid_                                \
     }
+
+#define VELK_CLASS_UID_2(uid_, name_)       \
+    static constexpr ::velk::Uid class_uid  \
+    {                                       \
+        uid_                                \
+    };                                      \
+    static constexpr ::velk::string_view class_name { name_ }
+
+#define VELK_CLASS_UID_SELECT(_1, _2, MACRO, ...) MACRO
+#define VELK_CLASS_UID(...) VELK_CLASS_UID_SELECT(__VA_ARGS__, VELK_CLASS_UID_2, VELK_CLASS_UID_1)(__VA_ARGS__)
 
 // IObject detection: walks ParentInterface chains to check if IObject is already reachable.
 
@@ -143,11 +153,18 @@ public:
     ~ObjectCore() override = default;
 
 public:
-    /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr string_view class_name() noexcept { return ::velk::get_name<FinalClass>(); }
+    /** @brief Returns the compile-time class name of FinalClass, preferring a user-specified class_name. */
+    static constexpr string_view static_class_name() noexcept
+    {
+        if constexpr (detail::has_class_name<FinalClass>::value) {
+            return FinalClass::class_name;
+        } else {
+            return ::velk::get_name<FinalClass>();
+        }
+    }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid.
      */
-    static constexpr Uid class_id() noexcept
+    static constexpr Uid static_class_id() noexcept
     {
         if constexpr (detail::has_class_uid<FinalClass>::value) {
             return FinalClass::class_uid;
@@ -157,9 +174,9 @@ public:
     }
 
 public: // IObject
-    Uid get_class_uid() const override { return class_id(); }
+    Uid get_class_uid() const override { return static_class_id(); }
 
-    string_view get_class_name() const override { return class_name(); }
+    string_view get_class_name() const override { return static_class_name(); }
 
     /** @brief Returns a shared_ptr to this object, or empty if expired. */
     IObject::Ptr get_self() const override { return detail::make_self_ptr(this->get_block()); }

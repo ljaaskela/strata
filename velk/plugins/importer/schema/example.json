@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "id": "panel_a1",
+      "name": "Main Panel",
+      "class": "velk-ui.Panel",
+      "properties": {
+        "width": 800,
+        "height": 600,
+        "title": "My Application"
+      }
+    },
+    {
+      "id": "btn_b2",
+      "name": "OK",
+      "class": "velk-ui.Button",
+      "properties": {
+        "label": "OK",
+        "width": { "value": 120, "flags": 0 }
+      }
+    },
+    {
+      "id": "btn_c3",
+      "name": "Cancel",
+      "class": "velk-ui.Button",
+      "properties": {
+        "label": "Cancel",
+        "width": 120
+      }
+    },
+    {
+      "id": "label_d4",
+      "name": "Status",
+      "class": "velk-ui.Label",
+      "properties": {
+        "text": { "ref": "panel_a1.title" }
+      }
+    }
+  ],
+  "hierarchies": {
+    "main": {
+      "panel_a1": ["btn_b2", "btn_c3", "label_d4"]
+    }
+  },
+  "bindings": [
+    {
+      "source": "panel_a1.width",
+      "targets": ["btn_b2.width"]
+    }
+  ],
+  "transitions": [
+    {
+      "targets": ["btn_b2.width", "btn_b2.height"],
+      "duration": 300000,
+      "easing": "ease_out"
+    }
+  ]
+}

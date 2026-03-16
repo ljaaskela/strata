@@ -8,7 +8,7 @@ namespace velk {
 
 /**
  * @brief Creates an ObjectHive from a hive store.
- * @tparam T The object class to store (must have class_id()).
+ * @tparam T The object class to store (must have static_class_id()).
  * @tparam I The implicit interface type for hive objects.
  */
 template <class T, class I = IObject>
@@ -29,7 +29,7 @@ auto create_hive(IHiveStore& store, Uid classUid)
 
 /**
  * @brief Creates a RawHive from a hive store.
- * @tparam T The element type to store (must not have class_id()).
+ * @tparam T The element type to store (must not have static_class_id()).
  */
 template <class T>
 auto create_raw_hive(IHiveStore& store)

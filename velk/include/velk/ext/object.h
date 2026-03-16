@@ -217,8 +217,8 @@ private:
     {
         const ClassInfo& get_class_info() const override
         {
-            static constexpr ClassInfo info{FinalClass::class_id(),
-                                            FinalClass::class_name(),
+            static constexpr ClassInfo info{FinalClass::static_class_id(),
+                                            FinalClass::static_class_name(),
                                             FinalClass::class_interfaces,
                                             FinalClass::class_metadata};
             return info;

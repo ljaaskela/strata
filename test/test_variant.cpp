@@ -194,14 +194,14 @@ public:
 class VariantPropTestImpl : public ::velk::ext::Object<VariantPropTestImpl, IVariantPropTest>
 {
 public:
-    VELK_CLASS_UID("d1e2f3a4-b5c6-7890-abcd-ef1234560001");
+    VELK_CLASS_UID("d1e2f3a4-b5c6-7890-abcd-ef1234560001", "VariantTestImpl");
 };
 
 TEST(VariantProperty, SetAndGetFloat)
 {
     ::velk::register_type<VariantPropTestImpl>(::velk::instance());
 
-    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
     ASSERT_TRUE(obj);
 
     auto* intf = velk::interface_cast<IVariantPropTest>(obj);
@@ -222,7 +222,7 @@ TEST(VariantProperty, SetAndGetFloat)
 
 TEST(VariantProperty, SetFloatThenString)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
     auto* intf = velk::interface_cast<IVariantPropTest>(obj);
     ASSERT_TRUE(intf);
 
@@ -243,7 +243,7 @@ TEST(VariantProperty, SetFloatThenString)
 
 TEST(VariantProperty, OnChangedFires)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
     auto* intf = velk::interface_cast<IVariantPropTest>(obj);
     ASSERT_TRUE(intf);
 
@@ -274,7 +274,7 @@ TEST(VariantProperty, OnChangedFires)
 
 TEST(VariantProperty, StateStructAccess)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::class_id());
+    auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
     auto* meta = velk::interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 

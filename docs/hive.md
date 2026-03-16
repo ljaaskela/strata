@@ -102,7 +102,7 @@ auto& velk = instance();
 auto store = velk.create<IHiveStore>(ClassId::HiveStore);
 
 // Typed hive: add/remove/for_each work with IMyWidget directly
-ObjectHive<IMyWidget> hive(*store, MyWidget::class_id());
+ObjectHive<IMyWidget> hive(*store, MyWidget::static_class_id());
 IMyWidget::Ptr w = hive.add();
 w->width().set_value(200.f);
 ```
@@ -129,12 +129,12 @@ The hive store manages hives, one per class UID. Create one via `ClassId::HiveSt
 auto store = instance().create<IHiveStore>(ClassId::HiveStore);
 
 // get_hive: returns the hive for the class, creating it if needed
-auto hive = store->get_hive(MyWidget::class_id());
+auto hive = store->get_hive(MyWidget::static_class_id());
 
 // find_hive: returns the hive if it exists, nullptr otherwise
-auto hive = store->find_hive(MyWidget::class_id());
+auto hive = store->find_hive(MyWidget::static_class_id());
 
-// Templated versions (use T::class_id() internally)
+// Templated versions (use T::static_class_id() internally)
 auto hive = store->get_hive<MyWidget>();
 auto hive = store->find_hive<MyWidget>();
 ```
@@ -158,12 +158,12 @@ Multiple hive stores can coexist independently. Each store maintains its own set
 
 ```cpp
 // Typed: add() returns IMyWidget::Ptr
-ObjectHive<IMyWidget> hive(*store, MyWidget::class_id());
+ObjectHive<IMyWidget> hive(*store, MyWidget::static_class_id());
 IMyWidget::Ptr w = hive.add();
 w->width().set_value(200.f);
 
 // Untyped: add() returns IObject::Ptr
-ObjectHive<> hive(*store, MyWidget::class_id());
+ObjectHive<> hive(*store, MyWidget::static_class_id());
 IObject::Ptr obj = hive.add();
 auto w = interface_pointer_cast<IMyWidget>(obj);
 ```
@@ -186,14 +186,14 @@ After removal, the object's slot becomes available for reuse. If external refere
 
 ```cpp
 // Typed hive: visitor receives IMyWidget&
-ObjectHive<IMyWidget> hive(*store, MyWidget::class_id());
+ObjectHive<IMyWidget> hive(*store, MyWidget::static_class_id());
 hive.for_each([&](IMyWidget& w) {
     sum += w.width().get_value();
     return true;  // return false to stop early
 });
 
 // Untyped hive: visitor receives IObject&
-ObjectHive<> hive(*store, MyWidget::class_id());
+ObjectHive<> hive(*store, MyWidget::static_class_id());
 hive.for_each([&](IObject& obj) {
     auto* w = interface_cast<IMyWidget>(&obj);
     // ...
@@ -386,7 +386,7 @@ Multiple threads can safely call any combination of these operations concurrentl
 If a `for_each` visitor attempts to call `add()` or `remove()` on the same hive, the exclusive lock request will deadlock against the shared lock already held by `for_each`. This is intentional: it turns what would otherwise be silent undefined behavior into an immediate, diagnosable hang.
 
 ```cpp
-ObjectHive<IMyWidget> hive(*store, MyWidget::class_id());
+ObjectHive<IMyWidget> hive(*store, MyWidget::static_class_id());
 
 // Safe: two threads adding concurrently
 // Thread A                    // Thread B

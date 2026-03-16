@@ -32,13 +32,13 @@ public:
     template <class T>
     ReturnValue unload_plugin()
     {
-        return unload_plugin(T::class_id());
+        return unload_plugin(T::static_class_id());
     }
     /** @brief Finds a loaded plugin by its class type, or nullptr if not loaded. */
     template <class T>
     IPlugin::Ptr find_plugin() const
     {
-        return find_plugin(T::class_id());
+        return find_plugin(T::static_class_id());
     }
     /**
      * @brief Returns a plugin instance with given plugin id.
