@@ -1,10 +1,11 @@
 #ifndef VELK_IMPORTER_JSON_PARSER_H
 #define VELK_IMPORTER_JSON_PARSER_H
 
+#include <velk/string.h>
+#include <velk/vector.h>
+
 #include <cstddef>
-#include <string>
 #include <utility>
-#include <vector>
 
 namespace velk {
 
@@ -30,21 +31,21 @@ public:
         j.number_ = v;
         return j;
     }
-    static JsonValue string(std::string v)
+    static JsonValue string(::velk::string v)
     {
         JsonValue j;
         j.type_ = JsonType::String;
         j.string_ = std::move(v);
         return j;
     }
-    static JsonValue array(std::vector<JsonValue> v)
+    static JsonValue array(::velk::vector<JsonValue> v)
     {
         JsonValue j;
         j.type_ = JsonType::Array;
         j.array_ = std::move(v);
         return j;
     }
-    static JsonValue object(std::vector<std::pair<std::string, JsonValue>> v)
+    static JsonValue object(::velk::vector<std::pair<::velk::string, JsonValue>> v)
     {
         JsonValue j;
         j.type_ = JsonType::Object;
@@ -54,26 +55,26 @@ public:
 
     JsonType type() const { return type_; }
 
-    const std::string& as_string() const { return string_; }
+    const ::velk::string& as_string() const { return string_; }
     double as_number() const { return number_; }
     bool as_bool() const { return bool_; }
-    const std::vector<JsonValue>& as_array() const { return array_; }
-    const std::vector<std::pair<std::string, JsonValue>>& as_object() const { return object_; }
+    const ::velk::vector<JsonValue>& as_array() const { return array_; }
+    const ::velk::vector<std::pair<::velk::string, JsonValue>>& as_object() const { return object_; }
 
-    const JsonValue* find(const std::string& key) const
+    const JsonValue* find(string_view key) const
     {
         if (type_ != JsonType::Object) {
             return nullptr;
         }
         for (auto& pair : object_) {
-            if (pair.first == key) {
+            if (string_view(pair.first) == key) {
                 return &pair.second;
             }
         }
         return nullptr;
     }
 
-    const JsonValue& operator[](const std::string& key) const
+    const JsonValue& operator[](string_view key) const
     {
         auto* v = find(key);
         if (!v) {
@@ -96,9 +97,9 @@ private:
     JsonType type_;
     double number_;
     bool bool_;
-    std::string string_;
-    std::vector<JsonValue> array_;
-    std::vector<std::pair<std::string, JsonValue>> object_;
+    ::velk::string string_;
+    ::velk::vector<JsonValue> array_;
+    ::velk::vector<std::pair<::velk::string, JsonValue>> object_;
 };
 
 /** @brief Parses a JSON string into a JsonValue tree.
@@ -108,7 +109,7 @@ private:
  *  @param error  Receives a human-readable error message on failure.
  *  @return true on success, false on parse error.
  */
-bool json_parse(const char* input, size_t length, JsonValue& out, std::string& error);
+bool json_parse(const char* input, size_t length, JsonValue& out, ::velk::string& error);
 
 } // namespace velk
 

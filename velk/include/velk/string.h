@@ -360,12 +360,16 @@ public:
      * @return Position of the match, or npos if not found.
      */
     size_t find(string_view sv, size_t pos = 0) const { return view().find(sv, pos); }
+    /** @brief Searches for the first occurrence of character @p ch starting at @p pos. */
+    size_t find(char ch, size_t pos = 0) const { return view().find(ch, pos); }
 
     /**
      * @brief Searches for the last occurrence of @p sv at or before @p pos.
      * @return Position of the match, or npos if not found.
      */
     size_t rfind(string_view sv, size_t pos = npos) const { return view().rfind(sv, pos); }
+    /** @brief Searches for the last occurrence of character @p ch at or before @p pos. */
+    size_t rfind(char ch, size_t pos = npos) const { return view().rfind(ch, pos); }
 
     /** @brief Implicit conversion to a read-only string_view. */
     operator string_view() const { return view(); }
@@ -397,6 +401,28 @@ public:
     }
 
     /** @brief Concatenation of two strings. */
+    friend string operator+(const string& lhs, const string& rhs)
+    {
+        string result;
+        result.reserve(lhs.size() + rhs.size());
+        result.append(lhs.view());
+        result.append(rhs.view());
+        return result;
+    }
+
+    /** @brief Concatenation of a string and a C string. */
+    friend string operator+(const string& lhs, const char* rhs)
+    {
+        return lhs + string_view(rhs, std::strlen(rhs));
+    }
+
+    /** @brief Concatenation of a C string and a string. */
+    friend string operator+(const char* lhs, const string& rhs)
+    {
+        return string_view(lhs, std::strlen(lhs)) + rhs;
+    }
+
+    /** @brief Concatenation of a string and a string_view. */
     friend string operator+(const string& lhs, string_view rhs)
     {
         string result;

@@ -88,6 +88,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | [Advanced](docs/advanced.md) | Any types and value chains, writing metadata by hand, shared_ptr internals |
 | [C API](docs/c_api.md) | Flat C API for FFI: handles, ref counting, property access, events |
 | **Built-in plugins** | |
+| [Importer](docs/plugins/importer.md) | JSON scene import with extensible collections |
 | [Animator](docs/plugins/animator.md) | Implicit animations and transitions for properties |
 
 ## Project structure
@@ -106,6 +107,7 @@ velk/
     plugins.md            Plugin system: writing, loading, dependencies, bundles
     advanced.md           Any types, value chains, manual metadata, shared_ptr internals
     plugins/
+      importer.md         Importer plugin: JSON import, extensions, format reference
       animator.md         Animator plugin: transitions, easing, interpolators
   velk/
     include/              Public API (consumers depend only on these headers)
@@ -130,6 +132,7 @@ cmake --build build --config Release
 Output: 
 * `build/bin/Release/velk.dll` (shared library)
 * `build/bin/Release/velk_c.dll` (C API shared library)
+* `build/bin/Release/velk_importer.dll` (shared library)
 * `build/bin/Release/velk_animator.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)

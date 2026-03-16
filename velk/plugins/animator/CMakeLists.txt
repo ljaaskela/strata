@@ -5,6 +5,8 @@ add_library(velk_animator SHARED
     src/animator.cpp
     src/transition.h
     src/transition.cpp
+    src/animator_import_handler.h
+    src/animator_import_handler.cpp
     src/animator_plugin.h
     src/animator_plugin.cpp
     include/velk/plugins/animator/interface/intf_transition.h

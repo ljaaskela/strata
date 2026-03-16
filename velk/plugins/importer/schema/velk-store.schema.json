@@ -43,10 +43,11 @@
       ]
     },
 
-    "reference": {
+    "object_reference": {
       "type": "object",
+      "description": "Object reference for ObjectRef properties. Only valid on properties of type ObjectRef.",
       "properties": {
-        "ref": { "type": "string", "description": "Path to the referenced object/property (e.g. 'panel_a1' or 'panel_a1.width')." },
+        "ref": { "type": "string", "description": "Path to the referenced object (e.g. 'panel_a1' or '/scene/root/child')." },
         "type": {
           "type": "string",
           "enum": ["strong", "weak"],
@@ -56,11 +57,21 @@
       "required": ["ref"]
     },
 
+    "inline_binding": {
+      "type": "object",
+      "description": "Inline one-way binding from a source property.",
+      "properties": {
+        "bind": { "type": "string", "description": "Source property path (e.g. 'widget_1.width')." }
+      },
+      "required": ["bind"]
+    },
+
     "property_value": {
-      "description": "Property value: either a bare value (shorthand) or an object with value and optional flags.",
+      "description": "Property value: bare value (shorthand), object ref, inline binding, or object form with value and optional flags.",
       "oneOf": [
         { "$ref": "#/$defs/value" },
-        { "$ref": "#/$defs/reference" },
+        { "$ref": "#/$defs/object_reference" },
+        { "$ref": "#/$defs/inline_binding" },
         {
           "type": "object",
           "properties": {

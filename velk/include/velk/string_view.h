@@ -57,6 +57,32 @@ public:
         return {data_ + pos, count};
     }
 
+    /** @brief Searches for the first occurrence of character @p ch starting at @p pos. */
+    constexpr size_t find(char ch, size_t pos = 0) const
+    {
+        for (size_t i = pos; i < size_; ++i) {
+            if (data_[i] == ch) {
+                return i;
+            }
+        }
+        return npos;
+    }
+
+    /** @brief Searches for the last occurrence of character @p ch at or before @p pos. */
+    constexpr size_t rfind(char ch, size_t pos = npos) const
+    {
+        if (size_ == 0) {
+            return npos;
+        }
+        size_t last = pos < size_ ? pos : size_ - 1;
+        for (size_t i = last + 1; i > 0; --i) {
+            if (data_[i - 1] == ch) {
+                return i - 1;
+            }
+        }
+        return npos;
+    }
+
     /**
      * @brief Searches for the first occurrence of @p sv starting at @p pos.
      * @return Position of the match, or npos if not found.
