@@ -30,6 +30,11 @@ void add_error(ImportResult& result, const ::velk::string& msg)
     result.errors.push_back(msg);
 }
 
+std::string to_std_string(string_view sv)
+{
+    return std::string(sv.data(), sv.size());
+}
+
 const MemberDesc* find_property_desc(const ClassInfo& info, string_view name)
 {
     for (size_t i = 0; i < info.members.size(); i++) {
@@ -258,11 +263,11 @@ void JsonImporter::register_imported_object(ImportContext& ctx, IObject::Ptr obj
     auto* id_val = obj_node.find("id");
     const auto& id_str = id_val->as_string();
 
-    ctx.name_to_object[std::string(id_str.c_str(), id_str.size())] = obj;
+    ctx.name_to_object[to_std_string(id_str)] = obj;
     auto* name_val = obj_node.find("name");
     if (name_val && name_val->type() == JsonType::String) {
         const auto& nm = name_val->as_string();
-        ctx.name_to_object[std::string(nm.c_str(), nm.size())] = obj;
+        ctx.name_to_object[to_std_string(nm)] = obj;
         ctx.object_to_name[obj.get()] = nm;
     } else {
         ctx.object_to_name[obj.get()] = id_str;
@@ -309,14 +314,14 @@ void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json,
         for (auto& child_val : children_val.as_array()) {
             if (child_val.type() == JsonType::String) {
                 const auto& cs = child_val.as_string();
-                all_children.insert(std::string(cs.c_str(), cs.size()));
+                all_children.insert(to_std_string(cs));
             }
         }
     }
 
     string root_id;
     for (auto& [parent_id, children_val] : tree_json.as_object()) {
-        std::string pid(parent_id.c_str(), parent_id.size());
+        auto pid = to_std_string(parent_id);
         if (all_children.find(pid) == all_children.end()) {
             root_id = parent_id;
             break;
@@ -382,7 +387,7 @@ IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ct
     }
 
     // Direct name: try name map first (includes both ids and names), then store lookup
-    auto it = ctx.name_to_object.find(std::string(path.data(), path.size()));
+    auto it = ctx.name_to_object.find(to_std_string(path));
     if (it != ctx.name_to_object.end()) {
         return it->second;
     }

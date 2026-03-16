@@ -19,6 +19,12 @@ namespace velk {
 
 namespace {
 
+::velk::string make_animation_key(size_t index)
+{
+    auto idx = std::to_string(index);
+    return ::velk::string("animation:") + string_view(idx.c_str(), idx.size());
+}
+
 easing::EasingFn resolve_easing(string_view name)
 {
     if (name == "linear") return easing::linear;
@@ -138,8 +144,7 @@ void process_transition(const IImportData& entry, IStore& store, const IImportRe
         }
     }
 
-    auto idx = std::to_string(index);
-    ::velk::string store_key = ::velk::string("animation:") + string_view(idx.c_str(), idx.size());
+    auto store_key = make_animation_key(index);
     store.add(store_key, interface_pointer_cast<IObject>(tr));
 }
 
@@ -236,8 +241,7 @@ void process_track(const IImportData& entry, IStore& store, const IImportResolve
         track->play();
     }
 
-    auto idx = std::to_string(index);
-    ::velk::string store_key = ::velk::string("animation:") + string_view(idx.c_str(), idx.size());
+    auto store_key = make_animation_key(index);
     store.add(store_key, interface_pointer_cast<IObject>(track));
 }
 

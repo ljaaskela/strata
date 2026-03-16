@@ -326,7 +326,7 @@ public:
     }
 
     /** @brief Appends @p value by move (non-trivial types only). */
-    template <bool NT = !is_trivial(), std::enable_if_t<NT, int> = 0>
+    template <class U = T, std::enable_if_t<!std::is_trivially_copyable_v<U>, int> = 0>
     void push_back(T&& value)
     {
         ensure_capacity(size_ + 1);
@@ -389,7 +389,7 @@ public:
     }
 
     /** @brief Inserts @p value by move before the element at @p pos (non-trivial types only). */
-    template <bool NT = !is_trivial(), std::enable_if_t<NT, int> = 0>
+    template <class U = T, std::enable_if_t<!std::is_trivially_copyable_v<U>, int> = 0>
     T* insert(const T* pos, T&& value)
     {
         size_t idx = static_cast<size_t>(pos - typed_data());
