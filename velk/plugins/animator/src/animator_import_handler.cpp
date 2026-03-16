@@ -11,8 +11,9 @@
 #include <velk/plugins/animator/interface/intf_transition.h>
 #include <velk/plugins/animator/plugin.h>
 
+#include <velk/string.h>
+
 #include <string>
-#include <vector>
 
 namespace velk {
 
@@ -137,9 +138,9 @@ void process_transition(const IImportData& entry, IStore& store, const IImportRe
         }
     }
 
-    auto store_key = "animation:" + std::to_string(index);
-    store.add(string_view(store_key.c_str(), store_key.size()),
-              interface_pointer_cast<IObject>(tr));
+    auto idx = std::to_string(index);
+    ::velk::string store_key = ::velk::string("animation:") + string_view(idx.c_str(), idx.size());
+    store.add(store_key, interface_pointer_cast<IObject>(tr));
 }
 
 void process_track(const IImportData& entry, IStore& store, const IImportResolver& resolver,
@@ -235,9 +236,9 @@ void process_track(const IImportData& entry, IStore& store, const IImportResolve
         track->play();
     }
 
-    auto store_key = "animation:" + std::to_string(index);
-    store.add(string_view(store_key.c_str(), store_key.size()),
-              interface_pointer_cast<IObject>(track));
+    auto idx = std::to_string(index);
+    ::velk::string store_key = ::velk::string("animation:") + string_view(idx.c_str(), idx.size());
+    store.add(store_key, interface_pointer_cast<IObject>(track));
 }
 
 } // namespace

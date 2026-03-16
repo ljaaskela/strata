@@ -10,7 +10,8 @@
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
 
-#include <string>
+#include <velk/string.h>
+
 #include <unordered_map>
 
 namespace velk {
@@ -28,11 +29,11 @@ private:
     struct ImportContext
     {
         std::unordered_map<std::string, IObject::Ptr> name_to_object;
-        std::unordered_map<IObject*, std::string> object_to_name;
+        std::unordered_map<IObject*, string> object_to_name;
         std::unordered_map<IObject*, const ClassInfo*> object_to_class_info;
     };
 
-    Uid resolve_class(const std::string& class_str, ImportResult& result) const;
+    Uid resolve_class(string_view class_str, ImportResult& result) const;
     IObject::Ptr create_object(const JsonValue& obj_node, ImportResult& result) const;
     void set_properties(IObject& obj, const JsonValue& props, const ClassInfo& info,
                         ImportResult& result) const;
@@ -40,24 +41,24 @@ private:
     void register_imported_object(ImportContext& ctx, IObject::Ptr obj, const JsonValue& obj_node,
                                   ImportResult& result) const;
     void build_hierarchies(const JsonValue& hierarchies, IStore& store, ImportResult& result) const;
-    void build_hierarchy(const std::string& name, const JsonValue& tree_json, IStore& store,
+    void build_hierarchy(string_view name, const JsonValue& tree_json, IStore& store,
                          ImportResult& result) const;
     void resolve_references(IStore& store, const JsonValue& objects, const ImportContext& ctx,
                             ImportResult& result) const;
-    void resolve_object_ref(IMetadata& meta, const std::string& name, const JsonValue& ref_node,
+    void resolve_object_ref(IMetadata& meta, string_view name, const JsonValue& ref_node,
                             IStore& store, const ImportContext& ctx, ImportResult& result) const;
-    void resolve_inline_binding(IMetadata& meta, const std::string& name, const std::string& ref_path,
+    void resolve_inline_binding(IMetadata& meta, string_view name, string_view ref_path,
                                 IStore& store, const ImportContext& ctx, ImportResult& result) const;
     void create_bindings(IStore& store, const JsonValue& root, const ImportContext& ctx,
                          ImportResult& result) const;
     void parse_binding(const JsonValue& binding_node, IStore& store, const ImportContext& ctx,
                        ImportResult& result) const;
     IObject::Ptr resolve_object(IStore& store, const ImportContext& ctx,
-                                const std::string& path) const;
+                                string_view path) const;
     IObject::Ptr resolve_object_by_path(IStore& store, const ImportContext& ctx,
-                                        const std::string& path) const;
+                                        string_view path) const;
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
-                                    const std::string& path) const;
+                                    string_view path) const;
     void dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const;
 };
 

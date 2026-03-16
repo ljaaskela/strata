@@ -1,6 +1,7 @@
 #include "json_parser.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 namespace velk {
@@ -12,7 +13,7 @@ class Parser
 public:
     Parser(const char* data, size_t length) : data_(data), end_(data + length), pos_(data) {}
 
-    bool parse(JsonValue& out, std::string& err)
+    bool parse(JsonValue& out, velk::string& err)
     {
         skip_whitespace();
         out = parse_value();
@@ -34,14 +35,16 @@ private:
     const char* end_;
     const char* pos_;
     bool failed_ = false;
-    std::string error_;
+    velk::string error_;
 
     void set_error(const char* msg)
     {
         if (failed_) return;
         failed_ = true;
         size_t offset = static_cast<size_t>(pos_ - data_);
-        error_ = "JSON parse error at offset " + std::to_string(offset) + ": " + msg;
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%zu", offset);
+        error_ = velk::string("JSON parse error at offset ") + buf + ": " + msg;
     }
 
     char peek()
@@ -69,10 +72,9 @@ private:
         if (failed_) return false;
         if (got != c) {
             pos_--;
-            std::string msg = "expected '";
-            msg += c;
-            msg += "'";
-            set_error(msg.c_str());
+            char msg[] = "expected 'X'";
+            msg[10] = c;
+            set_error(msg);
             return false;
         }
         return true;
@@ -180,7 +182,7 @@ private:
             }
         }
         // Manual strtod without exceptions
-        std::string numStr(start, pos_);
+        velk::string numStr(start, static_cast<size_t>(pos_ - start));
         char* end_ptr = nullptr;
         double value = std::strtod(numStr.c_str(), &end_ptr);
         if (end_ptr == numStr.c_str()) {
@@ -190,11 +192,11 @@ private:
         return JsonValue::number(value);
     }
 
-    std::string parse_string()
+    velk::string parse_string()
     {
         if (failed_) return {};
         if (!expect('"')) return {};
-        std::string result;
+        velk::string result;
         while (true) {
             if (failed_) return {};
             if (pos_ >= end_) {
@@ -295,7 +297,7 @@ private:
         return value;
     }
 
-    static void encode_utf8(std::string& out, uint32_t cp)
+    static void encode_utf8(velk::string& out, uint32_t cp)
     {
         if (cp < 0x80) {
             out += static_cast<char>(cp);
@@ -319,7 +321,7 @@ private:
         if (failed_) return {};
         if (!expect('{')) return {};
         skip_whitespace();
-        std::vector<std::pair<std::string, JsonValue>> members;
+        velk::vector<std::pair<velk::string, JsonValue>> members;
         if (!failed_ && peek() == '}') {
             pos_++;
             return JsonValue::object(std::move(members));
@@ -328,7 +330,7 @@ private:
         while (true) {
             if (failed_) return {};
             skip_whitespace();
-            std::string key = parse_string();
+            auto key = parse_string();
             if (failed_) return {};
             skip_whitespace();
             if (!expect(':')) return {};
@@ -356,7 +358,7 @@ private:
         if (failed_) return {};
         if (!expect('[')) return {};
         skip_whitespace();
-        std::vector<JsonValue> elements;
+        vector<JsonValue> elements;
         if (!failed_ && peek() == ']') {
             pos_++;
             return JsonValue::array(std::move(elements));
@@ -385,7 +387,7 @@ private:
 
 } // namespace
 
-bool json_parse(const char* input, size_t length, JsonValue& out, std::string& error)
+bool json_parse(const char* input, size_t length, JsonValue& out, string& error)
 {
     if (!input || length == 0) {
         error = "JSON parse error: empty input";

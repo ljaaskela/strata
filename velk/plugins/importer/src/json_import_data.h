@@ -63,8 +63,7 @@ public:
 
     string_view as_string() const override
     {
-        auto& s = value_.as_string();
-        return string_view(s.c_str(), s.size());
+        return value_.as_string();
     }
 
     size_t count() const override
@@ -101,7 +100,7 @@ public:
         }
         auto& obj = value_.as_object();
         for (size_t i = 0; i < obj.size(); i++) {
-            if (string_view(obj[i].first.c_str(), obj[i].first.size()) == key) {
+            if (string_view(obj[i].first) == key) {
                 return get_or_create(i, obj[i].second);
             }
         }
@@ -113,7 +112,7 @@ public:
         if (value_.type() == JsonType::Object) {
             auto& obj = value_.as_object();
             if (index < obj.size()) {
-                return string_view(obj[index].first.c_str(), obj[index].first.size());
+                return obj[index].first;
             }
         }
         return {};
