@@ -1,8 +1,10 @@
 #include <velk/api/hierarchy.h>
+#include <velk/api/object_ref.h>
 #include <velk/api/store.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/ext/plugin.h>
+#include <velk/interface/intf_object_ref.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
 #include <velk/string.h>
@@ -58,6 +60,21 @@ public:
     VELK_CLASS_UID("c0000000-0000-0000-0000-000000000020", "Widget");
 };
 
+class ITestImportContainer : public Interface<ITestImportContainer>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, ObjectRef, target, {}),
+        (PROP, float, width, 0.f)
+    )
+};
+
+class TestImportContainer : public ext::Object<TestImportContainer, ITestImportContainer>
+{
+public:
+    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000012", "Container");
+};
+
 class WidgetPlugin : public ext::Plugin<WidgetPlugin>
 {
 public:
@@ -83,12 +100,14 @@ protected:
     {
         ::velk::instance().type_registry().register_type<TestImportWidget>();
         ::velk::instance().type_registry().register_type<TestImportPanel>();
+        ::velk::instance().type_registry().register_type<TestImportContainer>();
     }
 
     static void TearDownTestSuite()
     {
         ::velk::instance().type_registry().unregister_type<TestImportWidget>();
         ::velk::instance().type_registry().unregister_type<TestImportPanel>();
+        ::velk::instance().type_registry().unregister_type<TestImportContainer>();
     }
 
     void load_importer()
@@ -101,6 +120,7 @@ protected:
         ASSERT_NE(nullptr, importer_);
         importer_->register_class_alias("test.Widget", TestImportWidget::static_class_id());
         importer_->register_class_alias("test.Panel", TestImportPanel::static_class_id());
+        importer_->register_class_alias("test.Container", TestImportContainer::static_class_id());
     }
 
     void TearDown() override
@@ -386,4 +406,269 @@ TEST_F(ImporterTest, ImportByScopedFriendlyName)
     EXPECT_FLOAT_EQ(240.0f, pw->height().get_value());
 
     ::velk::instance().plugin_registry().unload_plugin(WidgetPlugin::static_class_id());
+}
+
+TEST_F(ImporterTest, ObjectRefByDirectName)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 10.0 } },
+            {
+                "id": "c1",
+                "class": "test.Container",
+                "properties": {
+                    "target": { "ref": "w1" }
+                }
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto c1 = result.store->find("c1");
+    ASSERT_TRUE(c1);
+    auto* ci = interface_cast<ITestImportContainer>(c1);
+    ASSERT_NE(nullptr, ci);
+
+    auto val = ci->target().get_value();
+    ASSERT_TRUE(val);
+    auto* obj_ref = interface_cast<IObjectRef>(val);
+    ASSERT_TRUE(obj_ref);
+    EXPECT_TRUE(obj_ref->is_owning());
+
+    auto w1 = result.store->find("w1");
+    EXPECT_EQ(obj_ref->get_object(), w1);
+}
+
+TEST_F(ImporterTest, ObjectRefByHierarchyPath)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "root", "name": "root", "class": "test.Widget", "properties": { "width": 1.0 } },
+            { "id": "child_a", "name": "child_a", "class": "test.Widget", "properties": { "width": 2.0 } },
+            {
+                "id": "c1",
+                "name": "c1",
+                "class": "test.Container",
+                "properties": {
+                    "target": { "ref": "/root/child_a" }
+                }
+            }
+        ],
+        "hierarchies": {
+            "scene": [
+                { "parent": "root", "child": "child_a" },
+                { "parent": "root", "child": "c1" }
+            ]
+        }
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto c1 = result.store->find("c1");
+    auto* ci = interface_cast<ITestImportContainer>(c1);
+    ASSERT_NE(nullptr, ci);
+
+    auto val = ci->target().get_value();
+    auto* obj_ref = interface_cast<IObjectRef>(val);
+    ASSERT_TRUE(obj_ref);
+
+    auto child_a = result.store->find("child_a");
+    EXPECT_EQ(obj_ref->get_object(), child_a);
+}
+
+TEST_F(ImporterTest, ObjectRefWeak)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 10.0 } },
+            {
+                "id": "c1",
+                "class": "test.Container",
+                "properties": {
+                    "target": { "ref": "w1", "type": "weak" }
+                }
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto c1 = result.store->find("c1");
+    auto* ci = interface_cast<ITestImportContainer>(c1);
+    auto val = ci->target().get_value();
+    auto* obj_ref = interface_cast<IObjectRef>(val);
+    ASSERT_TRUE(obj_ref);
+    EXPECT_FALSE(obj_ref->is_owning());
+    EXPECT_EQ(obj_ref->get_object(), result.store->find("w1"));
+}
+
+TEST_F(ImporterTest, ObjectRefNonexistentReportsError)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            {
+                "id": "c1",
+                "class": "test.Container",
+                "properties": {
+                    "target": { "ref": "nonexistent" }
+                }
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    ASSERT_FALSE(result.errors.empty());
+    bool found = false;
+    for (auto& e : result.errors) {
+        if (e.find("nonexistent") != ::velk::string::npos) {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST_F(ImporterTest, TopLevelBindingSourceDrivesTarget)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "src", "class": "test.Widget", "properties": { "width": 100.0 } },
+            { "id": "dst", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "bindings": [
+            { "source": "src.width", "targets": ["dst.width"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto src = result.store->find("src");
+    auto dst = result.store->find("dst");
+    auto* src_w = interface_cast<ITestImportWidget>(src);
+    auto* dst_w = interface_cast<ITestImportWidget>(dst);
+
+    // Binding should make dst.width read the same as src.width
+    EXPECT_FLOAT_EQ(100.0f, dst_w->width().get_value());
+
+    // Changing source should propagate
+    src_w->width().set_value(200.0f);
+    EXPECT_FLOAT_EQ(200.0f, dst_w->width().get_value());
+}
+
+TEST_F(ImporterTest, TopLevelBindingMultiTarget)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "src", "class": "test.Widget", "properties": { "width": 50.0 } },
+            { "id": "dst1", "class": "test.Widget", "properties": { "width": 0.0 } },
+            { "id": "dst2", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "bindings": [
+            { "source": "src.width", "targets": ["dst1.width", "dst2.width"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto* dst1_w = interface_cast<ITestImportWidget>(result.store->find("dst1"));
+    auto* dst2_w = interface_cast<ITestImportWidget>(result.store->find("dst2"));
+
+    EXPECT_FLOAT_EQ(50.0f, dst1_w->width().get_value());
+    EXPECT_FLOAT_EQ(50.0f, dst2_w->width().get_value());
+}
+
+TEST_F(ImporterTest, InlineScalarRefCreatesBinding)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "src", "class": "test.Widget", "properties": { "width": 42.0 } },
+            {
+                "id": "dst",
+                "class": "test.Widget",
+                "properties": {
+                    "width": { "ref": "src.width" }
+                }
+            }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto* src_w = interface_cast<ITestImportWidget>(result.store->find("src"));
+    auto* dst_w = interface_cast<ITestImportWidget>(result.store->find("dst"));
+
+    // Inline ref creates a binding, so dst reads source value
+    EXPECT_FLOAT_EQ(42.0f, dst_w->width().get_value());
+
+    // Changing source propagates
+    src_w->width().set_value(99.0f);
+    EXPECT_FLOAT_EQ(99.0f, dst_w->width().get_value());
+}
+
+TEST_F(ImporterTest, BindingNonexistentSourceReportsError)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "dst", "class": "test.Widget", "properties": { "width": 0.0 } }
+        ],
+        "bindings": [
+            { "source": "nonexistent.width", "targets": ["dst.width"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    ASSERT_FALSE(result.errors.empty());
+    bool found = false;
+    for (auto& e : result.errors) {
+        if (e.find("nonexistent") != ::velk::string::npos) {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST_F(ImporterTest, BindingNonexistentTargetReportsError)
+{
+    load_importer();
+    auto result = importer_->import_from_json(R"({
+        "version": 1,
+        "objects": [
+            { "id": "src", "class": "test.Widget", "properties": { "width": 10.0 } }
+        ],
+        "bindings": [
+            { "source": "src.width", "targets": ["nonexistent.width"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    ASSERT_FALSE(result.errors.empty());
+    bool found = false;
+    for (auto& e : result.errors) {
+        if (e.find("nonexistent") != ::velk::string::npos) {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
 }
