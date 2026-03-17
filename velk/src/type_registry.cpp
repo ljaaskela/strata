@@ -15,6 +15,7 @@
 #include "thread_context.h"
 #include "variant.h"
 
+#include <velk/api/math_types.h>
 #include <velk/api/velk.h>
 #include <velk/ext/any.h>
 #include <velk/interface/intf_log.h>
@@ -55,6 +56,12 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<int64_t>>();
     ITypeRegistry::register_type<ext::AnyValue<string>>();
     ITypeRegistry::register_type<ext::AnyValue<Duration>>();
+    ITypeRegistry::register_type<ext::AnyValue<vec2>>();
+    ITypeRegistry::register_type<ext::AnyValue<vec3>>();
+    ITypeRegistry::register_type<ext::AnyValue<vec4>>();
+    ITypeRegistry::register_type<ext::AnyValue<size>>();
+    ITypeRegistry::register_type<ext::AnyValue<rect>>();
+    ITypeRegistry::register_type<ext::AnyValue<color>>();
     ITypeRegistry::register_type<ext::AnyValue<HierarchyChange>>();
 
     ITypeRegistry::register_type<ext::ArrayAnyValue<float>>();

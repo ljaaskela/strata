@@ -3,6 +3,7 @@
 
 #include <velk/ext/interface_dispatch.h>
 
+#include <velk/api/math_types.h>
 #include <velk/api/binding.h>
 #include <velk/api/hierarchy.h>
 #include <velk/api/store.h>
@@ -254,6 +255,40 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
         if (val.type() != JsonType::String) return;
         auto v = val.as_string();
         pi.set_data(&v, sizeof(v), typeUid);
+    } else if (val.type() == JsonType::Array) {
+        auto& arr = val.as_array();
+        if (typeUid == type_uid<vec2>() && arr.size() == 2) {
+            vec2 v{static_cast<float>(arr[0].as_number()),
+                    static_cast<float>(arr[1].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<vec3>() && arr.size() == 3) {
+            vec3 v{static_cast<float>(arr[0].as_number()),
+                    static_cast<float>(arr[1].as_number()),
+                    static_cast<float>(arr[2].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<vec4>() && arr.size() == 4) {
+            vec4 v{static_cast<float>(arr[0].as_number()),
+                    static_cast<float>(arr[1].as_number()),
+                    static_cast<float>(arr[2].as_number()),
+                    static_cast<float>(arr[3].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<size>() && arr.size() == 2) {
+            size v{static_cast<float>(arr[0].as_number()),
+                   static_cast<float>(arr[1].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<rect>() && arr.size() == 4) {
+            rect v{static_cast<float>(arr[0].as_number()),
+                    static_cast<float>(arr[1].as_number()),
+                    static_cast<float>(arr[2].as_number()),
+                    static_cast<float>(arr[3].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<color>() && arr.size() == 4) {
+            color v{static_cast<float>(arr[0].as_number()),
+                     static_cast<float>(arr[1].as_number()),
+                     static_cast<float>(arr[2].as_number()),
+                     static_cast<float>(arr[3].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
+        }
     }
 }
 
