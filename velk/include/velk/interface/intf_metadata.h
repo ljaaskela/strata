@@ -714,14 +714,32 @@ struct FnRawBind
         ::velk::detail::ArrBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
 #define _VELK_DEFAULTS_EVT(...)
 
-#define _VELK_DEFAULTS_FN_0(Name)                               \
-    static constexpr ::velk::FunctionKind _velk_fnkind_##Name = \
-        ::velk::detail::FnBind<&_velk_intf_type::fn_##Name>::kind;
-#define _VELK_DEFAULTS_FN_N(Name, ...)                                                        \
-    static constexpr ::velk::FnArgDesc _velk_fnargs_##Name[] = {_VELK_ARGDESCS(__VA_ARGS__)}; \
-    static constexpr ::velk::FunctionKind _velk_fnkind_##Name{                                \
-        &::velk::detail::FnBind<&_velk_intf_type::fn_##Name>::trampoline,                     \
-        {_velk_fnargs_##Name, _VELK_NARG(__VA_ARGS__)}};
+// Per-member nested struct avoids auto NTTP (FnBind<auto Fn>) in the macro expansion.
+// MSVC 19.x can mangle two auto-NTTP specializations identically when the pointer
+// values differ but share the same type, causing LNK1179 duplicate COMDAT errors.
+// The nested struct is named after the member, guaranteeing unique symbols.
+
+#define _VELK_DEFAULTS_FN_0(Name)                                                                 \
+    struct _velk_fnbind_##Name                                                                    \
+    {                                                                                             \
+        static ::velk::IAny::Ptr trampoline(void* self, ::velk::FnArgs args)                      \
+        {                                                                                         \
+            return ::velk::detail::interface_trampoline(self, args, &_velk_intf_type::fn_##Name); \
+        }                                                                                         \
+    };                                                                                            \
+    static constexpr ::velk::FunctionKind _velk_fnkind_##Name{&_velk_fnbind_##Name::trampoline, {}};
+
+#define _VELK_DEFAULTS_FN_N(Name, ...)                                                            \
+    struct _velk_fnbind_##Name                                                                    \
+    {                                                                                             \
+        static ::velk::IAny::Ptr trampoline(void* self, ::velk::FnArgs args)                      \
+        {                                                                                         \
+            return ::velk::detail::interface_trampoline(self, args, &_velk_intf_type::fn_##Name); \
+        }                                                                                         \
+    };                                                                                            \
+    static constexpr ::velk::FnArgDesc _velk_fnargs_##Name[] = {_VELK_ARGDESCS(__VA_ARGS__)};     \
+    static constexpr ::velk::FunctionKind _velk_fnkind_##Name{                                    \
+        &_velk_fnbind_##Name::trampoline, {_velk_fnargs_##Name, _VELK_NARG(__VA_ARGS__)}};
 
 #define _VELK_DFN_2(RetType, Name) _VELK_DEFAULTS_FN_0(Name)
 #define _VELK_DFN_3(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
@@ -734,9 +752,16 @@ struct FnRawBind
 #define _VELK_DFN_10(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
 #define _VELK_DEFAULTS_FN(...) _VELK_EXPAND(_VELK_CAT(_VELK_DFN_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
-#define _VELK_DEFAULTS_FN_RAW(Name)                             \
-    static constexpr ::velk::FunctionKind _velk_fnkind_##Name = \
-        ::velk::detail::FnRawBind<&_velk_intf_type::fn_##Name>::kind;
+#define _VELK_DEFAULTS_FN_RAW(Name)                                          \
+    struct _velk_fnbind_##Name                                               \
+    {                                                                        \
+        static ::velk::IAny::Ptr trampoline(void* self, ::velk::FnArgs args) \
+        {                                                                    \
+            auto* intf = static_cast<_velk_intf_type*>(self);                \
+            return intf->fn_##Name(args);                                    \
+        }                                                                    \
+    };                                                                       \
+    static constexpr ::velk::FunctionKind _velk_fnkind_##Name{&_velk_fnbind_##Name::trampoline, {}};
 
 #define _VELK_DEFAULTS(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_DEFAULTS_, Tag)(__VA_ARGS__))
 
