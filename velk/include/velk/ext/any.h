@@ -568,7 +568,7 @@ IAny::Ptr create_array_any_ref(vector<T>* ptr)
     auto* obj = new ArrayAnyRef<T>(ptr);
     auto* block = detail::alloc_control_block();
     detail::BlockAccess::replace(*obj, block);
-    return IAny::Ptr(static_cast<IAny*>(static_cast<void*>(obj)), block, adopt_ref);
+    return IAny::Ptr(static_cast<IAny*>(static_cast<void*>(obj)), block);
 }
 
 /** @brief Creates an AnyRef<T> wrapped in a shared_ptr, pointing to the given address. */
@@ -578,7 +578,7 @@ IAny::Ptr create_any_ref(T* ptr)
     auto* obj = new AnyRef<T>(ptr);
     auto* block = detail::alloc_control_block();
     detail::BlockAccess::replace(*obj, block);
-    return IAny::Ptr(static_cast<IAny*>(static_cast<void*>(obj)), block, adopt_ref);
+    return IAny::Ptr(static_cast<IAny*>(static_cast<void*>(obj)), block);
 }
 
 } // namespace velk::ext

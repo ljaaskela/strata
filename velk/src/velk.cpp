@@ -256,7 +256,7 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
             auto* b = pool->ext_head;
             pool->ext_head = static_cast<external_control_block*>(static_cast<control_block*>(b->get_ptr()));
             --pool->ext_size;
-            b->strong.store(1, std::memory_order_relaxed);
+            b->strong.store(0, std::memory_order_relaxed);
             b->weak.store(1, std::memory_order_relaxed);
             b->set_ptr(nullptr);
             b->set_external_tag();
@@ -264,7 +264,7 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
             return b;
         }
         auto* b = new external_control_block;
-        b->strong.store(1, std::memory_order_relaxed);
+        b->strong.store(0, std::memory_order_relaxed);
         b->set_external_tag();
         return b;
     }
@@ -273,13 +273,13 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
         auto* b = pool->head;
         pool->head = static_cast<control_block*>(b->get_ptr());
         --pool->size;
-        b->strong.store(1, std::memory_order_relaxed);
+        b->strong.store(0, std::memory_order_relaxed);
         b->weak.store(1, std::memory_order_relaxed);
         b->set_ptr(nullptr);
         return b;
     }
     auto* b = new control_block;
-    b->strong.store(1, std::memory_order_relaxed);
+    b->strong.store(0, std::memory_order_relaxed);
     return b;
 }
 
@@ -325,11 +325,11 @@ VELK_EXPORT control_block* detail::alloc_control_block(bool external)
 {
     if (external) {
         auto* b = new external_control_block;
-        b->strong.store(1, std::memory_order_relaxed);
+        b->strong.store(0, std::memory_order_relaxed);
         return b;
     }
     auto* b = new control_block;
-    b->strong.store(1, std::memory_order_relaxed);
+    b->strong.store(0, std::memory_order_relaxed);
     return b;
 }
 

@@ -32,7 +32,7 @@ IObject::Ptr make_object(uint32_t flags = ObjectFlags::None)
     auto* obj = new T;
     auto* block = detail::alloc_control_block();
     detail::BlockAccess::replace(*obj, block, flags);
-    IObject::Ptr result(static_cast<IObject*>(static_cast<void*>(obj)), block, adopt_ref);
+    IObject::Ptr result(static_cast<IObject*>(static_cast<void*>(obj)), block);
     if (!block->get_ptr()) {
         block->set_ptr(result.get());
     }

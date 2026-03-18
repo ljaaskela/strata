@@ -320,7 +320,7 @@ IObject* ObjectHive::prepare_slot(HivePage*& out_page, size_t& out_slot_idx, uin
 
     // Initialize the embedded HiveControlBlock (no heap allocation).
     auto* hcb = &target->hcbs[slot_idx];
-    hcb->ecb.strong.store(1, std::memory_order_relaxed);
+    hcb->ecb.strong.store(0, std::memory_order_relaxed);
     hcb->ecb.weak.store(1, std::memory_order_relaxed);
     hcb->ecb.destroy = hive_destroy;
     hcb->ecb.set_ptr(nullptr);
@@ -356,7 +356,7 @@ IObject::Ptr ObjectHive::allocate(uint32_t flags)
     page->state[slot_idx] = SlotState::Zombie;
 
     // No hive ownership ref: the returned shared_ptr is the only owner.
-    return IObject::Ptr(obj, &page->hcbs[slot_idx].ecb, adopt_ref);
+    return IObject::Ptr(obj, &page->hcbs[slot_idx].ecb);
 }
 
 IObject::Ptr ObjectHive::add()
@@ -381,10 +381,10 @@ IObject::Ptr ObjectHive::add()
     set_slot_active(page->active_bits, word, bit);
 
     // The hive owns one strong ref (keeps the object alive while in the hive).
-    // The returned shared_ptr will acquire a second strong ref via adopt_ref + ref().
+    // The returned shared_ptr acquires one strong ref via acquire(). Add the hive's ref.
     ++live_count_;
 
-    IObject::Ptr result(obj, &page->hcbs[slot_idx].ecb, adopt_ref);
+    IObject::Ptr result(obj, &page->hcbs[slot_idx].ecb);
     obj->ref(); // Hive's strong ref
     return result;
 }
