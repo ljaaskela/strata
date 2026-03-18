@@ -173,9 +173,9 @@ public:
  * @tparam T An Object-derived class with a static get_factory() method.
  */
 template <class T>
-ReturnValue register_type(IVelk& instance)
+ReturnValue register_type(IVelk& instance, const TypeOptions& options = {})
 {
-    return instance.type_registry().register_type(T::get_factory());
+    return instance.type_registry().register_type(T::get_factory(), options);
 }
 
 /**

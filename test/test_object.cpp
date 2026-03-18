@@ -929,7 +929,10 @@ class ObjectWrapperTest : public ::testing::Test
 protected:
     static void SetUpTestSuite() { instance().type_registry().register_type<TestWidget>(); }
 
-    ::velk::Object make() { return ::velk::Object(instance().create<IObject>(TestWidget::static_class_id())); }
+    ::velk::Object make()
+    {
+        return ::velk::Object(instance().create<IObject>(TestWidget::static_class_id()));
+    }
 };
 
 TEST_F(ObjectWrapperTest, DefaultConstructedIsInvalid)
@@ -959,7 +962,7 @@ TEST_F(ObjectWrapperTest, ClassName)
 TEST_F(ObjectWrapperTest, Flags)
 {
     auto obj = make();
-    EXPECT_EQ(obj.flags(), static_cast<uint32_t>(ObjectFlags::None));
+    EXPECT_TRUE(obj.flags() == ObjectFlags::None || obj.flags() == ObjectFlags::HiveManaged);
 }
 
 TEST_F(ObjectWrapperTest, AsRawPointer)

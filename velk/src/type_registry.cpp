@@ -7,11 +7,10 @@
 #include "future.h"
 #include "hierarchy.h"
 #include "hive/hive_store.h"
-#include "hive/object_hive.h"
 #include "hive/raw_hive.h"
+#include "object_ref.h"
 #include "property.h"
 #include "store.h"
-#include "object_ref.h"
 #include "thread_context.h"
 #include "variant.h"
 
@@ -77,18 +76,18 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::ArrayAnyValue<string>>();
 }
 
-const IObjectFactory* TypeRegistry::find(Uid uid) const
+const TypeRegistry::Entry* TypeRegistry::find(Uid uid) const
 {
     std::shared_lock lock(mutex_);
-    Entry key{uid, nullptr};
+    Entry key{uid, nullptr, {}};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == uid) {
-        return it->factory;
+        return &*it;
     }
     return nullptr;
 }
 
-ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
+ReturnValue TypeRegistry::register_type(const IObjectFactory& factory, const TypeOptions& options)
 {
     auto& info = factory.get_class_info();
     detail::velk_log(log_,
@@ -98,12 +97,20 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
                      "Register %.*s",
                      static_cast<int>(info.name.size()),
                      info.name.data());
+
+    CreationPolicy resolved = options.policy;
+    if (resolved == CreationPolicy::Auto) {
+        resolved = factory.get_instance_size() < 1024 ? CreationPolicy::Hive : CreationPolicy::Alloc;
+    }
+
     std::unique_lock lock(mutex_);
-    Entry entry{info.uid, &factory, current_owner_};
+    Entry entry{info.uid, &factory, current_owner_, resolved, {}};
     auto it = std::lower_bound(types_.begin(), types_.end(), entry);
     if (it != types_.end() && it->uid == info.uid) {
         it->factory = &factory;
         it->owner = current_owner_;
+        it->resolved_policy = resolved;
+        it->hive.reset();
     } else {
         types_.insert(it, entry);
     }
@@ -113,7 +120,7 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory)
 ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
 {
     std::unique_lock lock(mutex_);
-    Entry key{factory.get_class_info().uid, nullptr};
+    Entry key{factory.get_class_info().uid, nullptr, {}};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == key.uid) {
         types_.erase(it);
@@ -123,29 +130,48 @@ ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
 
 IInterface::Ptr TypeRegistry::create(Uid uid, uint32_t flags) const
 {
-    if (auto* factory = find(uid)) {
-        auto object = factory->create_instance(flags);
-        if (!object) {
-            VELK_LOG(
-                E, "Failed to instantiate %s: %s", factory->get_class_info().name, to_string(uid).c_str());
-        }
-        return object;
+    const Entry* entry = find(uid);
+    if (!entry) {
+        VELK_LOG(E, "Failed to instantiate %s", to_string(uid).c_str());
+        return {};
     }
-    VELK_LOG(E, "Failed to instantiate %s", to_string(uid).c_str());
-    return {};
+
+    if (entry->resolved_policy == CreationPolicy::Hive) {
+        auto* hive = ensure_hive(*entry);
+        if (hive) {
+            auto object = hive->allocate(flags);
+            if (!object) {
+                VELK_LOG(E,
+                         "Failed to instantiate %s: %s",
+                         entry->factory->get_class_info().name,
+                         to_string(uid).c_str());
+            }
+            return object;
+        }
+    }
+
+    auto object = entry->factory->create_instance(flags);
+    if (!object) {
+        VELK_LOG(
+            E, "Failed to instantiate %s: %s", entry->factory->get_class_info().name, to_string(uid).c_str());
+    }
+    return object;
 }
 
 const ClassInfo* TypeRegistry::get_class_info(Uid classUid) const
 {
-    if (auto* factory = find(classUid)) {
-        return &factory->get_class_info();
+    if (auto* entry = find(classUid)) {
+        return &entry->factory->get_class_info();
     }
     return nullptr;
 }
 
 const IObjectFactory* TypeRegistry::find_factory(Uid classUid) const
 {
-    return find(classUid);
+    if (auto* entry = find(classUid)) {
+        return entry->factory;
+    }
+    return nullptr;
 }
 
 void TypeRegistry::set_owner(Uid uid)
@@ -157,12 +183,28 @@ void TypeRegistry::set_owner(Uid uid)
 void TypeRegistry::sweep_owner(Uid uid)
 {
     std::unique_lock lock(mutex_);
+
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
+
     interpolators_.erase(std::remove_if(interpolators_.begin(),
                                         interpolators_.end(),
                                         [&](const InterpolatorEntry& e) { return e.owner == uid; }),
                          interpolators_.end());
+}
+
+impl::ObjectHive* TypeRegistry::ensure_hive(const Entry& entry) const
+{
+    std::unique_lock lock(mutex_);
+    if (entry.hive) {
+        return static_cast<impl::ObjectHive*>(entry.hive.get());
+    }
+
+    auto hive_obj = ext::make_object<impl::ObjectHive>();
+    auto* hive = static_cast<impl::ObjectHive*>(hive_obj.get());
+    hive->init(entry.uid, *entry.factory);
+    entry.hive = std::move(hive_obj);
+    return hive;
 }
 
 ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)

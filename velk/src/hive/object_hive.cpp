@@ -166,6 +166,14 @@ void ObjectHive::init(Uid classUid)
     }
 }
 
+void ObjectHive::init(Uid classUid, const IObjectFactory& factory)
+{
+    element_class_uid_ = classUid;
+    factory_ = &factory;
+    slot_size_ = align_up(factory.get_instance_size(), factory.get_instance_alignment());
+    slot_alignment_ = factory.get_instance_alignment();
+}
+
 Uid ObjectHive::get_element_uid() const
 {
     return element_class_uid_;
@@ -284,17 +292,9 @@ bool ObjectHive::find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) 
     return false;
 }
 
-IObject::Ptr ObjectHive::add()
+IObject* ObjectHive::prepare_slot(HivePage*& out_page, size_t& out_slot_idx, uint32_t flags)
 {
-    if (!factory_) {
-        return {};
-    }
-
-    check_iteration_guard(mutex_, "add");
-
-    std::lock_guard<std::shared_mutex> lock(mutex_);
-
-    // Check cached page hint first, then scan.
+    // Find a page with free slots (cached hint first, then scan).
     HivePage* target = nullptr;
     if (current_page_ && current_page_->free_head != PAGE_SENTINEL) {
         target = current_page_;
@@ -316,13 +316,7 @@ IObject::Ptr ObjectHive::add()
 
     // Pop slot from freelist.
     size_t slot_idx = pop_free_slot(target->slots, slot_size_, target->free_head);
-    target->state[slot_idx] = SlotState::Active;
     ++target->live_count;
-
-    // Set active bit.
-    size_t word = slot_idx / 64;
-    size_t bit = slot_idx % 64;
-    set_slot_active(target->active_bits, word, bit);
 
     // Initialize the embedded HiveControlBlock (no heap allocation).
     auto* hcb = &target->hcbs[slot_idx];
@@ -333,20 +327,64 @@ IObject::Ptr ObjectHive::add()
     hcb->page = target;
 
     // Placement-construct the object, installing the hive's control block.
-    // The factory swaps in our block and returns the auto-allocated one to the pool.
     void* slot = slot_ptr(*target, slot_idx);
-    auto* obj = factory_->construct_in_place(slot, &hcb->ecb, ObjectFlags::HiveManaged);
+    auto* obj = factory_->construct_in_place(slot, &hcb->ecb, flags | ObjectFlags::HiveManaged);
 
     // Set the self-pointer and external + embedded tags on the block.
     hcb->ecb.set_ptr(static_cast<void*>(obj));
     hcb->ecb.set_external_tag();
     hcb->ecb.set_embedded_tag();
 
+    out_page = target;
+    out_slot_idx = slot_idx;
+    return obj;
+}
+
+IObject::Ptr ObjectHive::allocate(uint32_t flags)
+{
+    if (!factory_) {
+        return {};
+    }
+
+    std::lock_guard<std::shared_mutex> lock(mutex_);
+
+    HivePage* page = nullptr;
+    size_t slot_idx = 0;
+    auto* obj = prepare_slot(page, slot_idx, flags);
+
+    // Born zombie: slot is live (page tracks it) but not active (not iterable).
+    page->state[slot_idx] = SlotState::Zombie;
+
+    // No hive ownership ref: the returned shared_ptr is the only owner.
+    return IObject::Ptr(obj, &page->hcbs[slot_idx].ecb, adopt_ref);
+}
+
+IObject::Ptr ObjectHive::add()
+{
+    if (!factory_) {
+        return {};
+    }
+
+    check_iteration_guard(mutex_, "add");
+
+    std::lock_guard<std::shared_mutex> lock(mutex_);
+
+    HivePage* page = nullptr;
+    size_t slot_idx = 0;
+    auto* obj = prepare_slot(page, slot_idx, ObjectFlags::None);
+
+    page->state[slot_idx] = SlotState::Active;
+
+    // Set active bit.
+    size_t word = slot_idx / 64;
+    size_t bit = slot_idx % 64;
+    set_slot_active(page->active_bits, word, bit);
+
     // The hive owns one strong ref (keeps the object alive while in the hive).
     // The returned shared_ptr will acquire a second strong ref via adopt_ref + ref().
     ++live_count_;
 
-    IObject::Ptr result(obj, &hcb->ecb, adopt_ref);
+    IObject::Ptr result(obj, &page->hcbs[slot_idx].ecb, adopt_ref);
     obj->ref(); // Hive's strong ref
     return result;
 }
