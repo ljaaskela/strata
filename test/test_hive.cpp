@@ -10,7 +10,7 @@
 
 using namespace velk;
 
-// --- Test interface and object for hive storage ---
+// Test interface and object for hive storage
 
 class IObjectHiveWidget : public Interface<IObjectHiveWidget>
 {
@@ -36,7 +36,7 @@ public:
 class HiveGadget : public ext::Object<HiveGadget, IObjectHiveGadget>
 {};
 
-// --- Test fixture ---
+// Test fixture
 
 class HiveTest : public ::testing::Test
 {
@@ -64,7 +64,7 @@ protected:
     IHiveStore::Ptr registry_;
 };
 
-// --- IHiveStore tests ---
+// IHiveStore tests
 
 TEST_F(HiveTest, GetHiveCreatesHive)
 {
@@ -121,7 +121,7 @@ TEST_F(HiveTest, ForEachHive)
     EXPECT_GE(count, 1);
 }
 
-// --- IObjectHive tests (use fresh_hive() for isolation) ---
+// IObjectHive tests (use fresh_hive() for isolation)
 
 TEST_F(HiveTest, NewHiveIsEmpty)
 {
@@ -323,7 +323,7 @@ TEST_F(HiveTest, CreateHiveStoreViaClassId)
     EXPECT_NE(registry_.get(), reg2.get());
 }
 
-// --- Placement storage tests ---
+// Placement storage tests
 
 TEST_F(HiveTest, PageGrowth)
 {
@@ -421,7 +421,7 @@ TEST_F(HiveTest, MetadataAvailableOnHiveObjects)
     EXPECT_TRUE(prop);
 }
 
-// --- for_each_state and for_each_hive tests ---
+// for_each_state and for_each_hive tests
 
 TEST_F(HiveTest, ForEachStateVisitsAllWithCorrectValues)
 {
@@ -525,7 +525,7 @@ TEST_F(HiveTest, ForEachHiveOnEmptyHive)
     EXPECT_EQ(0, count);
 }
 
-// --- IRawHive tests ---
+// IRawHive tests
 
 struct RawPoint
 {
@@ -801,4 +801,125 @@ TEST_F(HiveTest, ForEachHiveVisitsBothTypes)
         return true;
     });
     EXPECT_GE(count, 2);
+}
+
+// Hive-backed TypeRegistry allocation tests
+
+class IAllocWidget : public Interface<IAllocWidget>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, float, value, 0.f)
+    )
+};
+
+class AllocWidget : public ext::Object<AllocWidget, IAllocWidget>
+{
+public:
+    VELK_CLASS_UID("d1e2f3a4-b5c6-4d7e-8f90-a1b2c3d4e5f6");
+};
+
+class AllocHeapWidget : public ext::Object<AllocHeapWidget, IAllocWidget>
+{
+public:
+    VELK_CLASS_UID("e2f3a4b5-c6d7-4e8f-90a1-b2c3d4e5f6a7");
+};
+
+class HiveAllocTest : public ::testing::Test
+{
+protected:
+    IVelk& velk_ = instance();
+
+    void SetUp() override
+    {
+        velk_.type_registry().register_type<AllocWidget>();
+        velk_.type_registry().register_type<AllocHeapWidget>(TypeOptions{CreationPolicy::Alloc});
+    }
+
+    void TearDown() override
+    {
+        velk_.type_registry().unregister_type<AllocHeapWidget>();
+        velk_.type_registry().unregister_type<AllocWidget>();
+    }
+};
+
+TEST_F(HiveAllocTest, SmallTypeAutoGetsHiveManaged)
+{
+    auto obj = velk_.create<IObject>(AllocWidget::static_class_id());
+    ASSERT_TRUE(obj);
+    EXPECT_TRUE(obj->get_object_flags() & ObjectFlags::HiveManaged);
+}
+
+TEST_F(HiveAllocTest, AllocPolicyNoHiveManaged)
+{
+    auto obj = velk_.create<IObject>(AllocHeapWidget::static_class_id());
+    ASSERT_TRUE(obj);
+    EXPECT_FALSE(obj->get_object_flags() & ObjectFlags::HiveManaged);
+}
+
+TEST_F(HiveAllocTest, HiveAllocatedObjectIsUsable)
+{
+    auto obj = velk_.create<IObject>(AllocWidget::static_class_id());
+    ASSERT_TRUE(obj);
+
+    auto* widget = interface_cast<IAllocWidget>(obj);
+    ASSERT_NE(nullptr, widget);
+
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(nullptr, meta);
+    auto prop = meta->get_property("value");
+    EXPECT_TRUE(prop);
+}
+
+TEST_F(HiveAllocTest, HiveAllocatedObjectDestroyedWhenRefsDropped)
+{
+    weak_ptr<IObject> weak;
+    {
+        auto obj = velk_.create<IObject>(AllocWidget::static_class_id());
+        ASSERT_TRUE(obj);
+        weak = obj;
+        EXPECT_FALSE(weak.expired());
+    }
+    EXPECT_TRUE(weak.expired());
+}
+
+TEST_F(HiveAllocTest, WeakPtrSurvivesHiveObjectDestruction)
+{
+    weak_ptr<IObject> weak;
+    {
+        auto obj = velk_.create<IObject>(AllocWidget::static_class_id());
+        weak = obj;
+    }
+    // weak_ptr should be expired but not dangling
+    EXPECT_TRUE(weak.expired());
+    auto locked = weak.lock();
+    EXPECT_FALSE(locked);
+}
+
+TEST_F(HiveAllocTest, GetSelfWorksForHiveAllocatedObject)
+{
+    auto obj = velk_.create<IObject>(AllocWidget::static_class_id());
+    ASSERT_TRUE(obj);
+
+    auto self = obj->get_self();
+    ASSERT_TRUE(self);
+    EXPECT_EQ(obj.get(), self.get());
+}
+
+TEST_F(HiveAllocTest, MultipleHiveObjectsIndependent)
+{
+    auto obj1 = velk_.create<IObject>(AllocWidget::static_class_id());
+    auto obj2 = velk_.create<IObject>(AllocWidget::static_class_id());
+    auto obj3 = velk_.create<IObject>(AllocWidget::static_class_id());
+
+    ASSERT_TRUE(obj1);
+    ASSERT_TRUE(obj2);
+    ASSERT_TRUE(obj3);
+    EXPECT_NE(obj1.get(), obj2.get());
+    EXPECT_NE(obj2.get(), obj3.get());
+
+    // Dropping one doesn't affect the others
+    obj2.reset();
+    EXPECT_TRUE(obj1);
+    EXPECT_TRUE(obj3);
 }

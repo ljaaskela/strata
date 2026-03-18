@@ -6,13 +6,12 @@
 #include <velk/ext/core_object.h>
 #include <velk/interface/hive/intf_hive.h>
 #include <velk/interface/intf_object_factory.h>
+#include <velk/vector.h>
 
 #include <atomic>
 #include <cstdint>
 #include <memory>
 #include <shared_mutex>
-
-#include <velk/vector.h>
 
 namespace velk::impl {
 
@@ -58,8 +57,10 @@ public:
     ObjectHive() = default;
     ~ObjectHive() override;
 
-    /** @brief Initializes the hive for the given class UID. */
+    /** @brief Initializes the hive for the given class UID (looks up factory via registry). */
     void init(Uid classUid);
+    /** @brief Initializes the hive with a known factory (avoids registry lookup). */
+    void init(Uid classUid, const IObjectFactory& factory);
 
     // IHive overrides
     HiveType get_hive_type() const override { return HiveType::ObjectHive; }
@@ -69,6 +70,9 @@ public:
     void clear() override;
     HivePageCapacity get_page_capacity() const override;
     void set_page_capacity(const HivePageCapacity& capacity) override;
+
+    /** @brief Allocates a born-zombie object (no hive ownership). Used by TypeRegistry. */
+    IObject::Ptr allocate(uint32_t flags = ObjectFlags::None);
 
     // IObjectHive overrides
     IObject::Ptr add() override;
@@ -100,6 +104,9 @@ private:
 
     /** @brief Finds the page and slot index for a given object pointer. Returns false if not found. */
     bool find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const;
+
+    /** @brief Prepares a slot: finds/allocs page, pops freelist, inits HCB, placement-constructs. */
+    IObject* prepare_slot(HivePage*& out_page, size_t& out_slot_idx, uint32_t flags);
 
     mutable std::shared_mutex mutex_;
     Uid element_class_uid_;

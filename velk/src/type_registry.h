@@ -1,10 +1,11 @@
 #ifndef VELK_TYPE_REGISTRY_H
 #define VELK_TYPE_REGISTRY_H
 
+#include "hive/object_hive.h"
+
 #include <velk/ext/interface_dispatch.h>
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_type_registry.h>
-
 #include <velk/vector.h>
 
 #include <shared_mutex>
@@ -23,7 +24,7 @@ public:
     explicit TypeRegistry(ILog& log);
 
     // ITypeRegistry overrides
-    ReturnValue register_type(const IObjectFactory& factory) override;
+    ReturnValue register_type(const IObjectFactory& factory, const TypeOptions& options = {}) override;
     ReturnValue unregister_type(const IObjectFactory& factory) override;
     const ClassInfo* get_class_info(Uid classUid) const override;
     const IObjectFactory* find_factory(Uid classUid) const override;
@@ -57,11 +58,16 @@ private:
         Uid uid;                       ///< Class UID.
         const IObjectFactory* factory; ///< Factory that creates instances of this class.
         Uid owner;                     ///< Plugin that registered this type (Uid{} = builtin).
+        CreationPolicy resolved_policy{CreationPolicy::Alloc}; ///< Resolved allocation policy.
+        mutable IObject::Ptr hive;                             ///< Lazy hive (null until first use).
         bool operator<(const Entry& o) const { return uid < o.uid; }
     };
 
-    /** @brief Finds the factory for the given class UID, or nullptr if not registered. */
-    const IObjectFactory* find(Uid uid) const;
+    /** @brief Finds the entry for the given class UID, or nullptr if not registered. */
+    const Entry* find(Uid uid) const;
+
+    /** @brief Lazily creates and caches a hive for the given entry. */
+    impl::ObjectHive* ensure_hive(const Entry& entry) const;
 
     /** @brief Registry entry mapping a type UID to its interpolator function. */
     struct InterpolatorEntry
@@ -74,8 +80,8 @@ private:
 
     vector<Entry> types_;                     ///< Sorted registry of class factories.
     vector<InterpolatorEntry> interpolators_; ///< Sorted registry of interpolator functions.
-    Uid current_owner_;                            ///< Owner context for type registration.
-    mutable std::shared_mutex mutex_;              ///< Protects types_, interpolators_, current_owner_.
+    Uid current_owner_;                       ///< Owner context for type registration.
+    mutable std::shared_mutex mutex_;         ///< Protects types_, interpolators_, current_owner_.
     ILog& log_;
 };
 

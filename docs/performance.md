@@ -79,22 +79,22 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~10 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property get** | 1 virtual call + `memcpy` | ~11 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
 | **Property set** | 1 virtual call + `memcpy` | ~12 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
-| **Variant get** | Property lookup + delegate | ~8 ns | Same-type returns IAny pointer directly; conversion path scans type table (~41 ns) |
-| **Variant set** | `copy_from` + delegate | ~31 ns | Same-type delegates to inner IAny; type-change allocates new inner (~92 ns) |
-| **Variant state read/write** | Direct `get_data`/`set_data` | ~5/9 ns | `Variant::get<T>()`/`set<T>()` bypass PropertyImpl, call VariantImpl directly |
+| **Variant get** | Property lookup + delegate | ~9 ns | Same-type returns IAny pointer directly; conversion path scans type table (~41 ns) |
+| **Variant set** | `copy_from` + delegate | ~31 ns | Same-type delegates to inner IAny; type-change allocates new inner (~98 ns) |
+| **Variant state read/write** | Direct `get_data`/`set_data` | ~5/10 ns | `Variant::get<T>()`/`set<T>()` bypass PropertyImpl, call VariantImpl directly |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~13 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
 | **Typed-arg trampoline** | Arg extraction + indirect call | ~41 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
 | **Raw function invoke** | 1 indirect call | ~14 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
 | **Event dispatch (immediate)** | Snapshot + loop | ~36 ns | Snapshots handler list, then iterates; safe against handler mutation during dispatch |
-| **Event dispatch (deferred)** | Clone + queue | ~140 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **Event dispatch (deferred)** | Clone + queue | ~139 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~578 ns | First `get_property()` call; allocates `ClassId::Property` and caches result |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~603 ns | First `get_property()` call; allocates `ClassId::Property` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 1 heap alloc + pool emplace | ~58 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
+| **Object creation** | 1 heap alloc + pool emplace | ~53 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -163,16 +163,16 @@ Hierarchy operations are measured on balanced binary trees of `BenchWidget` obje
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **parent_of** | Hash lookup | ~77 ns | Returns parent of a leaf in a 1024-node tree |
-| **contains** | Hash lookup | ~13 ns | Checks membership of a known leaf |
-| **children_of** (512 children) | Copy vector | ~30 µs | Returns `vector<IObject::Ptr>`; cost dominated by ref-count bumps |
-| **for_each_child** (512 children) | Iterate + cast | ~5.6 µs | Visits each child via `interface_cast<IObject>` callback |
-| **add + remove** (leaf) | 2 mutations | ~367 ns | Steady-state add then remove on a 256-node tree |
-| **replace** | In-place swap | ~485 ns | Replaces a node, reparents children |
-| **set_root** | 1 mutation | ~380 ns | Sets root on an empty hierarchy (includes object creation) |
-| **Build tree/64** | 64 add ops | ~19 µs | Balanced binary tree construction |
-| **Build tree/512** | 512 add ops | ~157 µs | |
-| **Build tree/1024** | 1024 add ops | ~322 µs | ~315 ns per node amortized |
+| **parent_of** | Hash lookup | ~76 ns | Returns parent of a leaf in a 1024-node tree |
+| **contains** | Hash lookup | ~14 ns | Checks membership of a known leaf |
+| **children_of** (512 children) | Copy vector | ~31 µs | Returns `vector<IObject::Ptr>`; cost dominated by ref-count bumps |
+| **for_each_child** (512 children) | Iterate + cast | ~5.7 µs | Visits each child via `interface_cast<IObject>` callback |
+| **add + remove** (leaf) | 2 mutations | ~398 ns | Steady-state add then remove on a 256-node tree |
+| **replace** | In-place swap | ~644 ns | Replaces a node, reparents children |
+| **set_root** | 1 mutation | ~401 ns | Sets root on an empty hierarchy (includes object creation) |
+| **Build tree/64** | 64 add ops | ~20 µs | Balanced binary tree construction |
+| **Build tree/512** | 512 add ops | ~159 µs | |
+| **Build tree/1024** | 1024 add ops | ~324 µs | ~316 ns per node amortized |
 
 ### Queries
 
@@ -184,16 +184,16 @@ Hierarchy operations are measured on balanced binary trees of `BenchWidget` obje
 
 ### Tree construction
 
-Building a balanced binary tree scales linearly. At 1024 nodes the amortized cost is ~315 ns per node, which includes object creation (~55 ns) plus the `add()` operation.
+Building a balanced binary tree scales linearly. At 1024 nodes the amortized cost is ~316 ns per node, which includes object creation (~53 ns) plus the `add()` operation.
 
 ### Event overhead
 
 | Scenario | Measured | Notes |
 |---|---|---|
-| add + remove, no handler | ~369 ns | Baseline: no event listeners |
-| add + remove, with handler | ~567 ns | One `on_changed` handler subscribed |
+| add + remove, no handler | ~401 ns | Baseline: no event listeners |
+| add + remove, with handler | ~638 ns | One `on_changed` handler subscribed |
 
-Subscribing an `on_changed` handler adds ~54% overhead to mutation operations. With no handlers registered, the event system imposes no cost beyond checking for an empty handler list.
+Subscribing an `on_changed` handler adds ~59% overhead to mutation operations. With no handlers registered, the event system imposes no cost beyond checking for an empty handler list.
 
 ## Memory layout
 

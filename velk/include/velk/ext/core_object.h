@@ -30,10 +30,10 @@ template <class T>
 IObject::Ptr make_object(uint32_t flags = ObjectFlags::None)
 {
     auto* obj = new T;
-    detail::BlockAccess::set_flags(*obj, flags);
-    auto* block = detail::BlockAccess::get(*obj);
-    IObject::Ptr result(static_cast<IObject*>(static_cast<void*>(obj)), block, adopt_ref);
-    if (block && !block->get_ptr()) {
+    auto* block = detail::alloc_control_block();
+    detail::BlockAccess::replace(*obj, block, flags);
+    IObject::Ptr result(static_cast<IObject*>(static_cast<void*>(obj)), block);
+    if (!block->get_ptr()) {
         block->set_ptr(result.get());
     }
     return result;
@@ -71,11 +71,10 @@ public:
                                 uint32_t flags = ObjectFlags::None) const override
     {
         auto* obj = new (location) FinalClass();
-        detail::BlockAccess::set_flags(*obj, flags);
-        if (block) {
-            detail::dealloc_control_block(detail::BlockAccess::get(*obj));
-            detail::BlockAccess::replace(*obj, block);
+        if (!block) {
+            block = detail::alloc_control_block();
         }
+        detail::BlockAccess::replace(*obj, block, flags);
         return static_cast<IObject*>(static_cast<void*>(obj));
     }
     void destroy_in_place(void* location) const override
@@ -103,21 +102,22 @@ class DefaultFactory : public ObjectFactory<FinalClass>
 };
 
 /** @brief Declares a static constexpr class UID, with an optional friendly name. */
-#define VELK_CLASS_UID_1(uid_)              \
-    static constexpr ::velk::Uid class_uid  \
-    {                                       \
-        uid_                                \
+#define VELK_CLASS_UID_1(uid_)             \
+    static constexpr ::velk::Uid class_uid \
+    {                                      \
+        uid_                               \
     }
 
-#define VELK_CLASS_UID_2(uid_, name_)       \
-    static constexpr ::velk::Uid class_uid  \
-    {                                       \
-        uid_                                \
-    };                                      \
-    static constexpr ::velk::string_view class_name { name_ }
+#define VELK_CLASS_UID_2(uid_, name_)               \
+    static constexpr ::velk::Uid class_uid{uid_};   \
+    static constexpr ::velk::string_view class_name \
+    {                                               \
+        name_                                       \
+    }
 
 #define VELK_CLASS_UID_SELECT(_1, _2, MACRO, ...) MACRO
-#define VELK_CLASS_UID(...) VELK_CLASS_UID_SELECT(__VA_ARGS__, VELK_CLASS_UID_2, VELK_CLASS_UID_1)(__VA_ARGS__)
+#define VELK_CLASS_UID(...) \
+    VELK_CLASS_UID_SELECT(__VA_ARGS__, VELK_CLASS_UID_2, VELK_CLASS_UID_1)(__VA_ARGS__)
 
 // IObject detection: walks ParentInterface chains to check if IObject is already reachable.
 
