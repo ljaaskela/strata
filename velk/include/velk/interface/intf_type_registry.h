@@ -15,6 +15,20 @@ namespace velk {
 /** @brief Interpolation callback: interpolates between two type-erased values. */
 using InterpolatorFn = ReturnValue (*)(const IAny& from, const IAny& to, float t, IAny& result);
 
+/** @brief Controls how TypeRegistry allocates instances of a registered type. */
+enum class CreationPolicy : uint8_t
+{
+    Auto, ///< Hive for small types (< 1 KB), heap for large types.
+    Hive, ///< Always allocate from an ObjectHive.
+    Alloc ///< Always use per-object heap allocation.
+};
+
+/** @brief Options for type registration. */
+struct TypeOptions
+{
+    CreationPolicy policy{CreationPolicy::Auto};
+};
+
 /**
  * @brief Interface for registering, unregistering, and querying object type factories.
  *
@@ -25,7 +39,7 @@ class ITypeRegistry : public Interface<ITypeRegistry>
 {
 public:
     /** @brief Registers an object factory for the type it describes. */
-    virtual ReturnValue register_type(const IObjectFactory& factory) = 0;
+    virtual ReturnValue register_type(const IObjectFactory& factory, const TypeOptions& options = {}) = 0;
     /** @brief Unregisters a previously registered object factory. */
     virtual ReturnValue unregister_type(const IObjectFactory& factory) = 0;
     /** @brief Returns the ClassInfo for a registered type, or nullptr if not found. */
@@ -85,9 +99,9 @@ public:
      * @tparam T An Object-derived class with a static get_factory() method.
      */
     template <class T>
-    ReturnValue register_type()
+    ReturnValue register_type(const TypeOptions& options = {})
     {
-        return register_type(T::get_factory());
+        return register_type(T::get_factory(), options);
     }
     /**
      * @brief Unregisters a previously registered type using its static get_factory() method.

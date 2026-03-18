@@ -6,6 +6,8 @@
 #include <velk/memory.h>
 #include <velk/thread.h>
 
+#include <cassert>
+
 namespace velk {
 
 namespace detail {
@@ -36,11 +38,16 @@ class RefCountedDispatch : public InterfaceDispatch<Interfaces...>
 {
 public:
     /** @brief Atomically increments the reference count. */
-    void ref() override { data_.block->add_ref(); }
+    void ref() override
+    {
+        assert(data_.block && "ref() called on object without control block");
+        data_.block->add_ref();
+    }
 
     /** @brief Atomically decrements the reference count; deletes the object at zero. */
     void unref() override
     {
+        assert(data_.block && "unref() called on object without control block");
         if (data_.block->release_ref()) {
             if (data_.block->is_external()) {
                 auto* ecb = static_cast<external_control_block*>(data_.block);
@@ -60,15 +67,20 @@ public:
      * Zeroes the strong count so that any outstanding weak_ptr sees the object
      * as expired, then releases the "strong group" weak ref on the block.
      */
-    ~RefCountedDispatch() override { detail::release_ref_counted(*data_.block); }
+    ~RefCountedDispatch() override
+    {
+        if (data_.block) {
+            detail::release_ref_counted(*data_.block);
+        }
+    }
 
 protected:
     /** @brief Per-object data: flags and control block pointer. */
     struct ObjectData
     {
-        control_block* block{detail::alloc_control_block()}; ///< Pooled control block (strong=1).
-        uint32_t flags{ObjectFlags::None};                   ///< Bitwise combination of ObjectFlags.
-        uint32_t owner_thread_id{current_thread_id()};       ///< Thread that created this object.
+        control_block* block{nullptr};                 ///< Set by make_object/construct_in_place.
+        uint32_t flags{ObjectFlags::None};             ///< Bitwise combination of ObjectFlags.
+        uint32_t owner_thread_id{current_thread_id()}; ///< Thread that created this object.
     };
     /** @brief Returns a mutable reference to the per-object data. */
     constexpr ObjectData& get_object_data() noexcept { return data_; }
@@ -81,7 +93,11 @@ private:
     friend struct detail::BlockAccess;
 
     /** @brief Replaces the control block. Used internally by placement storage. */
-    void replace_block(control_block* block) noexcept { data_.block = block; }
+    void replace_block(control_block* block, uint32_t flags) noexcept
+    {
+        data_.block = block;
+        data_.flags = flags;
+    }
 
     ObjectData data_;
 };
@@ -100,15 +116,9 @@ struct BlockAccess
     }
 
     template <class T>
-    static void replace(T& obj, control_block* block) noexcept
+    static void replace(T& obj, control_block* block, uint32_t flags = ObjectFlags::None) noexcept
     {
-        obj.replace_block(block);
-    }
-
-    template <class T>
-    static void set_flags(T& obj, uint32_t flags) noexcept
-    {
-        obj.get_object_data().flags = flags;
+        obj.replace_block(block, flags);
     }
 };
 

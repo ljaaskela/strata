@@ -22,11 +22,18 @@ namespace velk {
  * For non-IInterface types: use external_control_block, which extends
  * this with a type-erased destroy function.
  *
+ * @par Strong count lifecycle
+ * Blocks are allocated with strong=0. The first shared_ptr constructor
+ * call (acquire() or add_ref()) brings strong from 0 to 1. This avoids
+ * the need for adopt-ref semantics at construction sites.
+ *
  * @par Weak count semantics
  * The @c weak count starts at 1, representing the "strong group is alive"
- * reference. Each weak_ptr adds +1 on construction and -1 on destruction.
- * When the last strong ref drops, the strong group's +1 is released. The
- * block is deleted when weak reaches zero.
+ * reference. Each shared_ptr/weak_ptr adds +1 on construction and -1 on
+ * destruction. When the last strong ref drops, the strong group's +1 is
+ * released (via ~RefCountedDispatch for intrusive types, or
+ * shared_release_external for external types). The block is deleted when
+ * weak reaches zero.
  */
 struct control_block
 {
@@ -141,7 +148,7 @@ namespace detail {
  * @param external If true, allocates an external_control_block (24 bytes,
  *                 not pooled). If false, allocates a control_block (16 bytes,
  *                 pooled when available).
- * @return A block initialized with strong=1, weak=1, ptr=nullptr
+ * @return A block initialized with strong=0, weak=1, ptr=nullptr
  *         (and destroy=nullptr for external blocks).
  */
 VELK_EXPORT control_block* alloc_control_block(bool external = false);
@@ -222,12 +229,6 @@ inline void shared_release_external(control_block* block)
 }
 
 } // namespace detail
-
-/** @brief Tag type for adopting an existing reference without incrementing. */
-struct adopt_ref_t
-{};
-/** @brief Tag value for adopt_ref_t. */
-inline constexpr adopt_ref_t adopt_ref{};
 
 class IInterface;
 
@@ -393,19 +394,8 @@ public:
             ecb->set_ptr(p);
             ecb->destroy = [](external_control_block* b) { delete static_cast<T*>(b->get_ptr()); };
             block_ = ecb;
+            block_->add_ref();
         }
-    }
-
-    /**
-     * @brief Adopts an existing intrusive reference without incrementing.
-     *
-     * For IInterface types only. Used by factories that return pointers with
-     * refcount already set (e.g. from new or create()).
-     */
-    shared_ptr(T* p, adopt_ref_t)
-    {
-        static_assert(is_interface, "adopt_ref_t is only for IInterface types");
-        ptr_ = p;
     }
 
     /**
@@ -414,19 +404,6 @@ public:
      * Adds a reference. Used by interface_pointer_cast and similar.
      */
     shared_ptr(T* p, control_block* b) : base(p, b) { acquire(); }
-
-    /**
-     * @brief Adopts an existing reference without incrementing the strong count.
-     *
-     * Only adds a weak ref to the block. Used by make_object() after construction
-     * when the ref count is already 1.
-     */
-    shared_ptr(T* p, control_block* b, adopt_ref_t) : base(p, b)
-    {
-        if (block_) {
-            block_->add_weak();
-        }
-    }
 
     ~shared_ptr() { release(); }
 
@@ -615,9 +592,9 @@ public:
         if (!(block_ && block_->try_add_ref())) {
             return {};
         }
-        // try_add_ref succeeded: we now own one strong ref in the block.
-        // Construct a shared_ptr that adopts this ref (no extra ref() needed
-        // for intrusive types since try_add_ref already incremented strong).
+        // try_add_ref succeeded: we own one strong ref in the block.
+        // Manually construct a shared_ptr without going through acquire(),
+        // since try_add_ref already incremented strong. Only add weak.
         shared_ptr<T> result;
         result.ptr_ = ptr_;
         result.block_ = block_;
