@@ -286,11 +286,13 @@ protected:
             "incorrect IInterface detection. Move T's full definition before any "
             "shared_ptr<T>/weak_ptr<T> member declarations.");
 #ifdef _DEBUG
-        //    Runtime mismatch detection: the non-IInterface path uses external_control_block
-        //    (24 bytes) but IInterface types allocate regular control_block (16 bytes).
-        //    A mismatch here means is_interface was incorrectly evaluated (incomplete type).
+        // Runtime mismatch detection: non-IInterface types use external_control_block
+        // but IInterface types normally use regular control_block. A mismatch indicates
+        // is_interface was incorrectly evaluated (incomplete type). Hive-embedded blocks
+        // are an exception: they use external_control_block for the destroy callback
+        // regardless of type, and are identified by the embedded tag.
         if (block_) {
-            assert(is_interface != block_->is_external() &&
+            assert((is_interface != block_->is_external() || block_->is_embedded()) &&
                    "shared_ptr/weak_ptr<T>: is_interface mismatch, T was likely incomplete "
                    "when the template was instantiated");
         }

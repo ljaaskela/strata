@@ -94,7 +94,7 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
 | **Metadata lookup (cold)** | Linear scan + alloc | ~603 ns | First `get_property()` call; allocates `ClassId::Property` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 1 heap alloc + pool emplace | ~53 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
+| **Object creation** | placement-new into hive page | ~53 ns | Factory lookup (`O(log N)`), then hive allocation (default for types < 1 KB via `CreationPolicy::Auto`); no per-object heap alloc after initial page |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -149,11 +149,29 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 
 ### Object creation
 
+`instance().create()` defaults to hive-backed allocation for most types. The ~53 ns benchmark number measures this hive path.
+
+**Steps (hive path, default):**
+
 1. **Factory lookup**: `O(log N)` binary search on sorted registered types vector
-2. **Allocate object**: One `new FinalClass` wrapped in `shared_ptr` with ref-counting deleter
-3. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
-4. **Allocate ObjectStorage**: Pool-allocated from a `Hive<ObjectStorage>` (placement-new into a pre-allocated page slot with mutex); stores a pointer to the static metadata array and the owning object
+2. **Policy check**: `CreationPolicy::Auto` is resolved at registration time to `Hive` for types < 1 KB, `Alloc` for larger types
+3. **Hive allocation**: `ensure_hive()` lazily creates one `ObjectHive` per type on first use (cached in the registry entry). `allocate()` does placement-new into a pre-allocated page slot. The returned object is a "born zombie": it lives in a hive slot but is not active (not iterable via `for_each()`), and the returned `shared_ptr` is the sole owner. No per-object heap allocation after the initial page is allocated.
+4. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
+
+**Heap fallback:**
+
+When `resolved_policy` is `Alloc` (types >= 1 KB, or explicitly requested), the factory's `create_instance()` does `new FinalClass` with a pool-recycled control block.
+
+**CreationPolicy override:** The policy can be set per-type via `TypeOptions` at registration time:
+
+```cpp
+instance().type_registry().register_type<MyType>({CreationPolicy::Alloc});
+instance().type_registry().register_type<MyType>({CreationPolicy::Hive});
+instance().type_registry().register_type<MyType>({CreationPolicy::Auto}); // default
+```
+
+**allocate() vs add():** TypeRegistry's `create()` uses `ObjectHive::allocate()`, which produces a born zombie (external ownership only, not iterable). `ObjectHive::add()` creates an active slot where the hive holds a strong reference and the object is iterable via `for_each()`. Use `add()` when the hive should own and enumerate its objects; `allocate()` when the caller manages lifetime independently.
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
 
