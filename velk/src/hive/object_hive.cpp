@@ -167,17 +167,14 @@ ObjectHive::~ObjectHive()
 
 bool ObjectHive::has_outstanding_refs() const
 {
-#ifdef _DEBUG
+    if (live_count_ > 0) {
+        return true;
+    }
     for (auto& page_ptr : pages_) {
-        auto& page = *page_ptr;
-        if (page.live_count > 0) {
-            return true;
-        }
-        if (page.weak_hcb_count.load(std::memory_order_acquire) > 0) {
+        if (page_ptr->live_count > 0 || page_ptr->weak_hcb_count.load(std::memory_order_acquire) > 0) {
             return true;
         }
     }
-#endif
     return false;
 }
 

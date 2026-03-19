@@ -272,9 +272,10 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
                     static_cast<float>(arr[2].as_number()),
                     static_cast<float>(arr[3].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
-        } else if (typeUid == type_uid<size>() && arr.size() == 2) {
+        } else if (typeUid == type_uid<size>() && arr.size() >= 2) {
             size v{static_cast<float>(arr[0].as_number()),
-                   static_cast<float>(arr[1].as_number())};
+                   static_cast<float>(arr[1].as_number()),
+                   arr.size() >= 3 ? static_cast<float>(arr[2].as_number()) : 0.f};
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<rect>() && arr.size() == 4) {
             rect v{static_cast<float>(arr[0].as_number()),
@@ -282,11 +283,39 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
                     static_cast<float>(arr[2].as_number()),
                     static_cast<float>(arr[3].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
-        } else if (typeUid == type_uid<color>() && arr.size() == 4) {
+        } else if (typeUid == type_uid<color>() && arr.size() >= 3) {
             color v{static_cast<float>(arr[0].as_number()),
                      static_cast<float>(arr[1].as_number()),
                      static_cast<float>(arr[2].as_number()),
-                     static_cast<float>(arr[3].as_number())};
+                     arr.size() >= 4 ? static_cast<float>(arr[3].as_number()) : 1.f};
+            pi.set_data(&v, sizeof(v), typeUid);
+        }
+    } else if (val.type() == JsonType::Object) {
+        auto f = [&](string_view key) -> float {
+            auto* n = val.find(key);
+            return n ? static_cast<float>(n->as_number()) : 0.f;
+        };
+        auto f1 = [&](string_view key, float def) -> float {
+            auto* n = val.find(key);
+            return n ? static_cast<float>(n->as_number()) : def;
+        };
+        if (typeUid == type_uid<vec2>()) {
+            vec2 v{f("x"), f("y")};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<vec3>()) {
+            vec3 v{f("x"), f("y"), f("z")};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<vec4>()) {
+            vec4 v{f("x"), f("y"), f("z"), f("w")};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<size>()) {
+            size v{f("width"), f("height"), f("depth")};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<rect>()) {
+            rect v{f("x"), f("y"), f("width"), f("height")};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<color>()) {
+            color v{f("r"), f("g"), f("b"), f1("a", 1.f)};
             pi.set_data(&v, sizeof(v), typeUid);
         }
     }
