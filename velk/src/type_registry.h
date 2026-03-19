@@ -38,6 +38,8 @@ public:
     void set_owner(Uid uid);
     /** @brief Erases all entries owned by the given plugin UID. */
     void sweep_owner(Uid uid);
+    /** @brief Checks hives owned by uid for outstanding refs. Returns count. Debug only. */
+    size_t check_owner_hives(Uid uid) const;
 
     void create_event_once(IEvent::Ptr& slot) const override;
     IAny::Ptr create_any(Uid type) const override;

@@ -120,6 +120,15 @@ static void hive_destroy_orphan(external_control_block* ecb)
 
 ObjectHive::~ObjectHive()
 {
+#ifdef _DEBUG
+    if (live_count_ > 0) {
+        auto* info = instance().type_registry().get_class_info(element_class_uid_);
+        const char* name = info ? info->name.data() : "unknown";
+        VELK_LOG(W, "~ObjectHive: %zu live objects still in hive for class '%s'",
+                 live_count_, name);
+    }
+#endif
+
     // Release the hive's strong ref on all active objects.
     clear();
 
@@ -154,6 +163,22 @@ ObjectHive::~ObjectHive()
             free_page(page);
         }
     }
+}
+
+bool ObjectHive::has_outstanding_refs() const
+{
+#ifdef _DEBUG
+    for (auto& page_ptr : pages_) {
+        auto& page = *page_ptr;
+        if (page.live_count > 0) {
+            return true;
+        }
+        if (page.weak_hcb_count.load(std::memory_order_acquire) > 0) {
+            return true;
+        }
+    }
+#endif
+    return false;
 }
 
 void ObjectHive::init(Uid classUid)

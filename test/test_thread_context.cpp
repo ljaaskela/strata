@@ -188,6 +188,9 @@ TEST(ThreadContext, ReaderWriterExclusion)
 
     EXPECT_GT(read_count.load(), 0);
     EXPECT_GT(write_count.load(), 0);
+
+    obj.reset();
+    instance().type_registry().unregister_type<ThreadTestWidget>();
 }
 
 TEST(ThreadContext, HierarchyAttachment)

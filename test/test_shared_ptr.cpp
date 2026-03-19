@@ -256,14 +256,16 @@ public:
 };
 int TrackableObject::alive_count = 0;
 
-static bool register_trackable = [] {
-    instance().type_registry().register_type<TrackableObject>();
-    return true;
-}();
+class TrackableTest : public ::testing::Test
+{
+protected:
+    static void SetUpTestSuite() { instance().type_registry().register_type<TrackableObject>(); }
+    static void TearDownTestSuite() { instance().type_registry().unregister_type<TrackableObject>(); }
+};
 
 // Intrusive destruction tracking
 
-TEST(SharedPtrIntrusive, LastSharedPtrDestroysObject)
+TEST_F(TrackableTest, LastSharedPtrDestroysObject)
 {
     TrackableObject::alive_count = 0;
     {
@@ -273,7 +275,7 @@ TEST(SharedPtrIntrusive, LastSharedPtrDestroysObject)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(SharedPtrIntrusive, CopyKeepsObjectAlive)
+TEST_F(TrackableTest, CopyKeepsObjectAlive)
 {
     TrackableObject::alive_count = 0;
     {
@@ -289,7 +291,7 @@ TEST(SharedPtrIntrusive, CopyKeepsObjectAlive)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(SharedPtrIntrusive, MultipleCopiesKeepObjectAlive)
+TEST_F(TrackableTest, MultipleCopiesKeepObjectAlive)
 {
     TrackableObject::alive_count = 0;
     {
@@ -308,7 +310,7 @@ TEST(SharedPtrIntrusive, MultipleCopiesKeepObjectAlive)
     }
 }
 
-TEST(SharedPtrIntrusive, MoveDoesNotDestroyObject)
+TEST_F(TrackableTest, MoveDoesNotDestroyObject)
 {
     TrackableObject::alive_count = 0;
     {
@@ -321,7 +323,7 @@ TEST(SharedPtrIntrusive, MoveDoesNotDestroyObject)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(SharedPtrIntrusive, ResetDestroysWhenLastRef)
+TEST_F(TrackableTest, ResetDestroysWhenLastRef)
 {
     TrackableObject::alive_count = 0;
     auto obj = instance().create<IObject>(TrackableObject::static_class_id());
@@ -332,7 +334,7 @@ TEST(SharedPtrIntrusive, ResetDestroysWhenLastRef)
 
 // interface_pointer_cast ref counting
 
-TEST(SharedPtrIntrusive, InterfacePointerCastKeepsAlive)
+TEST_F(TrackableTest, InterfacePointerCastKeepsAlive)
 {
     TrackableObject::alive_count = 0;
     {
@@ -348,7 +350,7 @@ TEST(SharedPtrIntrusive, InterfacePointerCastKeepsAlive)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(SharedPtrIntrusive, InterfaceCastBackAndForth)
+TEST_F(TrackableTest, InterfaceCastBackAndForth)
 {
     TrackableObject::alive_count = 0;
     {
@@ -367,7 +369,7 @@ TEST(SharedPtrIntrusive, InterfaceCastBackAndForth)
 
 // weak_ptr + intrusive destruction
 
-TEST(WeakPtrIntrusive, ExpiredAfterLastSharedDies)
+TEST_F(TrackableTest, WeakExpiredAfterLastSharedDies)
 {
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp;
@@ -382,7 +384,7 @@ TEST(WeakPtrIntrusive, ExpiredAfterLastSharedDies)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(WeakPtrIntrusive, LockExtendsLifetime)
+TEST_F(TrackableTest, WeakLockExtendsLifetime)
 {
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp;
@@ -408,7 +410,7 @@ TEST(WeakPtrIntrusive, LockExtendsLifetime)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(WeakPtrIntrusive, MultipleWeakPtrsToSameObject)
+TEST_F(TrackableTest, WeakMultipleWeakPtrsToSameObject)
 {
     TrackableObject::alive_count = 0;
     weak_ptr<IObject> wp1, wp2, wp3;
@@ -427,7 +429,7 @@ TEST(WeakPtrIntrusive, MultipleWeakPtrsToSameObject)
     EXPECT_EQ(TrackableObject::alive_count, 0);
 }
 
-TEST(WeakPtrIntrusive, WeakPtrSurvivesObjectDestruction)
+TEST_F(TrackableTest, WeakPtrSurvivesObjectDestruction)
 {
     // Verify the control block outlives the object when weak_ptrs exist
     TrackableObject::alive_count = 0;
@@ -449,7 +451,7 @@ TEST(WeakPtrIntrusive, WeakPtrSurvivesObjectDestruction)
 
 // get_self interop with ref counting
 
-TEST(SharedPtrIntrusive, GetSelfKeepsObjectAlive)
+TEST_F(TrackableTest, GetSelfKeepsObjectAlive)
 {
     TrackableObject::alive_count = 0;
     {

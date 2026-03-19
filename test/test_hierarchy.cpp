@@ -61,6 +61,11 @@ protected:
         instance().type_registry().register_type<HierarchyTestObj>();
         instance().type_registry().register_type<ListenerObj>();
     }
+    static void TearDownTestSuite()
+    {
+        instance().type_registry().unregister_type<HierarchyTestObj>();
+        instance().type_registry().unregister_type<ListenerObj>();
+    }
 
     IObject::Ptr make_obj() { return instance().create<IObject>(HierarchyTestObj::static_class_id()); }
 };

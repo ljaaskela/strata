@@ -123,6 +123,15 @@ ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
     Entry key{factory.get_class_info().uid, nullptr, {}};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
     if (it != types_.end() && it->uid == key.uid) {
+#ifdef _DEBUG
+        if (it->hive) {
+            auto* hive = static_cast<impl::ObjectHive*>(it->hive.get());
+            if (hive->has_outstanding_refs()) {
+                VELK_LOG(E, "unregister_type: hive for '%s' has outstanding refs",
+                         it->factory->get_class_info().name.data());
+            }
+        }
+#endif
         types_.erase(it);
     }
     return ReturnValue::Success;
@@ -184,6 +193,18 @@ void TypeRegistry::sweep_owner(Uid uid)
 {
     std::unique_lock lock(mutex_);
 
+#ifdef _DEBUG
+    for (const auto& e : types_) {
+        if (e.owner == uid && e.hive) {
+            auto* hive = static_cast<impl::ObjectHive*>(e.hive.get());
+            if (hive->has_outstanding_refs()) {
+                VELK_LOG(E, "sweep_owner: hive for '%s' has outstanding refs",
+                         e.factory->get_class_info().name.data());
+            }
+        }
+    }
+#endif
+
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
 
@@ -191,6 +212,28 @@ void TypeRegistry::sweep_owner(Uid uid)
                                         interpolators_.end(),
                                         [&](const InterpolatorEntry& e) { return e.owner == uid; }),
                          interpolators_.end());
+}
+
+size_t TypeRegistry::check_owner_hives(Uid uid) const
+{
+#ifdef _DEBUG
+    std::shared_lock lock(mutex_);
+    size_t count = 0;
+    for (const auto& e : types_) {
+        if (e.owner == uid && e.hive) {
+            auto* hive = static_cast<impl::ObjectHive*>(e.hive.get());
+            if (hive->has_outstanding_refs()) {
+                VELK_LOG(E, "check_owner_hives: hive for '%s' has outstanding refs",
+                         e.factory->get_class_info().name.data());
+                ++count;
+            }
+        }
+    }
+    return count;
+#else
+    (void)uid;
+    return 0;
+#endif
 }
 
 impl::ObjectHive* TypeRegistry::ensure_hive(const Entry& entry) const

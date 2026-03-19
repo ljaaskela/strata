@@ -23,6 +23,7 @@ public:
     VELK_CLASS_UID(ClassId::Property, "Property");
 
     Property() = default;
+    ~Property() override;
 
 public: // IStorageOwned
     IObjectStorage* get_owner() const override { return owner_; }

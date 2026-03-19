@@ -31,6 +31,7 @@ class ArrayPropertyTest : public ::testing::Test
 {
 protected:
     static void SetUpTestSuite() { instance().type_registry().register_type<ArrayWidget>(); }
+    static void TearDownTestSuite() { instance().type_registry().unregister_type<ArrayWidget>(); }
 };
 
 // Basic creation and defaults

@@ -6,6 +6,8 @@
 #include <velk/ext/object.h>
 #include <velk/interface/intf_metadata.h>
 
+#include <gtest/gtest.h>
+
 namespace test_detail {
 
 class ITestInt : public ::velk::Interface<ITestInt>
@@ -37,6 +39,15 @@ inline void ensure_registered()
     ::velk::instance().type_registry().register_type<TestFloatObj>();
 }
 
+inline void ensure_unregistered()
+{
+    static bool done = false;
+    if (done) return;
+    done = true;
+    ::velk::instance().type_registry().unregister_type<TestIntObj>();
+    ::velk::instance().type_registry().unregister_type<TestFloatObj>();
+}
+
 /// Property wrapper that keeps the owning object alive.
 /// Inherits Property<T> so template deduction (e.g. create_tween) works unchanged.
 template <class T>
@@ -64,6 +75,15 @@ PropOwner<T> create_owned_property(const T& value = {})
     if (value != T{}) r.set_value(value);
     return r;
 }
+
+class TestHelpersCleanup : public ::testing::Environment
+{
+public:
+    void TearDown() override { ensure_unregistered(); }
+};
+
+inline ::testing::Environment* const test_helpers_env_ =
+    ::testing::AddGlobalTestEnvironment(new TestHelpersCleanup());
 
 } // namespace test_detail
 

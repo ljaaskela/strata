@@ -9,6 +9,16 @@
 
 namespace velk::impl {
 
+Property::~Property()
+{
+    // Walk the extension chain calling take_inner() so each extension
+    // can clean up (e.g. break ref cycles).
+    auto current = std::move(data_);
+    while (auto* ext = interface_cast<IAnyExtension>(current)) {
+        current = ext->take_inner(*static_cast<IInterface*>(static_cast<void*>(this)));
+    }
+}
+
 ReturnValue Property::set_value(const IAny& from, InvokeType type)
 {
     type = resolve_invoke_type(type, get_object_data().owner_thread_id);

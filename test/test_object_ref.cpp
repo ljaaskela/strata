@@ -343,32 +343,37 @@ TEST(ObjectRefProperty, OwningModeViaWrapper)
 
 TEST(ObjectRefProperty, ConstraintViaWrapper)
 {
-    auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
-    auto* meta = velk::interface_cast<velk::IMetadata>(obj);
-    ASSERT_TRUE(meta);
-
-    auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
-    auto prop = intf->child();
-
     {
-        auto writer = meta->write<IObjectRefPropTest>();
-        writer->child.set_constraint<IConstraintTest>();
+        auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
+        auto* meta = velk::interface_cast<velk::IMetadata>(obj);
+        ASSERT_TRUE(meta);
+
+        auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
+        auto prop = intf->child();
+
+        {
+            auto writer = meta->write<IObjectRefPropTest>();
+            writer->child.set_constraint<IConstraintTest>();
+        }
+
+        auto reader = meta->read<IObjectRefPropTest>();
+        EXPECT_EQ(reader->child.constraint_uid(), IConstraintTest::UID);
+
+        // Set an object that implements IConstraintTest
+        auto good_target = ::velk::instance().create<velk::IObject>(ConstraintTestImpl::static_class_id());
+        {
+            auto writer = meta->write<IObjectRefPropTest>();
+            EXPECT_EQ(writer->child.set(good_target), velk::ReturnValue::Success);
+        }
+
+        // Set an object that doesn't implement IConstraintTest
+        auto bad_target = ::velk::instance().create<velk::IObject>(velk::ClassId::Property);
+        {
+            auto writer = meta->write<IObjectRefPropTest>();
+            EXPECT_EQ(writer->child.set(bad_target), velk::ReturnValue::InvalidArgument);
+        }
     }
 
-    auto reader = meta->read<IObjectRefPropTest>();
-    EXPECT_EQ(reader->child.constraint_uid(), IConstraintTest::UID);
-
-    // Set an object that implements IConstraintTest
-    auto good_target = ::velk::instance().create<velk::IObject>(ConstraintTestImpl::static_class_id());
-    {
-        auto writer = meta->write<IObjectRefPropTest>();
-        EXPECT_EQ(writer->child.set(good_target), velk::ReturnValue::Success);
-    }
-
-    // Set an object that doesn't implement IConstraintTest
-    auto bad_target = ::velk::instance().create<velk::IObject>(velk::ClassId::Property);
-    {
-        auto writer = meta->write<IObjectRefPropTest>();
-        EXPECT_EQ(writer->child.set(bad_target), velk::ReturnValue::InvalidArgument);
-    }
+    ::velk::instance().type_registry().unregister_type<ConstraintTestImpl>();
+    ::velk::instance().type_registry().unregister_type<ObjectRefPropTestImpl>();
 }
