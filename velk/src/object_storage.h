@@ -72,8 +72,8 @@ private:
     mutable vector<std::pair<size_t, IInterface::Ptr>> instances_;
     mutable uint32_t attachment_end_{0}; ///< Boundary between attachments and metadata entries.
 
-    /// One event slot per metadata member, indexed by member index. Null until first access.
-    mutable vector<IEvent::Ptr> property_events_;
+    /// One slot per metadata member, indexed by storage id. Null until first access.
+    mutable vector<IEvent::Ptr> member_data_;
     /// Object-level observers for property change notifications.
     vector<IMetadataObserver*> observers_;
 

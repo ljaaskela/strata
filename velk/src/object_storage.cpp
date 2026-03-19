@@ -20,7 +20,7 @@ static constexpr size_t AttachmentSentinel = std::numeric_limits<size_t>::max();
 ObjectStorage::ObjectStorage(array_view<MemberDesc> members, IInterface* owner)
     : members_(members),
       owner_(owner),
-      property_events_(members.size())
+      member_data_(members.size())
 {}
 
 array_view<MemberDesc> ObjectStorage::get_static_metadata() const
@@ -253,13 +253,13 @@ IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Res
 
 IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) const
 {
-    if (storage_id >= property_events_.size()) {
+    if (storage_id >= member_data_.size()) {
         return {};
     }
-    if (!property_events_[storage_id] && mode == Resolve::Create) {
-        instance().type_registry().create_event_once(property_events_[storage_id]);
+    if (!member_data_[storage_id] && mode == Resolve::Create) {
+        instance().type_registry().create_event_once(member_data_[storage_id]);
     }
-    return property_events_[storage_id];
+    return member_data_[storage_id];
 }
 
 void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* property) const
@@ -275,8 +275,8 @@ void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* proper
             return;
         }
     }
-    if (storage_id < property_events_.size()) {
-        invoke_event(property_events_[storage_id], property->get_value().get());
+    if (storage_id < member_data_.size() && member_data_[storage_id]) {
+        invoke_event(member_data_[storage_id], property->get_value().get());
     }
     for (auto* observer : observers_) {
         observer->on_property_changed(*property);

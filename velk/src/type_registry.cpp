@@ -193,18 +193,6 @@ void TypeRegistry::sweep_owner(Uid uid)
 {
     std::unique_lock lock(mutex_);
 
-#ifdef _DEBUG
-    for (const auto& e : types_) {
-        if (e.owner == uid && e.hive) {
-            auto* hive = static_cast<impl::ObjectHive*>(e.hive.get());
-            if (hive->has_outstanding_refs()) {
-                VELK_LOG(E, "sweep_owner: hive for '%s' has outstanding refs",
-                         e.factory->get_class_info().name.data());
-            }
-        }
-    }
-#endif
-
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
 
