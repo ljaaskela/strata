@@ -308,4 +308,7 @@ TEST(VariantProperty, StateStructAccess)
     EXPECT_EQ(val->get_data(&result, sizeof(int32_t), velk::type_uid<int32_t>()),
               velk::ReturnValue::Success);
     EXPECT_EQ(result, 99);
+
+    obj.reset();
+    ::velk::instance().type_registry().unregister_type<VariantPropTestImpl>();
 }

@@ -81,6 +81,9 @@ public:
     void for_each(void* context, VisitorFn visitor) const override;
     void for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const override;
 
+    /** @brief Returns true if any page has live objects or outstanding weak refs. */
+    bool has_outstanding_refs() const;
+
     /** @brief Scans all active slots with prefetching, calling visit(slot_ptr) for each. */
     template <class VisitFn>
     void scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const;

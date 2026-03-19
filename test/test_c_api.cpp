@@ -40,6 +40,10 @@ protected:
     {
         ::velk::register_type<CApiWidget>(::velk::instance());
     }
+    static void TearDownTestSuite()
+    {
+        ::velk::unregister_type<CApiWidget>(::velk::instance());
+    }
 };
 
 // UID helpers

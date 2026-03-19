@@ -1,5 +1,6 @@
 #include "plugin_registry.h"
 
+#include <velk/api/velk.h>
 #include <velk/ext/plugin.h>
 #include <velk/interface/intf_log.h>
 
@@ -250,6 +251,16 @@ ReturnValue PluginRegistry::unload_plugin(Uid pluginId)
     // Phase 2: shutdown and cleanup outside lock.
     plugin->shutdown(velk_);
 
+#ifdef _DEBUG
+    if (!config.retainTypesOnUnload) {
+        size_t leaks = types_.check_owner_hives(pluginId);
+        if (leaks > 0) {
+            VELK_LOG(E, "unload_plugin: shutdown() did not release all owned objects (%zu hives with refs)",
+                 leaks);
+        }
+    }
+#endif
+
     if (!config.retainTypesOnUnload) {
         types_.sweep_owner(pluginId);
     }
@@ -302,6 +313,16 @@ void PluginRegistry::shutdown_all()
         }
 
         plugin->shutdown(velk_);
+
+#ifdef _DEBUG
+        if (!config.retainTypesOnUnload) {
+            size_t leaks = types_.check_owner_hives(uid);
+            if (leaks > 0) {
+                VELK_LOG(E, "shutdown_all: plugin shutdown() did not release all owned objects (%zu hives with refs)",
+                         leaks);
+            }
+        }
+#endif
 
         if (!config.retainTypesOnUnload) {
             types_.sweep_owner(uid);

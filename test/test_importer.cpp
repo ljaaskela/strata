@@ -412,6 +412,8 @@ TEST_F(ImporterTest, ImportByScopedFriendlyName)
     EXPECT_FLOAT_EQ(320.0f, pw->width().get_value());
     EXPECT_FLOAT_EQ(240.0f, pw->height().get_value());
 
+    obj.reset();
+    result = {};
     ::velk::instance().plugin_registry().unload_plugin(WidgetPlugin::static_class_id());
 }
 
@@ -796,6 +798,10 @@ protected:
 
     static void TearDownTestSuite()
     {
+        auto& reg = ::velk::instance().plugin_registry();
+        if (reg.find_plugin(PluginId::AnimatorPlugin)) {
+            reg.unload_plugin(PluginId::AnimatorPlugin);
+        }
         ::velk::instance().type_registry().unregister_type<TestImportWidget>();
     }
 
@@ -821,9 +827,6 @@ protected:
         if (reg.find_plugin(PluginId::ImporterPlugin)) {
             reg.unload_plugin(PluginId::ImporterPlugin);
         }
-        // Do not unload the animator plugin here: other test suites may still
-        // hold properties with transition extensions whose vtables live in the
-        // animator DLL. The plugin stays loaded for the process lifetime.
     }
 
     static bool has_animation_extension(const IProperty::Ptr& prop)

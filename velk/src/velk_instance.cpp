@@ -3,6 +3,7 @@
 #include "hive/raw_hive.h"
 #include "object_storage.h"
 
+#include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
 
 namespace velk {
@@ -103,7 +104,11 @@ void VelkInstance::flush_deferred_properties(vector<DeferredPropertySet>& propSe
     }
     // Second pass: fire on_changed for all properties that changed.
     for (auto* prop : notify) {
-        invoke_event(prop->on_changed(), prop->get_any().get());
+        if (auto* owned = interface_cast<IStorageOwned>(prop)) {
+            ::velk::invoke_property_changed(owned->get_owner(), owned->get_storage_id(), prop);
+        } else {
+            invoke_event(prop->on_changed(), prop->get_any().get());
+        }
     }
 }
 

@@ -31,6 +31,10 @@ ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
 
 ReturnValue AnimatorPlugin::shutdown(IVelk&)
 {
+    if (auto* a = interface_cast<IAnimator>(animator_)) {
+        a->cancel_all();
+    }
+    animator_.reset();
     return ReturnValue::Success;
 }
 
