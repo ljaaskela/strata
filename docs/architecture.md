@@ -123,9 +123,9 @@ Internal runtime implementations (compiled into the DLL).
 | `library_handle.h` | Platform-abstracted shared library loading (`LoadLibrary`/`dlopen`) |
 | `platform.h` | Platform-specific OS includes (`windows.h`, `dlfcn.h`, `pthread.h`) |
 | `object_storage.cpp/h` | `ObjectStorage` implementing `IObjectStorage` with lazy member creation and attachments |
-| `property.cpp/h` | `PropertyImpl` |
-| `function.cpp/h` | `FunctionImpl` implementing `IFunction` |
-| `event.cpp/h` | `EventImpl` implementing `IEvent` (inherits `IFunction`) |
+| `property.cpp/h` | `ClassId::Property` implementation |
+| `function.cpp/h` | `ClassId::Function` implementing `IFunction` |
+| `event.cpp/h` | `ClassId::Event` implementing `IEvent` (inherits `IFunction`) |
 | `velk.cpp` | DLL entry point, exports `instance()` |
 
 ## Type hierarchy across layers
@@ -307,7 +307,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 
 | Class | Role | When to use |
 |-------|------|-------------|
-| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkInstance`) |
+| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`ClassId::Property`, `ClassId::Function`, `VelkInstance`) |
 | `ext::Object<Final, Intf...>` | Full base with metadata and attachments | User-defined types with `VELK_INTERFACE` |
 | `ext::Plugin<Final>` | Plugin base with static metadata | Plugin implementations |
 
