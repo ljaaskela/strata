@@ -41,11 +41,11 @@ Velk follows a "pay for what you use" principle. Every abstraction layer is desi
 
 ### Lazy metadata creation
 
-`ObjectStorage` is not allocated until the first runtime metadata access (e.g. `get_property()`, `get_event()`, `get_function()`). Until then, the object carries only a null pointer. Once the container exists, individual member instances (`PropertyImpl`, `FunctionImpl`, `EventImpl`) are created on demand by `find_or_create()`, which checks a cache of already-created instances before scanning the static metadata array. An object that never touches its metadata at runtime pays nothing beyond the object itself.
+`ObjectStorage` is not allocated until the first runtime metadata access (e.g. `get_property()`, `get_event()`, `get_function()`). Until then, the object carries only a null pointer. Once the container exists, individual member instances (`ClassId::Property`, `ClassId::Function`, `ClassId::Event`) are created on demand by `find_or_create()`, which checks a cache of already-created instances before scanning the static metadata array. An object that never touches its metadata at runtime pays nothing beyond the object itself.
 
 ### Lazy change events
 
-Properties use `LazyEvent` for their `on_changed` notification. `LazyEvent` holds a single `shared_ptr<IEvent>` that starts null. The underlying `EventImpl` is created only on first access, either when a handler is registered or when the event is explicitly retrieved. Properties that are never observed pay no event overhead (16 bytes for the null `shared_ptr`, no heap allocation).
+Property change events are owned by `ObjectStorage`, not by each `ClassId::Property` instance. `ObjectStorage` lazily creates a `ClassId::Event` per property on first access (`get_property_event` with `Resolve::Create`). Properties that are never observed pay no event overhead. Firing a change (`invoke_property_changed`) uses `Resolve::Existing` so no event is created if nobody has subscribed.
 
 ### Extension chain
 
@@ -79,22 +79,22 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~11 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~12 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
-| **Variant get** | Property lookup + delegate | ~9 ns | Same-type returns IAny pointer directly; conversion path scans type table (~41 ns) |
-| **Variant set** | `copy_from` + delegate | ~31 ns | Same-type delegates to inner IAny; type-change allocates new inner (~98 ns) |
-| **Variant state read/write** | Direct `get_data`/`set_data` | ~5/10 ns | `Variant::get<T>()`/`set<T>()` bypass PropertyImpl, call VariantImpl directly |
+| **Property get** | 1 virtual call + `memcpy` | ~37 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~22 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Variant get** | Property lookup + delegate | ~20 ns | Same-type returns IAny pointer directly; conversion path scans type table (~44 ns) |
+| **Variant set** | `copy_from` + delegate | ~43 ns | Same-type delegates to inner IAny; type-change allocates new inner (~103 ns) |
+| **Variant state read/write** | Direct `get_data`/`set_data` | ~5/11 ns | `Variant::get<T>()`/`set<T>()` bypass `ClassId::Property`, call `ClassId::Variant` directly |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~13 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
-| **Typed-arg trampoline** | Arg extraction + indirect call | ~41 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
+| **Typed-arg trampoline** | Arg extraction + indirect call | ~42 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
 | **Raw function invoke** | 1 indirect call | ~14 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
 | **Event dispatch (immediate)** | Snapshot + loop | ~36 ns | Snapshots handler list, then iterates; safe against handler mutation during dispatch |
-| **Event dispatch (deferred)** | Clone + queue | ~139 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **Event dispatch (deferred)** | Clone + queue | ~144 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~603 ns | First `get_property()` call; allocates `ClassId::Property` and caches result |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~563 ns | First `get_property()` call; allocates `ClassId::Property` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | placement-new into hive page | ~53 ns | Factory lookup (`O(log N)`), then hive allocation (default for types < 1 KB via `CreationPolicy::Auto`); no per-object heap alloc after initial page |
+| **Object creation** | placement-new into hive page | ~55 ns | Factory lookup (`O(log N)`), then hive allocation (default for types < 1 KB via `CreationPolicy::Auto`); no per-object heap alloc after initial page |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -107,8 +107,8 @@ The backing `IAny` is typically an `AnyRef<T>`, a non-owning pointer into the ob
 ### Variant property get/set
 
 A variant property uses the same `ClassId::Property` path as a typed property, but the backing `IAny` is a `ClassId::Variant` that holds an inner typed `IAny` (e.g. `AnyValue<float>`) and delegates to it. 
-* Same-type gets (~8 ns) return the `IAny` pointer directly without calling `get_data`, while conversion gets (~41 ns) scan a static 42-entry conversion table with no heap allocation. 
-* Same-type sets (~31 ns) delegate to the inner `IAny`'s `copy_from`, type-change sets (~92 ns) allocate a new inner `IAny`, which dominates the cost. For hot paths, `Variant::get<T>()`/`set<T>()` bypass `ClassId::Property` entirely and call `ClassId::Variant` directly (~5/9 ns). 
+* Same-type gets (~20 ns) return the `IAny` pointer directly without calling `get_data`, while conversion gets (~44 ns) scan a static 42-entry conversion table with no heap allocation.
+* Same-type sets (~43 ns) delegate to the inner `IAny`'s `copy_from`, type-change sets (~103 ns) allocate a new inner `IAny`, which dominates the cost. For hot paths, `Variant::get<T>()`/`set<T>()` bypass `ClassId::Property` entirely and call `ClassId::Variant` directly (~5/11 ns).
 
 Per-instance memory overhead of a Variant is one `IAny::Ptr` (16 bytes) inside `ClassId::Variant` plus one `IVariant::Ptr` (16 bytes) in the State struct; compatible-type information is a single static array shared across all instances.
 
@@ -120,7 +120,7 @@ For trivially-copyable state structs, the entire state can be snapshotted or res
 
 ### Function invoke
 
-`FunctionImpl` stores a `target_fn_` / `target_context_` pair. Invocation is a single indirect call: `target_fn_(target_context_, args)`. For `VELK_INTERFACE` functions, the context is a pointer to the owning object and `target_fn_` is a static trampoline generated by `FnBind` or `FnRawBind`.
+`ClassId::Function` stores a `target_fn_` / `target_context_` pair. Invocation is a single indirect call: `target_fn_(target_context_, args)`. For `VELK_INTERFACE` functions, the context is a pointer to the owning object and `target_fn_` is a static trampoline generated by `FnBind` or `FnRawBind`.
 
 - **Zero-arg / typed-arg (`FN`)**: The `FnBind` trampoline extracts typed values from `FnArgs` via `IAny::get_data()` (one per argument), then calls the virtual `fn_Name(...)`.
 - **Raw (`FN_RAW`)**: The `FnRawBind` trampoline passes `FnArgs` through unchanged, no extraction overhead.
@@ -143,13 +143,13 @@ Complexity is `O(N + P)` where N is the number of interfaces in the pack (typica
 
 ### Metadata lookup
 
-`ObjectStorage::find_or_create(name, kind)` checks the `instances_` cache first, a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
+`ObjectStorage::find_or_create(name, kind)` checks the `instances_` cache first, a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `ClassId::Property` or `ClassId::Function`, wires up the virtual dispatch trampoline, and caches the result.
 
 Subsequent accesses for the same member skip creation and only pay the cache lookup cost. Since applications typically access a subset of declared members, the cache-first scan is shorter than the full members array. Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr`, shared across all instances at zero per-object cost.
 
 ### Object creation
 
-`instance().create()` defaults to hive-backed allocation for most types. The ~53 ns benchmark number measures this hive path.
+`instance().create()` defaults to hive-backed allocation for most types. The ~55 ns benchmark number measures this hive path.
 
 **Steps (hive path, default):**
 
@@ -173,7 +173,7 @@ instance().type_registry().register_type<MyType>({CreationPolicy::Auto}); // def
 
 **allocate() vs add():** TypeRegistry's `create()` uses `ObjectHive::allocate()`, which produces a born zombie (external ownership only, not iterable). `ObjectHive::add()` creates an active slot where the hive holds a strong reference and the object is iterable via `for_each()`. Use `add()` when the hive should own and enumerate its objects; `allocate()` when the caller manages lifetime independently.
 
-No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
+No member instances (`ClassId::Property`, `ClassId::Function`) are created until first access.
 
 ## Hierarchy
 
@@ -181,16 +181,16 @@ Hierarchy operations are measured on balanced binary trees of `BenchWidget` obje
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **parent_of** | Hash lookup | ~76 ns | Returns parent of a leaf in a 1024-node tree |
+| **parent_of** | Hash lookup | ~78 ns | Returns parent of a leaf in a 1024-node tree |
 | **contains** | Hash lookup | ~14 ns | Checks membership of a known leaf |
-| **children_of** (512 children) | Copy vector | ~31 µs | Returns `vector<IObject::Ptr>`; cost dominated by ref-count bumps |
-| **for_each_child** (512 children) | Iterate + cast | ~5.7 µs | Visits each child via `interface_cast<IObject>` callback |
-| **add + remove** (leaf) | 2 mutations | ~398 ns | Steady-state add then remove on a 256-node tree |
-| **replace** | In-place swap | ~644 ns | Replaces a node, reparents children |
-| **set_root** | 1 mutation | ~401 ns | Sets root on an empty hierarchy (includes object creation) |
-| **Build tree/64** | 64 add ops | ~20 µs | Balanced binary tree construction |
-| **Build tree/512** | 512 add ops | ~159 µs | |
-| **Build tree/1024** | 1024 add ops | ~324 µs | ~316 ns per node amortized |
+| **children_of** (512 children) | Copy vector | ~30 µs | Returns `vector<IObject::Ptr>`; cost dominated by ref-count bumps |
+| **for_each_child** (512 children) | Iterate + cast | ~5.4 µs | Visits each child via `interface_cast<IObject>` callback |
+| **add + remove** (leaf) | 2 mutations | ~408 ns | Steady-state add then remove on a 256-node tree |
+| **replace** | In-place swap | ~507 ns | Replaces a node, reparents children |
+| **set_root** | 1 mutation | ~381 ns | Sets root on an empty hierarchy (includes object creation) |
+| **Build tree/64** | 64 add ops | ~17 µs | Balanced binary tree construction |
+| **Build tree/512** | 512 add ops | ~135 µs | |
+| **Build tree/1024** | 1024 add ops | ~275 µs | ~268 ns per node amortized |
 
 ### Queries
 
@@ -202,14 +202,14 @@ Hierarchy operations are measured on balanced binary trees of `BenchWidget` obje
 
 ### Tree construction
 
-Building a balanced binary tree scales linearly. At 1024 nodes the amortized cost is ~316 ns per node, which includes object creation (~53 ns) plus the `add()` operation.
+Building a balanced binary tree scales linearly. At 1024 nodes the amortized cost is ~268 ns per node, which includes object creation (~55 ns) plus the `add()` operation.
 
 ### Event overhead
 
 | Scenario | Measured | Notes |
 |---|---|---|
-| add + remove, no handler | ~401 ns | Baseline: no event listeners |
-| add + remove, with handler | ~638 ns | One `on_changed` handler subscribed |
+| add + remove, no handler | ~407 ns | Baseline: no event listeners |
+| add + remove, with handler | ~646 ns | One `on_changed` handler subscribed |
 
 Subscribing an `on_changed` handler adds ~59% overhead to mutation operations. With no handlers registered, the event system imposes no cost beyond checking for an empty handler list.
 
@@ -308,11 +308,11 @@ ClassId::Property (72 bytes)        ClassId::Function (64 bytes)        ClassId:
 │ flags + padding          8 │      │ flags + padding          8 │      │ flags + padding          8 │
 │ block*                   8 │      │ block*                   8 │      │ block*                   8 │
 │ data_ (shared_ptr)      16 │      │ target_context_          8 │      │ target_context_          8 │
-│ onChanged_ (LazyEvent)  16 │      │ target_fn_               8 │      │ target_fn_               8 │
-│ external_ (bool) + pad   8 │      │ owned_context_           8 │      │ owned_context_           8 │
-│ (total verified: 72)       │      │ context_deleter_         8 │      │ context_deleter_         8 │
-└────────────────────────────┘      │ (total verified: 64)       │      │ handlers_ (vector)      24 │
-                                    └────────────────────────────┘      │ deferred_begin_ + pad    8 │
+│ owner_ (pointer)         8 │      │ target_fn_               8 │      │ target_fn_               8 │
+│ storage_id_ (size_t)     8 │      │ owned_context_           8 │      │ owned_context_           8 │
+│ external_ (bool) + pad   8 │      │ context_deleter_         8 │      │ context_deleter_         8 │
+│ (total verified: 72)       │      │ (total verified: 64)       │      │ handlers_ (vector)      24 │
+└────────────────────────────┘      └────────────────────────────┘      │ deferred_begin_ + pad    8 │
                                                                         │ (total verified: 96)       │
                                                                         └────────────────────────────┘
 ```
@@ -322,4 +322,4 @@ Internal interface types use inheritance to reduce MI chains: `IPropertyInternal
 - **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. **ArrayAnyValue** extends the same single chain (`IInterface` → `IObject` → `IAny` → `IArrayAny`), still one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop, it is always heap-allocated at construction.
 - **`ClassId::Function`** is the lightweight invoke-only implementation. The primary invoke target uses a unified context/function-pointer pair; plain callbacks go through a static trampoline. Owned callbacks (`set_owned_callback`) store heap-allocated context with a type-erased deleter. IEvent methods (`add_handler`, `remove_handler`) are stubs.
 - **`ClassId::Event`** extends the same invoke machinery with a partitioned handler list: `[0, deferred_begin_)` for immediate handlers, `[deferred_begin_, size())` for deferred. When no handlers are registered the vector is empty (zero heap allocation).
-- **`ClassId::Property`** holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications. `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `EventImpl` until a handler is actually registered or the event is invoked.
+- **`ClassId::Property`** holds a shared pointer to its backing `IAny` storage, a back-pointer to its owning `IObjectStorage`, and a storage index. Change events are owned by `ObjectStorage` rather than the property itself, so the property carries no per-instance event overhead. The destructor walks the extension chain calling `take_inner()` to break ref cycles when the property is destroyed.

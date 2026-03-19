@@ -38,7 +38,7 @@ For types that need custom storage or side effects (e.g. data that lives in a GP
 
 ### How properties use IAny
 
-A property (`PropertyImpl`) holds a single `IAny::Ptr` called `data_`. All reads and writes go through it:
+A property (`ClassId::Property`) holds a single `IAny::Ptr` called `data_`. All reads and writes go through it:
 
 ```
 Property::set_value(from)  -->  data_->copy_from(from)  -->  on_changed fires
@@ -66,7 +66,7 @@ Because `IAnyExtension` inherits `IAny`, an extension can be placed directly int
 Extensions form a chain. Each extension's inner points to the next, which may be another extension or the original plain `IAny`:
 
 ```
-PropertyImpl::data_
+Property::data_
   --> ExtensionA (IAnyExtension)
         inner_ --> ExtensionB (IAnyExtension)
                      inner_ --> AnyRef<float> (plain IAny, the original value)
