@@ -175,7 +175,8 @@ bool Property::remove_extension(const IAnyExtension::Ptr& extension)
 
 void Property::invoke_on_changed() const
 {
-    ::velk::invoke_property_changed(owner_, storage_id_);
+    auto* self = const_cast<Property*>(this)->get_interface<IProperty>();
+    ::velk::invoke_property_changed(owner_, storage_id_, self);
 }
 
 } // namespace velk::impl

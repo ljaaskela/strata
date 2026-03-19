@@ -104,9 +104,9 @@ protected:
     {
         return with_storage([&](auto& s) { return s.get_property_event(storage_id, mode); });
     }
-    void storage_invoke_property_changed(size_t storage_id) const
+    void storage_invoke_property_changed(size_t storage_id, IProperty* property) const
     {
-        with_storage([&](auto& s) { s.invoke_property_changed(storage_id); });
+        with_storage([&](auto& s) { s.invoke_property_changed(storage_id, property); });
     }
     void storage_add_observer(IMetadataObserver* observer)
     {
@@ -206,9 +206,9 @@ public: // IObjectStorage overrides
     {
         return storage_get_property_event(storage_id, mode);
     }
-    void invoke_property_changed(size_t storage_id) const override
+    void invoke_property_changed(size_t storage_id, IProperty* property) const override
     {
-        storage_invoke_property_changed(storage_id);
+        storage_invoke_property_changed(storage_id, property);
     }
     void add_observer(IMetadataObserver* observer) override
     {

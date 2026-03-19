@@ -264,27 +264,23 @@ IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) c
 
 void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* property) const
 {
-    if (property) {
-        if (storage_id < property_events_.size()) {
-            invoke_event(property_events_[storage_id], property->get_value().get());
+    if (!property) {
+        for (size_t i = attachment_end_; i < instances_.size(); ++i) {
+            if (instances_[i].first == storage_id) {
+                property = interface_cast<IProperty>(instances_[i].second);
+                break;
+            }
         }
-        for (auto* observer : observers_) {
-            observer->on_property_changed(*property);
-        }
-    }
-}
-
-void ObjectStorage::invoke_property_changed(size_t storage_id) const
-{
-    // Find the property instance by storage_id (member index)
-    IProperty* prop = nullptr;
-    for (size_t i = attachment_end_; i < instances_.size(); ++i) {
-        if (instances_[i].first == storage_id) {
-            prop = interface_cast<IProperty>(instances_[i].second);
-            break;
+        if (!property) {
+            return;
         }
     }
-    invoke_property_changed(storage_id, prop);
+    if (storage_id < property_events_.size()) {
+        invoke_event(property_events_[storage_id], property->get_value().get());
+    }
+    for (auto* observer : observers_) {
+        observer->on_property_changed(*property);
+    }
 }
 
 void ObjectStorage::add_observer(IMetadataObserver* observer)

@@ -218,7 +218,8 @@ void ArrayProperty::clear_array()
 
 void ArrayProperty::invoke_on_changed() const
 {
-    ::velk::invoke_property_changed(owner_, storage_id_);
+    auto* self = const_cast<ArrayProperty*>(this)->get_interface<IProperty>();
+    ::velk::invoke_property_changed(owner_, storage_id_, self);
 }
 
 } // namespace velk::impl

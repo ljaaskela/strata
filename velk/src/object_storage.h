@@ -59,13 +59,11 @@ public: // IObjectStorage (attachment operations)
 
 public: // IObjectStorage (property events + observers)
     IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const override;
-    void invoke_property_changed(size_t storage_id) const override;
+    void invoke_property_changed(size_t storage_id, IProperty* property) const override;
     void add_observer(IMetadataObserver* observer) override;
     void remove_observer(IMetadataObserver* observer) override;
 
 private:
-    void invoke_property_changed(size_t storage_id, IProperty* property) const;
-
     array_view<MemberDesc> members_; ///< Static metadata descriptors from VELK_INTERFACE.
     IInterface* owner_{};            ///< Owning object for trampoline binding and state access.
 

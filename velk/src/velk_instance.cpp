@@ -105,8 +105,7 @@ void VelkInstance::flush_deferred_properties(vector<DeferredPropertySet>& propSe
     // Second pass: fire on_changed for all properties that changed.
     for (auto* prop : notify) {
         if (auto* owned = interface_cast<IStorageOwned>(prop)) {
-            ::velk::invoke_property_changed(interface_cast<IObjectStorage>(owned->get_owner()),
-                                            owned->get_storage_id());
+            ::velk::invoke_property_changed(owned->get_owner(), owned->get_storage_id(), prop);
         } else {
             invoke_event(prop->on_changed(), prop->get_any().get());
         }

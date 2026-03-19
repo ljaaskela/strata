@@ -73,10 +73,12 @@ public:
 public: // IStorageOwned
     IObjectStorage* get_owner() const override { return owner_; }
     size_t get_storage_id() const override { return storage_id_; }
-    void set_owner(IInterface* storage, size_t id) override
+    void set_owner(IObjectStorage* storage, size_t id) override
     {
-        owner_ = interface_cast<IObjectStorage>(storage);
-        storage_id_ = id;
+        if (!owner_) {
+            owner_ = storage;
+            storage_id_ = id;
+        }
     }
 
 public: // IFunction

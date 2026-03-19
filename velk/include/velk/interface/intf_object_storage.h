@@ -75,9 +75,12 @@ public:
     virtual IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const = 0;
     /**
      * @brief Fires the on_changed event for a property and notifies object-level observers.
-     * @param storage_id The member index (uses Resolve::Existing so no event is created if nobody subscribed).
+     * @param storage_id The member index (uses Resolve::Existing so no event is created if nobody
+     * subscribed).
+     * @param property Direct pointer to the property with matching storage id.
+     *        If nullptr, a property with @p storage_id is search from storage.
      */
-    virtual void invoke_property_changed(size_t storage_id) const = 0;
+    virtual void invoke_property_changed(size_t storage_id, IProperty* property) const = 0;
     /** @brief Registers an observer for property change notifications on this object. */
     virtual void add_observer(IMetadataObserver* observer) = 0;
     /** @brief Removes a previously registered observer. */
@@ -91,10 +94,10 @@ inline IEvent::Ptr get_property_event(IObjectStorage* storage, size_t storage_id
 }
 
 /** @brief Null-safe helper to fire property changed on the owner. */
-inline void invoke_property_changed(IObjectStorage* storage, size_t storage_id)
+inline void invoke_property_changed(IObjectStorage* storage, size_t storage_id, IProperty* property = nullptr)
 {
     if (storage) {
-        storage->invoke_property_changed(storage_id);
+        storage->invoke_property_changed(storage_id, property);
     }
 }
 
