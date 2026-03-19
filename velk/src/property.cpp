@@ -30,7 +30,7 @@ ReturnValue Property::set_value(const IAny& from, InvokeType type)
     // type == Immediate, just copy the value
     auto ret = data_->copy_from(from);
     if (ret == ReturnValue::Success && !external_) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -64,7 +64,8 @@ bool Property::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
         // our on_changed. PropertyImpl skips its own explicit fire for external anys.
         external->on_data_changed()->add_handler(on_changed());
     }
-    return succeeded(invoke_event(on_changed(), data_.get()));
+    invoke_on_changed();
+    return true;
 }
 IAny::ConstPtr Property::get_any() const
 {
@@ -107,7 +108,7 @@ ReturnValue Property::set_data(const void* data, size_t size, Uid type, InvokeTy
     }
     auto ret = data_->set_data(data, size, type);
     if (ret == ReturnValue::Success && !external_) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -160,6 +161,11 @@ bool Property::remove_extension(const IAnyExtension::Ptr& extension)
         prev = next;
     }
     return false;
+}
+
+void Property::invoke_on_changed() const
+{
+    ::velk::invoke_property_changed(owner_, storage_id_);
 }
 
 } // namespace velk::impl

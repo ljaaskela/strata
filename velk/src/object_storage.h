@@ -2,6 +2,7 @@
 #define OBJECT_STORAGE_H
 
 #include <velk/ext/refcounted_dispatch.h>
+#include <velk/interface/intf_metadata_observer.h>
 #include <velk/interface/intf_object_storage.h>
 
 #include <velk/vector.h>
@@ -56,7 +57,15 @@ public: // IObjectStorage (attachment operations)
     IInterface::Ptr get_attachment(size_t index) const override;
     IInterface::Ptr find_attachment(const AttachmentQuery& query, Resolve mode) override;
 
+public: // IObjectStorage (property events + observers)
+    IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const override;
+    void invoke_property_changed(size_t storage_id) const override;
+    void add_observer(IMetadataObserver* observer) override;
+    void remove_observer(IMetadataObserver* observer) override;
+
 private:
+    void invoke_property_changed(size_t storage_id, IProperty* property) const;
+
     array_view<MemberDesc> members_; ///< Static metadata descriptors from VELK_INTERFACE.
     IInterface* owner_{};            ///< Owning object for trampoline binding and state access.
 
@@ -64,6 +73,11 @@ private:
     ///                         [attachment_end_, size()) = metadata instances.
     mutable vector<std::pair<size_t, IInterface::Ptr>> instances_;
     mutable uint32_t attachment_end_{0}; ///< Boundary between attachments and metadata entries.
+
+    /// One event slot per metadata member, indexed by member index. Null until first access.
+    mutable vector<IEvent::Ptr> property_events_;
+    /// Object-level observers for property change notifications.
+    vector<IMetadataObserver*> observers_;
 
     /** @brief Finds a static member by name and kind, creating its runtime instance if needed. */
     IInterface::Ptr find_or_create(string_view name, MemberKind kind, Resolve mode) const;

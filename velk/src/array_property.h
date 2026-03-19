@@ -3,10 +3,10 @@
 
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
-#include <velk/ext/event.h>
 #include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_array_any.h>
 #include <velk/interface/intf_array_property.h>
+#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 
@@ -26,10 +26,22 @@ public:
 
     ArrayProperty() = default;
 
+public: // IStorageOwned
+    IObjectStorage* get_owner() const override { return owner_; }
+    size_t get_storage_id() const override { return storage_id_; }
+    void set_owner(IInterface* storage, size_t id) override
+    {
+        owner_ = interface_cast<IObjectStorage>(storage);
+        storage_id_ = id;
+    }
+
 protected: // IProperty
     ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;
     const IAny::ConstPtr get_value() const override;
-    IEvent::Ptr on_changed() const override { return onChanged_; }
+    IEvent::Ptr on_changed() const override
+    {
+        return ::velk::get_property_event(owner_, storage_id_, Resolve::Create);
+    }
 
 protected: // IPropertyInternal
     bool set_any(const IAny::Ptr& value, IAny::Ptr* previous = nullptr) override;
@@ -38,6 +50,8 @@ protected: // IPropertyInternal
     ReturnValue set_value_silent(const IAny& from) override;
     bool install_extension(const IAnyExtension::Ptr& extension) override;
     bool remove_extension(const IAnyExtension::Ptr& extension) override;
+
+    void invoke_on_changed() const;
 
 protected: // IArrayProperty
     size_t array_size() const override;
@@ -51,7 +65,8 @@ private:
     IArrayAny* get_array_any() const;
 
     IAny::Ptr data_;
-    ext::LazyEvent onChanged_;
+    IObjectStorage* owner_{};
+    size_t storage_id_{};
 };
 
 } // namespace velk::impl

@@ -3,6 +3,7 @@
 
 #include "function.h"
 
+#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/types.h>
 #include <velk/vector.h>
 
@@ -22,6 +23,15 @@ public:
 
     Event() = default;
     ~Event();
+
+public: // IStorageOwned
+    IObjectStorage* get_owner() const override { return owner_; }
+    size_t get_storage_id() const override { return storage_id_; }
+    void set_owner(IInterface* storage, size_t id) override
+    {
+        owner_ = interface_cast<IObjectStorage>(storage);
+        storage_id_ = id;
+    }
 
 public: // IFunction
     IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const override;
@@ -45,6 +55,8 @@ private:
 
     void release_owned_context();
 
+    IObjectStorage* owner_{};
+    size_t storage_id_{};
     void* target_context_{};
     IFunction::BoundFn* target_fn_{};
     void* owned_context_{};

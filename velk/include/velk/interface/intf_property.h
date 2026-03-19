@@ -4,12 +4,13 @@
 #include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_function.h>
+#include <velk/interface/intf_storage_owned.h>
 #include <velk/vector.h>
 
 namespace velk {
 
 /** @brief Interface for a type-erased property with change notification. */
-class IProperty : public Interface<IProperty>
+class IProperty : public Interface<IProperty, IStorageOwned>
 {
 public:
     /**

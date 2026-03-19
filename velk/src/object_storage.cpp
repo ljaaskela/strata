@@ -19,7 +19,8 @@ static constexpr size_t AttachmentSentinel = std::numeric_limits<size_t>::max();
 
 ObjectStorage::ObjectStorage(array_view<MemberDesc> members, IInterface* owner)
     : members_(members),
-      owner_(owner)
+      owner_(owner),
+      property_events_(members.size())
 {}
 
 array_view<MemberDesc> ObjectStorage::get_static_metadata() const
@@ -131,6 +132,10 @@ IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind,
             created = create(m);
             // Bind (if function)
             bind(m, created);
+            // Set owner back-pointer for IStorageOwned
+            if (auto* owned = interface_cast<IStorageOwned>(created)) {
+                owned->set_owner(const_cast<ObjectStorage*>(this), i);
+            }
             // Add to metadata
             instances_.emplace_back(i, created);
         }
@@ -162,7 +167,6 @@ void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notif
     // Iterate only metadata entries (skip attachment region)
     for (size_t i = attachment_end_; i < instances_.size(); ++i) {
         auto idx = instances_[i].first;
-        auto& ptr = instances_[i].second;
         auto& m = members_[idx];
         if (m.kind != kind || !m.interfaceInfo || m.interfaceInfo->uid != interfaceUid) {
             continue;
@@ -171,9 +175,7 @@ void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notif
         switch (notification) {
         case Notification::Changed:
             if (kind == MemberKind::Property || kind == MemberKind::ArrayProperty) {
-                if (auto* prop = interface_cast<IProperty>(ptr)) {
-                    invoke_event(prop->on_changed(), prop->get_value().get());
-                }
+                invoke_property_changed(idx, interface_cast<IProperty>(instances_[i].second));
             }
             break;
         default:
@@ -247,6 +249,57 @@ IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Res
         return created;
     }
     return {};
+}
+
+IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) const
+{
+    if (storage_id >= property_events_.size()) {
+        return {};
+    }
+    if (!property_events_[storage_id] && mode == Resolve::Create) {
+        instance().type_registry().create_event_once(property_events_[storage_id]);
+    }
+    return property_events_[storage_id];
+}
+
+void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* property) const
+{
+    if (property) {
+        if (storage_id < property_events_.size()) {
+            invoke_event(property_events_[storage_id], property->get_value().get());
+        }
+        for (auto* observer : observers_) {
+            observer->on_property_changed(*property);
+        }
+    }
+}
+
+void ObjectStorage::invoke_property_changed(size_t storage_id) const
+{
+    // Find the property instance by storage_id (member index)
+    IProperty* prop = nullptr;
+    for (size_t i = attachment_end_; i < instances_.size(); ++i) {
+        if (instances_[i].first == storage_id) {
+            prop = interface_cast<IProperty>(instances_[i].second);
+            break;
+        }
+    }
+    invoke_property_changed(storage_id, prop);
+}
+
+void ObjectStorage::add_observer(IMetadataObserver* observer)
+{
+    if (observer) {
+        observers_.push_back(observer);
+    }
+}
+
+void ObjectStorage::remove_observer(IMetadataObserver* observer)
+{
+    auto it = std::find(observers_.begin(), observers_.end(), observer);
+    if (it != observers_.end()) {
+        observers_.erase(it);
+    }
 }
 
 } // namespace velk

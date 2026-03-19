@@ -1,3 +1,5 @@
+#include "test_helpers.h"
+
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/property.h>
@@ -216,7 +218,7 @@ protected:
         animatorObj_ = obj;
     }
 
-    Property<float> prop_ = create_property<float>(0.f);
+    test_detail::PropOwner<float> prop_ = create_property<float>(0.f);
     IAnimator* animator_ = nullptr;
     IObject::Ptr animatorObj_;
 };
@@ -431,7 +433,7 @@ protected:
         animatorObj_ = obj;
     }
 
-    Property<float> prop_ = create_property<float>(0.f);
+    test_detail::PropOwner<float> prop_ = create_property<float>(0.f);
     IAnimator* animator_ = nullptr;
     IObject::Ptr animatorObj_;
 };
@@ -569,7 +571,7 @@ protected:
     }
 
     Duration time_{};
-    Property<float> prop_ = create_property<float>(0.f);
+    test_detail::PropOwner<float> prop_ = create_property<float>(0.f);
 };
 
 TEST_F(ImplicitAnimationTest, TransitionAnimatesOnSetValue)

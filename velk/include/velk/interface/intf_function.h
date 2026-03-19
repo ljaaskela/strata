@@ -4,6 +4,7 @@
 #include <velk/common.h>
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_interface.h>
+#include <velk/interface/intf_storage_owned.h>
 #include <velk/thread.h>
 
 namespace velk {
@@ -46,7 +47,7 @@ struct FnArgs
 };
 
 /** @brief Interface for an invocable function object. */
-class IFunction : public Interface<IFunction>
+class IFunction : public Interface<IFunction, IStorageOwned>
 {
 public:
     /** @brief Function pointer type for invoke callbacks. */

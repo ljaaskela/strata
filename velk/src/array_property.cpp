@@ -26,7 +26,7 @@ ReturnValue ArrayProperty::set_value(const IAny& from, InvokeType type)
     }
     auto ret = data_->copy_from(from);
     if (ret == ReturnValue::Success) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -49,7 +49,8 @@ bool ArrayProperty::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
         }
     }
     data_ = value;
-    return succeeded(invoke_event(on_changed(), data_.get()));
+    invoke_on_changed();
+    return true;
 }
 
 IAny::ConstPtr ArrayProperty::get_any() const
@@ -76,7 +77,7 @@ ReturnValue ArrayProperty::set_data(const void* data, size_t size, Uid type, Inv
     }
     auto ret = data_->set_data(data, size, type);
     if (ret == ReturnValue::Success) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -165,7 +166,7 @@ ReturnValue ArrayProperty::set_at(size_t index, const IAny& value)
     }
     auto ret = aa->set_at(index, value);
     if (succeeded(ret)) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -181,7 +182,7 @@ ReturnValue ArrayProperty::push_back(const IAny& value)
     }
     auto ret = aa->push_back(value);
     if (succeeded(ret)) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -197,7 +198,7 @@ ReturnValue ArrayProperty::erase_at(size_t index)
     }
     auto ret = aa->erase_at(index);
     if (succeeded(ret)) {
-        invoke_event(on_changed(), data_.get());
+        invoke_on_changed();
     }
     return ret;
 }
@@ -212,7 +213,12 @@ void ArrayProperty::clear_array()
         return;
     }
     aa->clear_array();
-    invoke_event(on_changed(), data_.get());
+    invoke_on_changed();
+}
+
+void ArrayProperty::invoke_on_changed() const
+{
+    ::velk::invoke_property_changed(owner_, storage_id_);
 }
 
 } // namespace velk::impl

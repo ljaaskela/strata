@@ -2,6 +2,7 @@
 #define VELK_INTF_OBJECT_STORAGE_H
 
 #include <velk/interface/intf_metadata.h>
+#include <velk/interface/intf_metadata_observer.h>
 
 namespace velk {
 
@@ -65,7 +66,37 @@ public:
     {
         return interface_pointer_cast<T>(find_attachment({T::UID, classUid}, Resolve::Create));
     }
+
+    /**
+     * @brief Returns the on_changed event for a property by storage id.
+     * @param storage_id The member index within the static metadata array.
+     * @param mode Resolve::Create allocates the event if absent; Resolve::Existing returns nullptr.
+     */
+    virtual IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const = 0;
+    /**
+     * @brief Fires the on_changed event for a property and notifies object-level observers.
+     * @param storage_id The member index (uses Resolve::Existing so no event is created if nobody subscribed).
+     */
+    virtual void invoke_property_changed(size_t storage_id) const = 0;
+    /** @brief Registers an observer for property change notifications on this object. */
+    virtual void add_observer(IMetadataObserver* observer) = 0;
+    /** @brief Removes a previously registered observer. */
+    virtual void remove_observer(IMetadataObserver* observer) = 0;
 };
+
+/** @brief Null-safe helper to get a property event by storage id. */
+inline IEvent::Ptr get_property_event(IObjectStorage* storage, size_t storage_id, Resolve mode)
+{
+    return storage ? storage->get_property_event(storage_id, mode) : IEvent::Ptr{};
+}
+
+/** @brief Null-safe helper to fire property changed on the owner. */
+inline void invoke_property_changed(IObjectStorage* storage, size_t storage_id)
+{
+    if (storage) {
+        storage->invoke_property_changed(storage_id);
+    }
+}
 
 } // namespace velk
 
