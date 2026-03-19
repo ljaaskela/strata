@@ -530,7 +530,6 @@ int main()
 
     demo_properties();
     demo_custom_any();
-    demo_change_notifications();
     demo_static_metadata();
 
     auto widget = r.create<IObject>(MyWidget::static_class_id());

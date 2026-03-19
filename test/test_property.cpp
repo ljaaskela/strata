@@ -1,3 +1,5 @@
+#include "test_helpers.h"
+
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/property.h>
@@ -107,7 +109,8 @@ TEST(Property, BoolConversion)
     EXPECT_TRUE(p);
 }
 
-// ReadOnly property
+// ReadOnly property (standalone, no on_changed needed)
+#undef create_property
 
 TEST(Property, DefaultConstructedReadOnlyHasInitialValue)
 {
@@ -132,6 +135,9 @@ TEST(Property, ConstructReadOnlySetFails)
     EXPECT_TRUE(pp);
     EXPECT_EQ(pp.set_value(1), ReturnValue::ReadOnly);
 }
+
+// Re-enable ObjectStorage-backed create_property
+#define create_property test_detail::create_owned_property
 
 // Deferred property updates
 

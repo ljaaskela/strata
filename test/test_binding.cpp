@@ -1,3 +1,5 @@
+#include "test_helpers.h"
+
 #include <velk/api/any.h>
 #include <velk/api/binding.h>
 #include <velk/api/callback.h>

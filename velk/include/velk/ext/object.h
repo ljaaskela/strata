@@ -100,6 +100,22 @@ protected:
     {
         return with_storage([&](auto& s) { return s.find_attachment(query, mode); });
     }
+    IEvent::Ptr storage_get_property_event(size_t storage_id, Resolve mode) const
+    {
+        return with_storage([&](auto& s) { return s.get_property_event(storage_id, mode); });
+    }
+    void storage_invoke_property_changed(size_t storage_id, IProperty* property) const
+    {
+        with_storage([&](auto& s) { s.invoke_property_changed(storage_id, property); });
+    }
+    void storage_add_observer(IMetadataObserver* observer)
+    {
+        with_storage([&](auto& s) { s.add_observer(observer); });
+    }
+    void storage_remove_observer(IMetadataObserver* observer)
+    {
+        with_storage([&](auto& s) { s.remove_observer(observer); });
+    }
 
 private:
     IObjectStorage* stor() const { return storage_.load(std::memory_order_acquire); }
@@ -185,6 +201,23 @@ public: // IObjectStorage overrides
     {
         ensure_object_storage(mode);
         return storage_find_attachment(query, mode);
+    }
+    IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const override
+    {
+        return storage_get_property_event(storage_id, mode);
+    }
+    void invoke_property_changed(size_t storage_id, IProperty* property) const override
+    {
+        storage_invoke_property_changed(storage_id, property);
+    }
+    void add_observer(IMetadataObserver* observer) override
+    {
+        ensure_object_storage();
+        storage_add_observer(observer);
+    }
+    void remove_observer(IMetadataObserver* observer) override
+    {
+        storage_remove_observer(observer);
     }
 
 public: // IPropertyState override

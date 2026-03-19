@@ -87,6 +87,7 @@ class ObjectTest : public ::testing::Test
 {
 protected:
     static void SetUpTestSuite() { instance().type_registry().register_type<TestWidget>(); }
+    static void TearDownTestSuite() { instance().type_registry().unregister_type<TestWidget>(); }
 };
 
 // --- Tests ---
@@ -564,6 +565,11 @@ protected:
         instance().type_registry().register_type<TaggedWidget>();
         instance().type_registry().register_type<AutoUidWidget>();
     }
+    static void TearDownTestSuite()
+    {
+        instance().type_registry().unregister_type<TaggedWidget>();
+        instance().type_registry().unregister_type<AutoUidWidget>();
+    }
 };
 
 TEST_F(ClassUidTest, UserSpecifiedClassUid)
@@ -928,6 +934,7 @@ class ObjectWrapperTest : public ::testing::Test
 {
 protected:
     static void SetUpTestSuite() { instance().type_registry().register_type<TestWidget>(); }
+    static void TearDownTestSuite() { instance().type_registry().unregister_type<TestWidget>(); }
 
     ::velk::Object make()
     {
