@@ -97,6 +97,21 @@ struct rect
     constexpr bool operator!=(const rect& rhs) const { return !(*this == rhs); }
 };
 
+/// @brief 3D axis-aligned bounding box (position and extent).
+struct aabb
+{
+    vec3 position{};
+    size extent{};
+
+    static constexpr aabb zero() { return {}; }
+
+    constexpr vec3 min() const { return position; }
+    constexpr vec3 max() const { return {position.x + extent.width, position.y + extent.height, position.z + extent.depth}; }
+
+    constexpr bool operator==(const aabb& rhs) const { return position == rhs.position && extent == rhs.extent; }
+    constexpr bool operator!=(const aabb& rhs) const { return !(*this == rhs); }
+};
+
 /// @brief RGBA color. Alpha defaults to 1 (fully opaque).
 struct color
 {

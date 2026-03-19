@@ -289,6 +289,11 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
                      static_cast<float>(arr[2].as_number()),
                      arr.size() >= 4 ? static_cast<float>(arr[3].as_number()) : 1.f};
             pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<mat4>() && arr.size() == 16) {
+            mat4 v{};
+            for (int i = 0; i < 16; ++i)
+                v.m[i] = static_cast<float>(arr[i].as_number());
+            pi.set_data(&v, sizeof(v), typeUid);
         }
     } else if (val.type() == JsonType::Object) {
         auto f = [&](string_view key) -> float {
@@ -316,6 +321,19 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<color>()) {
             color v{f("r"), f("g"), f("b"), f1("a", 1.f)};
+            pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<aabb>()) {
+            auto* pos_node = val.find(string_view{"position"});
+            auto* ext_node = val.find(string_view{"extent"});
+            auto fp = [](const JsonValue* node, string_view key) -> float {
+                if (!node) return 0.f;
+                auto* n = node->find(key);
+                return n ? static_cast<float>(n->as_number()) : 0.f;
+            };
+            aabb v{
+                {fp(pos_node, "x"), fp(pos_node, "y"), fp(pos_node, "z")},
+                {fp(ext_node, "width"), fp(ext_node, "height"), fp(ext_node, "depth")}
+            };
             pi.set_data(&v, sizeof(v), typeUid);
         }
     }

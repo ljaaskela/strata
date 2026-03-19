@@ -61,6 +61,8 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<size>>();
     ITypeRegistry::register_type<ext::AnyValue<rect>>();
     ITypeRegistry::register_type<ext::AnyValue<color>>();
+    ITypeRegistry::register_type<ext::AnyValue<mat4>>();
+    ITypeRegistry::register_type<ext::AnyValue<aabb>>();
     ITypeRegistry::register_type<ext::AnyValue<HierarchyChange>>();
 
     ITypeRegistry::register_type<ext::ArrayAnyValue<float>>();
