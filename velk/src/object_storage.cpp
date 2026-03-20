@@ -251,6 +251,31 @@ IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Res
     return {};
 }
 
+vector<IInterface::Ptr> ObjectStorage::find_attachments(const AttachmentQuery& query) const
+{
+    vector<IInterface::Ptr> matches;
+    const bool matchInterface = query.interfaceUid != Uid{};
+    const bool matchClass = query.classUid != Uid{};
+    for (uint32_t i = 0; i < attachment_end_; ++i) {
+        auto& att = instances_[i].second;
+        bool match = false;
+        if (matchInterface && att->get_interface(query.interfaceUid)) {
+            match = true;
+        }
+        if (!match && matchClass) {
+            if (auto* obj = att->get_interface<IObject>()) {
+                if (obj->get_class_uid() == query.classUid) {
+                    match = true;
+                }
+            }
+        }
+        if (match) {
+            matches.push_back(att);
+        }
+    }
+    return matches;
+}
+
 IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) const
 {
     if (storage_id >= member_data_.size()) {

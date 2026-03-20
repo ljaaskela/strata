@@ -100,6 +100,10 @@ protected:
     {
         return with_storage([&](auto& s) { return s.find_attachment(query, mode); });
     }
+    vector<IInterface::Ptr> storage_find_attachments(const AttachmentQuery& query) const
+    {
+        return with_storage([&](auto& s) { return s.find_attachments(query); });
+    }
     IEvent::Ptr storage_get_property_event(size_t storage_id, Resolve mode) const
     {
         return with_storage([&](auto& s) { return s.get_property_event(storage_id, mode); });
@@ -201,6 +205,10 @@ public: // IObjectStorage overrides
     {
         ensure_object_storage(mode);
         return storage_find_attachment(query, mode);
+    }
+    vector<IInterface::Ptr> find_attachments(const AttachmentQuery& query) const
+    {
+        return storage_find_attachments(query);
     }
     IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const override
     {

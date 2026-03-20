@@ -45,6 +45,11 @@ public:
                                             Resolve mode = Resolve::Existing) = 0;
 
     /**
+     * @brief Finds all attachments matching the query.
+     */
+    virtual vector<IInterface::Ptr> find_attachments(const AttachmentQuery& query) const = 0;
+
+    /**
      * @brief Finds the first attachment that implements interface T.
      * @tparam T The interface type to search for.
      * @return A shared pointer to the attachment cast to T, or nullptr if not found.

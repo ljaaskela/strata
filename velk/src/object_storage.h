@@ -56,6 +56,7 @@ public: // IObjectStorage (attachment operations)
     size_t attachment_count() const override;
     IInterface::Ptr get_attachment(size_t index) const override;
     IInterface::Ptr find_attachment(const AttachmentQuery& query, Resolve mode) override;
+    vector<IInterface::Ptr> find_attachments(const AttachmentQuery& query) const override;
 
 public: // IObjectStorage (property events + observers)
     IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const override;
