@@ -1,6 +1,8 @@
 #ifndef VELK_INTF_IMPORTER_EXTENSION_H
 #define VELK_INTF_IMPORTER_EXTENSION_H
 
+#include <velk/array_view.h>
+#include <velk/interface/intf_any.h>
 #include <velk/interface/intf_interface.h>
 #include <velk/interface/intf_store.h>
 #include <velk/interface/types.h>
@@ -92,6 +94,34 @@ public:
     /** @brief Processes the data subtree for this extension's collection key. */
     virtual void process(const IImportData& data, IStore& store,
                          const IImportResolver& resolver) const = 0;
+};
+
+/**
+ * @brief Extension point for custom type deserialization in the importer.
+ *
+ * Any plugin can register a class implementing this interface. At import time,
+ * the importer scans ITypeRegistry for all classes implementing
+ * IImporterTypeExtension and builds a type UID lookup table. When the built-in
+ * type dispatch chain has no match for a property's type, it falls back to
+ * the registered type extension.
+ *
+ * Definition only: no implementations live in velk.dll.
+ *
+ * Chain: IInterface -> IImporterTypeExtension
+ */
+class IImporterTypeExtension : public Interface<IImporterTypeExtension>
+{
+public:
+    /** @brief Returns the type UIDs this extension can deserialize. */
+    virtual array_view<Uid> supported_types() const = 0;
+
+    /**
+     * @brief Deserializes a value from import data.
+     * @param type_uid The type UID to deserialize.
+     * @param data The import data node containing the value.
+     * @return An IAny holding the result, or nullptr if the data can't be parsed.
+     */
+    virtual IAny::Ptr deserialize(Uid type_uid, const IImportData& data) const = 0;
 };
 
 } // namespace velk
