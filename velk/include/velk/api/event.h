@@ -113,7 +113,7 @@ public:
         : event_(std::move(evt))
     {
         Callback cb(std::forward<F>(callable));
-        handler_ = cb;
+        handler_ = static_cast<IFunction::ConstPtr>(cb);
         event_.add_handler(handler_);
     }
 
