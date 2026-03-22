@@ -13,6 +13,7 @@ See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json)
   - [Objects](#objects)
   - [Class resolution](#class-resolution)
   - [Properties](#properties)
+  - [Attachments](#attachments)
   - [Hierarchies](#hierarchies)
   - [Bindings](#bindings)
   - [Extension collections](#extension-collections)
@@ -22,6 +23,10 @@ See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json)
   - [IImportResolver](#iimportresolver)
   - [Writing an extension](#writing-an-extension)
   - [Example: animator extension](#example-animator-extension)
+- [Type extensions](#type-extensions)
+  - [IImporterTypeExtension](#iimportertypeextension)
+  - [Writing a type extension](#writing-a-type-extension)
+  - [Example: dim type (velk-ui)](#example-dim-type-velk-ui)
 - [Advanced](#advanced)
   - [Class aliases](#class-aliases)
   - [Direct interface access](#direct-interface-access)
@@ -48,6 +53,7 @@ A store file is a JSON object with a required `version` field and optional top-l
 {
     "version": 1,
     "objects": [...],
+    "attachments": [...],
     "hierarchies": { ... },
     "bindings": [...]
 }
@@ -122,6 +128,31 @@ Only valid on properties of type `ObjectRef`. The `ref` path supports direct ids
 Creates a one-way binding from the source property to this property. Equivalent to adding a top-level binding entry but more concise for single-source single-target cases.
 
 Supported value types: `float`, `double`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `int`, `bool`, `velk::string`.
+
+### Attachments
+
+Attachments create objects and attach them to target objects via `IObjectStorage::add_attachment()`. Each entry has a `class`, optional `properties`, and a `targets` array of object ids:
+
+```json
+{
+    "attachments": [
+        {
+            "targets": ["child1", "child3"],
+            "class": "velk-ui.FixedSize",
+            "properties": { "height": "150px" }
+        },
+        {
+            "targets": ["child1"],
+            "class": "velk-ui.RectVisual",
+            "properties": { "color": { "r": 0.9, "g": 0.2, "b": 0.2 } }
+        }
+    ]
+}
+```
+
+The importer creates one object per entry and attaches it to every target in the `targets` array. When an entry targets multiple objects, they share the same attachment instance. Class resolution and property setting follow the same rules as top-level objects.
+
+Target objects must have `IObjectStorage` (which they do if they inherit from `ext::Object`). Targets are resolved by id using the same lookup as object references.
 
 ### Hierarchies
 
@@ -359,6 +390,111 @@ Tracks play automatically by default. Set `"autoplay": false` to create the trac
 Both types support multi-target: a single animation entry can target multiple properties. All path formats supported by the resolver work in `"targets"` arrays.
 
 See [Animator plugin](animator.md) for the full list of easing function names and details on how transitions and tracks work.
+
+## Type extensions
+
+Type extensions let plugins teach the importer how to deserialize custom value types. The built-in property dispatch handles `float`, `int32_t`, `bool`, `string`, `vec2`, `vec3`, `color`, `aabb`, etc. When a property's type UID has no built-in handler, the importer falls back to registered type extensions.
+
+### IImporterTypeExtension
+
+```cpp
+class IImporterTypeExtension : public Interface<IImporterTypeExtension>
+{
+public:
+    virtual array_view<Uid> supported_types() const = 0;
+    virtual IAny::Ptr deserialize(Uid type_uid, const IImportData& data) const = 0;
+};
+```
+
+At import time the importer scans `ITypeRegistry` for all classes implementing `IImporterTypeExtension` and builds a type UID lookup table. When a property's type has no built-in match, it queries the table and calls `deserialize()` on the matching extension.
+
+`supported_types()` returns the type UIDs this extension handles. `deserialize()` receives the type UID and the raw `IImportData` node, and returns an `IAny::Ptr` holding the parsed value (or nullptr on failure).
+
+### Writing a type extension
+
+1. Define a class implementing `IImporterTypeExtension`:
+
+```cpp
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_importer_extension.h>
+#include <velk/api/any.h>
+
+class MyTypeExtension
+    : public velk::ext::ObjectCore<MyTypeExtension, velk::IImporterTypeExtension>
+{
+public:
+    VELK_CLASS_UID("...", "MyTypeExtension");
+
+    velk::array_view<velk::Uid> supported_types() const override
+    {
+        static const velk::Uid types[] = { velk::type_uid<MyType>() };
+        return { types, 1 };
+    }
+
+    velk::IAny::Ptr deserialize(velk::Uid, const velk::IImportData& data) const override
+    {
+        if (data.kind() == velk::IImportData::Kind::String) {
+            return velk::Any<MyType>(parse_my_type(data.as_string()));
+        }
+        return {};
+    }
+};
+```
+
+2. Register the extension **and** the `AnyValue<T>` factory in your plugin's `initialize()`:
+
+```cpp
+velk::register_type<MyTypeExtension>(velk);
+velk::register_type<velk::ext::AnyValue<MyType>>(velk);
+```
+
+The `AnyValue<MyType>` registration is required. Without it, `Any<MyType>(value)` cannot create the underlying `IAny` storage and will fail at runtime. This is easy to miss because the extension itself registers fine; the crash only happens when the importer actually tries to deserialize a value of that type.
+
+The importer discovers type extensions automatically via the type registry. No coupling between your plugin and the importer plugin is needed.
+
+### Example: dim type (velk-ui)
+
+The velk-ui plugin defines a `dim` value type that represents a dimension with a unit (pixels, percentage, or none). The JSON format accepts strings like `"150px"`, `"50%"`, or bare numbers:
+
+```json
+{
+    "attachments": [
+        {
+            "targets": ["child1"],
+            "class": "velk-ui.FixedSize",
+            "properties": { "height": "150px", "width": "50%" }
+        }
+    ]
+}
+```
+
+The `DimTypeExtension` handles deserialization:
+
+```cpp
+velk::array_view<velk::Uid> DimTypeExtension::supported_types() const
+{
+    static const velk::Uid types[] = { velk::type_uid<dim>() };
+    return { types, 1 };
+}
+
+velk::IAny::Ptr DimTypeExtension::deserialize(velk::Uid, const velk::IImportData& data) const
+{
+    if (data.kind() == velk::IImportData::Kind::String) {
+        return velk::Any<dim>(parse_dim(data.as_string()));
+    }
+    if (data.kind() == velk::IImportData::Kind::Number) {
+        return velk::Any<dim>(dim::px(static_cast<float>(data.as_number())));
+    }
+    return {};
+}
+```
+
+Registration in the plugin:
+
+```cpp
+velk::register_type<DimTypeExtension>(velk);
+velk::register_type<velk::ext::AnyValue<dim>>(velk);
+```
 
 ## Advanced
 
