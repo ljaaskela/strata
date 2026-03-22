@@ -1012,6 +1012,37 @@ write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
 
 If the object is destroyed before `update()`, the queued callback is silently skipped.
 
+### Object-level state observation
+
+Per-property `on_changed` events fire when a specific property value changes, but they require the property to be instantiated. For coarser, object-level notification that also covers `write_state`, implement `IMetadataObserver`.
+
+```cpp
+#include <velk/interface/intf_metadata_observer.h>
+
+class MyWidget : public ext::Object<MyWidget, IMyInterface, IMetadataObserver>
+{
+    void on_state_changed(string_view name, IMetadata& owner, Uid interfaceId) override
+    {
+        // name is the property name when triggered by set_value,
+        // or empty when triggered by write_state (individual fields unknown).
+        // interfaceId identifies which interface's state changed.
+        mark_dirty();
+    }
+};
+```
+
+When a class inherits `IMetadataObserver`, the object is automatically registered as its own observer during storage creation. External observers can also be added manually:
+
+```cpp
+auto* storage = interface_cast<IObjectStorage>(widget);
+storage->add_observer(&myObserver);
+
+// Later
+storage->remove_observer(&myObserver);
+```
+
+`on_state_changed` may be called frequently (once per `set_value`, once per `write_state` call). Keep handling lightweight. If you need to inspect the actual values, use the `owner` reference to lazily query properties.
+
 ### Bindings
 
 Bindings connect properties so that a target property automatically reflects the value of a source property or a computed function result. By default (one-way), the target is read-only: reads return the source value, and writes are rejected. Two-way bindings forward writes from the target back to the source. When the source changes, the target's `on_changed` fires.

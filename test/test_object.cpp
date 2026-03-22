@@ -1199,3 +1199,79 @@ TEST_F(ObjectWrapperTest, NullObjectSafe)
     EXPECT_FALSE(obj.find_or_create_attachment<IHierarchy>(ClassId::Hierarchy));
     EXPECT_FALSE(obj.get());
 }
+
+// --- IMetadataObserver auto-registration test ---
+
+class IObservable : public Interface<IObservable>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, float, value, 0.f)
+    )
+};
+
+class ObservableWidget : public ext::Object<ObservableWidget, IObservable, IMetadataObserver>
+{
+public:
+    int change_count = 0;
+    string_view last_changed_name;
+    Uid last_changed_interface;
+
+    void on_state_changed(string_view name, IMetadata& /*owner*/, Uid interfaceId) override
+    {
+        ++change_count;
+        last_changed_name = name;
+        last_changed_interface = interfaceId;
+    }
+};
+
+class MetadataObserverTest : public ::testing::Test
+{
+protected:
+    static void SetUpTestSuite() { instance().type_registry().register_type<ObservableWidget>(); }
+    static void TearDownTestSuite() { instance().type_registry().unregister_type<ObservableWidget>(); }
+};
+
+TEST_F(MetadataObserverTest, OnStateChangedFiresOnWriteState)
+{
+    auto obj = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto* widget = static_cast<ObservableWidget*>(interface_cast<IObservable>(obj));
+    ASSERT_NE(widget, nullptr);
+
+    EXPECT_EQ(widget->change_count, 0);
+
+    write_state<IObservable>(obj, [](IObservable::State& s) { s.value = 42.f; });
+
+    EXPECT_EQ(widget->change_count, 1);
+    EXPECT_TRUE(widget->last_changed_name.empty());
+    EXPECT_EQ(widget->last_changed_interface, IObservable::UID);
+}
+
+TEST_F(MetadataObserverTest, OnStateChangedFiresOnPropertySetValue)
+{
+    auto obj = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto* widget = static_cast<ObservableWidget*>(interface_cast<IObservable>(obj));
+    ASSERT_NE(widget, nullptr);
+
+    auto* iface = interface_cast<IObservable>(obj);
+    ASSERT_NE(iface, nullptr);
+
+    iface->value().set_value(99.f);
+
+    EXPECT_EQ(widget->change_count, 1);
+    EXPECT_EQ(widget->last_changed_name, "value");
+    EXPECT_EQ(widget->last_changed_interface, IObservable::UID);
+}
+
+TEST_F(MetadataObserverTest, OnStateChangedDoesNotFireWithoutChange)
+{
+    auto obj = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto* widget = static_cast<ObservableWidget*>(interface_cast<IObservable>(obj));
+    ASSERT_NE(widget, nullptr);
+
+    // Reading state should not fire
+    auto reader = read_state<IObservable>(obj);
+    EXPECT_FLOAT_EQ(reader->value, 0.f);
+
+    EXPECT_EQ(widget->change_count, 0);
+}

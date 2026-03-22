@@ -88,6 +88,75 @@ private:
     IEvent::Ptr event_;
 };
 
+/**
+ * @brief RAII event subscription. Subscribes on construction, unsubscribes on destruction.
+ *
+ * Move-only. When moved-from, the source becomes inert (won't unsubscribe).
+ *
+ * @par Example
+ * @code
+ * velk::ScopedHandler sh(widget->on_clicked(), [](FnArgs) {
+ *     // handle click
+ *     return ReturnValue::Success;
+ * });
+ * // handler is active until sh goes out of scope
+ * @endcode
+ */
+class ScopedHandler
+{
+public:
+    ScopedHandler() = default;
+
+    /** @brief Subscribes @p callable to @p evt. */
+    template <class F>
+    ScopedHandler(Event evt, F&& callable)
+        : event_(std::move(evt))
+    {
+        Callback cb(std::forward<F>(callable));
+        handler_ = static_cast<IFunction::ConstPtr>(cb);
+        event_.add_handler(handler_);
+    }
+
+    ~ScopedHandler() { reset(); }
+
+    ScopedHandler(const ScopedHandler&) = delete;
+    ScopedHandler& operator=(const ScopedHandler&) = delete;
+
+    ScopedHandler(ScopedHandler&& other) noexcept
+        : event_(std::move(other.event_))
+        , handler_(std::move(other.handler_))
+    {
+        other.handler_ = {};
+    }
+
+    ScopedHandler& operator=(ScopedHandler&& other) noexcept
+    {
+        if (this != &other) {
+            reset();
+            event_ = std::move(other.event_);
+            handler_ = std::move(other.handler_);
+            other.handler_ = {};
+        }
+        return *this;
+    }
+
+    /** @brief Unsubscribes early. Safe to call multiple times. */
+    void reset()
+    {
+        if (handler_ && event_) {
+            event_.remove_handler(handler_);
+            handler_ = {};
+        }
+    }
+
+    /** @brief Returns true if this guard holds an active subscription. */
+    explicit operator bool() const { return handler_.operator bool(); }
+
+private:
+    Event event_{IEvent::Ptr{}};
+    IFunction::ConstPtr handler_;
+};
+
 } // namespace velk
 
 #endif // VELK_API_EVENT_H
