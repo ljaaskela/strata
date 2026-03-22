@@ -52,7 +52,7 @@ protected:
         }
     }
 
-    void ensure_storage(const ClassInfo& info, IInterface* owner) const
+    void ensure_storage(const ClassInfo& info, IInterface* owner, IMetadataObserver* observer) const
     {
         if (storage_.load(std::memory_order_acquire)) {
             return;
@@ -62,6 +62,9 @@ protected:
         if (!storage_.compare_exchange_strong(expected, created, std::memory_order_release)) {
             // Another thread won the race; destroy our duplicate.
             instance().destroy_metadata_container(created);
+        } else if (observer) {
+            // This object owns the storage and lifetime of both is the same, no remove_observer needed
+            created->add_observer(observer);
         }
     }
     IProperty::Ptr storage_get_property(string_view name, Resolve mode = Resolve::Create) const
@@ -162,7 +165,13 @@ private:
         static const auto& ci = FinalClass::get_factory().get_class_info();
         auto* me =
             static_cast<IInterface*>(const_cast<IObjectStorage*>(static_cast<const IObjectStorage*>(this)));
-        ensure_storage(ci, me);
+        if constexpr (std::is_base_of_v<IMetadataObserver, FinalClass>) {
+            IMetadataObserver* observer =
+                const_cast<IMetadataObserver*>(static_cast<const IMetadataObserver*>(this));
+            ensure_storage(ci, me, observer);
+        } else {
+            ensure_storage(ci, me, nullptr);
+        }
     }
 
 public: // IMetadata overrides
@@ -184,7 +193,9 @@ public: // IMetadata overrides
     }
     void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
     {
-        // No need to ensure storage, if there's none there can't be anything to notify
+        if constexpr (std::is_base_of_v<IMetadataObserver, FinalClass>) {
+            ensure_object_storage();
+        }
         storage_notify(kind, interfaceUid, notification);
     }
 
