@@ -4,6 +4,7 @@
 #include "json_parser.h"
 
 #include <velk/ext/core_object.h>
+#include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/member_desc.h>
 #include <velk/interface/types.h>
@@ -59,7 +60,12 @@ private:
                                         string_view path) const;
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
                                     string_view path) const;
+    void process_attachments(const JsonValue& root, IStore& store, const ImportContext& ctx,
+                             ImportResult& result) const;
     void dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const;
+    void discover_type_extensions() const;
+
+    mutable std::unordered_map<Uid, IImporterTypeExtension::Ptr> type_extensions_;
 };
 
 } // namespace velk
