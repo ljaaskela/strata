@@ -4,6 +4,7 @@
 #include <velk/string_view.h>
 
 #include <cstdint>
+#include <functional>
 #include <ostream>
 
 namespace velk {
@@ -166,6 +167,15 @@ constexpr Uid make_hash(const string_view toHash)
 }
 
 } // namespace velk
+
+template <>
+struct std::hash<velk::Uid>
+{
+    constexpr size_t operator()(const velk::Uid& u) const noexcept
+    {
+        return static_cast<size_t>(u.hi ^ u.lo);
+    }
+};
 
 /** @brief Expands a UUID string literal into two uint64_t template arguments (hi, lo). */
 #define VELK_UID(str) ::velk::Uid(str).hi, ::velk::Uid(str).lo

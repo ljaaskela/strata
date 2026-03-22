@@ -1,15 +1,16 @@
-#include "json_import_data.h"
 #include "json_importer.h"
 
-#include <velk/ext/interface_dispatch.h>
+#include "json_import_data.h"
 
-#include <velk/api/math_types.h>
 #include <velk/api/binding.h>
 #include <velk/api/hierarchy.h>
+#include <velk/api/math_types.h>
 #include <velk/api/store.h>
 #include <velk/api/velk.h>
+#include <velk/ext/interface_dispatch.h>
 #include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_metadata.h>
+#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/intf_object_ref.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_type_registry.h>
@@ -39,9 +40,8 @@ std::string to_std_string(string_view sv)
 const MemberDesc* find_property_desc(const ClassInfo& info, string_view name)
 {
     for (size_t i = 0; i < info.members.size(); i++) {
-        if (info.members[i].name == name &&
-            (info.members[i].kind == MemberKind::Property ||
-             info.members[i].kind == MemberKind::ArrayProperty)) {
+        if (info.members[i].name == name && (info.members[i].kind == MemberKind::Property ||
+                                             info.members[i].kind == MemberKind::ArrayProperty)) {
             return &info.members[i];
         }
     }
@@ -70,6 +70,9 @@ ImportResult JsonImporter::import_from(string_view json) const
         add_error(result, "failed to create store");
         return result;
     }
+
+    // Discover type extensions for custom type deserialization
+    discover_type_extensions();
 
     ImportContext ctx;
 
@@ -101,6 +104,9 @@ ImportResult JsonImporter::import_from(string_view json) const
     if (hierarchies && hierarchies->type() == JsonType::Object) {
         build_hierarchies(*hierarchies, store, result);
     }
+
+    // Process attachments
+    process_attachments(root, store, ctx, result);
 
     // Resolve object references
     if (objects && objects->type() == JsonType::Array) {
@@ -178,8 +184,7 @@ void JsonImporter::set_properties(IObject& obj, const JsonValue& props, const Cl
         string_view name_sv = name;
         const MemberDesc* desc = find_property_desc(info, name_sv);
         if (!desc) {
-            add_error(result, string("unknown property '") + name + "' on class '" +
-                              info.name + "'");
+            add_error(result, string("unknown property '") + name + "' on class '" + info.name + "'");
             continue;
         }
 
@@ -220,57 +225,74 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
     Uid typeUid = pk.typeUid;
 
     if (typeUid == type_uid<float>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         float v = static_cast<float>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<double>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         double v = val.as_number();
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<int32_t>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         int32_t v = static_cast<int32_t>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<uint32_t>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         uint32_t v = static_cast<uint32_t>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<int64_t>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         int64_t v = static_cast<int64_t>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<uint64_t>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         uint64_t v = static_cast<uint64_t>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<bool>()) {
-        if (val.type() != JsonType::Bool) return;
+        if (val.type() != JsonType::Bool) {
+            return;
+        }
         bool v = val.as_bool();
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<int>()) {
-        if (val.type() != JsonType::Number) return;
+        if (val.type() != JsonType::Number) {
+            return;
+        }
         int v = static_cast<int>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<::velk::string>()) {
-        if (val.type() != JsonType::String) return;
+        if (val.type() != JsonType::String) {
+            return;
+        }
         auto v = val.as_string();
         pi.set_data(&v, sizeof(v), typeUid);
     } else if (val.type() == JsonType::Array) {
         auto& arr = val.as_array();
         if (typeUid == type_uid<vec2>() && arr.size() == 2) {
-            vec2 v{static_cast<float>(arr[0].as_number()),
-                    static_cast<float>(arr[1].as_number())};
+            vec2 v{static_cast<float>(arr[0].as_number()), static_cast<float>(arr[1].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<vec3>() && arr.size() == 3) {
             vec3 v{static_cast<float>(arr[0].as_number()),
-                    static_cast<float>(arr[1].as_number()),
-                    static_cast<float>(arr[2].as_number())};
+                   static_cast<float>(arr[1].as_number()),
+                   static_cast<float>(arr[2].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<vec4>() && arr.size() == 4) {
             vec4 v{static_cast<float>(arr[0].as_number()),
-                    static_cast<float>(arr[1].as_number()),
-                    static_cast<float>(arr[2].as_number()),
-                    static_cast<float>(arr[3].as_number())};
+                   static_cast<float>(arr[1].as_number()),
+                   static_cast<float>(arr[2].as_number()),
+                   static_cast<float>(arr[3].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<size>() && arr.size() >= 2) {
             size v{static_cast<float>(arr[0].as_number()),
@@ -279,20 +301,21 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<rect>() && arr.size() == 4) {
             rect v{static_cast<float>(arr[0].as_number()),
-                    static_cast<float>(arr[1].as_number()),
-                    static_cast<float>(arr[2].as_number()),
-                    static_cast<float>(arr[3].as_number())};
+                   static_cast<float>(arr[1].as_number()),
+                   static_cast<float>(arr[2].as_number()),
+                   static_cast<float>(arr[3].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<color>() && arr.size() >= 3) {
             color v{static_cast<float>(arr[0].as_number()),
-                     static_cast<float>(arr[1].as_number()),
-                     static_cast<float>(arr[2].as_number()),
-                     arr.size() >= 4 ? static_cast<float>(arr[3].as_number()) : 1.f};
+                    static_cast<float>(arr[1].as_number()),
+                    static_cast<float>(arr[2].as_number()),
+                    arr.size() >= 4 ? static_cast<float>(arr[3].as_number()) : 1.f};
             pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<mat4>() && arr.size() == 16) {
             mat4 v{};
-            for (int i = 0; i < 16; ++i)
+            for (int i = 0; i < 16; ++i) {
                 v.m[i] = static_cast<float>(arr[i].as_number());
+            }
             pi.set_data(&v, sizeof(v), typeUid);
         }
     } else if (val.type() == JsonType::Object) {
@@ -326,21 +349,31 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
             auto* pos_node = val.find(string_view{"position"});
             auto* ext_node = val.find(string_view{"extent"});
             auto fp = [](const JsonValue* node, string_view key) -> float {
-                if (!node) return 0.f;
+                if (!node) {
+                    return 0.f;
+                }
                 auto* n = node->find(key);
                 return n ? static_cast<float>(n->as_number()) : 0.f;
             };
-            aabb v{
-                {fp(pos_node, "x"), fp(pos_node, "y"), fp(pos_node, "z")},
-                {fp(ext_node, "width"), fp(ext_node, "height"), fp(ext_node, "depth")}
-            };
+            aabb v{{fp(pos_node, "x"), fp(pos_node, "y"), fp(pos_node, "z")},
+                   {fp(ext_node, "width"), fp(ext_node, "height"), fp(ext_node, "depth")}};
             pi.set_data(&v, sizeof(v), typeUid);
+        }
+    }
+
+    // Fallback: try registered type extensions for custom types
+    auto ext_it = type_extensions_.find(typeUid);
+    if (ext_it != type_extensions_.end()) {
+        JsonImportData wrapped(val);
+        auto result = ext_it->second->deserialize(typeUid, wrapped);
+        if (result) {
+            pi.set_value(*result);
         }
     }
 }
 
-void JsonImporter::register_imported_object(ImportContext& ctx, IObject::Ptr obj,
-                                            const JsonValue& obj_node, ImportResult& result) const
+void JsonImporter::register_imported_object(ImportContext& ctx, IObject::Ptr obj, const JsonValue& obj_node,
+                                            ImportResult& result) const
 {
     auto* id_val = obj_node.find("id");
     const auto& id_str = id_val->as_string();
@@ -359,14 +392,12 @@ void JsonImporter::register_imported_object(ImportContext& ctx, IObject::Ptr obj
     if (class_val && class_val->type() == JsonType::String) {
         Uid uid = resolve_class(class_val->as_string(), result);
         if (uid != Uid{}) {
-            ctx.object_to_class_info[obj.get()] =
-                ::velk::instance().type_registry().get_class_info(uid);
+            ctx.object_to_class_info[obj.get()] = ::velk::instance().type_registry().get_class_info(uid);
         }
     }
 }
 
-void JsonImporter::build_hierarchies(const JsonValue& hierarchies, IStore& store,
-                                     ImportResult& result) const
+void JsonImporter::build_hierarchies(const JsonValue& hierarchies, IStore& store, ImportResult& result) const
 {
     for (auto& [name, hierarchy_val] : hierarchies.as_object()) {
         if (hierarchy_val.type() != JsonType::Object) {
@@ -377,8 +408,8 @@ void JsonImporter::build_hierarchies(const JsonValue& hierarchies, IStore& store
     }
 }
 
-void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json,
-                                   IStore& store, ImportResult& result) const
+void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json, IStore& store,
+                                   ImportResult& result) const
 {
     auto hierarchy = ::velk::create_hierarchy();
     if (!hierarchy) {
@@ -427,8 +458,8 @@ void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json,
                 }
                 auto parent_obj = store.find(parent_id);
                 if (!parent_obj) {
-                    add_error(result, string("hierarchy '") + name +
-                                      "': parent object not found: " + parent_id);
+                    add_error(result,
+                              string("hierarchy '") + name + "': parent object not found: " + parent_id);
                     continue;
                 }
                 for (auto& child_val : children_val.as_array()) {
@@ -439,8 +470,9 @@ void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json,
                     if (child_obj) {
                         hierarchy.add(parent_obj, child_obj);
                     } else {
-                        add_error(result, string("hierarchy '") + name +
-                                          "': child object not found: " + child_val.as_string());
+                        add_error(result,
+                                  string("hierarchy '") + name +
+                                      "': child object not found: " + child_val.as_string());
                     }
                 }
             }
@@ -457,8 +489,7 @@ void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json,
     }
 }
 
-IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ctx,
-                                          string_view path) const
+IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ctx, string_view path) const
 {
     if (path.empty()) {
         return {};
@@ -477,7 +508,7 @@ IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ct
 }
 
 IObject::Ptr JsonImporter::resolve_object_by_path(IStore& store, const ImportContext& ctx,
-                                                   string_view path) const
+                                                  string_view path) const
 {
     // Hierarchy path: /segment1/segment2/...
     vector<string> segments;
@@ -559,8 +590,7 @@ IObject::Ptr JsonImporter::resolve_object_by_path(IStore& store, const ImportCon
     return current;
 }
 
-IProperty::Ptr JsonImporter::resolve_property(IStore& store, const ImportContext& ctx,
-                                              string_view path) const
+IProperty::Ptr JsonImporter::resolve_property(IStore& store, const ImportContext& ctx, string_view path) const
 {
     auto dot = path.rfind('.');
     if (dot == string_view::npos) {
@@ -583,8 +613,8 @@ IProperty::Ptr JsonImporter::resolve_property(IStore& store, const ImportContext
     return meta->get_property(prop_name);
 }
 
-void JsonImporter::resolve_references(IStore& store, const JsonValue& objects,
-                                      const ImportContext& ctx, ImportResult& result) const
+void JsonImporter::resolve_references(IStore& store, const JsonValue& objects, const ImportContext& ctx,
+                                      ImportResult& result) const
 {
     for (auto& obj_node : objects.as_array()) {
         if (obj_node.type() != JsonType::Object) {
@@ -634,7 +664,8 @@ void JsonImporter::resolve_references(IStore& store, const JsonValue& objects,
                 }
                 auto* pk = desc->propertyKind();
                 if (!pk || pk->typeUid != ClassId::ObjectRef) {
-                    add_error(result, string("property '") + name + "' is not an ObjectRef, use 'bind' for bindings");
+                    add_error(result,
+                              string("property '") + name + "' is not an ObjectRef, use 'bind' for bindings");
                     continue;
                 }
                 resolve_object_ref(*meta, name, val, store, ctx, result);
@@ -650,16 +681,16 @@ void JsonImporter::resolve_references(IStore& store, const JsonValue& objects,
     }
 }
 
-void JsonImporter::resolve_object_ref(IMetadata& meta, string_view name,
-                                      const JsonValue& ref_node, IStore& store,
-                                      const ImportContext& ctx, ImportResult& result) const
+void JsonImporter::resolve_object_ref(IMetadata& meta, string_view name, const JsonValue& ref_node,
+                                      IStore& store, const ImportContext& ctx, ImportResult& result) const
 {
     auto* ref_val = ref_node.find("ref");
     const auto& ref_path = ref_val->as_string();
 
     auto resolved = resolve_object(store, ctx, ref_path);
     if (!resolved) {
-        add_error(result, string("unresolved object reference '") + ref_path + "' on property '" + name + "'");
+        add_error(result,
+                  string("unresolved object reference '") + ref_path + "' on property '" + name + "'");
         return;
     }
 
@@ -685,9 +716,8 @@ void JsonImporter::resolve_object_ref(IMetadata& meta, string_view name,
     }
 }
 
-void JsonImporter::resolve_inline_binding(IMetadata& meta, string_view name,
-                                          string_view ref_path, IStore& store,
-                                          const ImportContext& ctx, ImportResult& result) const
+void JsonImporter::resolve_inline_binding(IMetadata& meta, string_view name, string_view ref_path,
+                                          IStore& store, const ImportContext& ctx, ImportResult& result) const
 {
     auto source_prop = resolve_property(store, ctx, ref_path);
     if (!source_prop) {
@@ -720,8 +750,8 @@ void JsonImporter::create_bindings(IStore& store, const JsonValue& root, const I
     }
 }
 
-void JsonImporter::parse_binding(const JsonValue& binding_node, IStore& store,
-                                 const ImportContext& ctx, ImportResult& result) const
+void JsonImporter::parse_binding(const JsonValue& binding_node, IStore& store, const ImportContext& ctx,
+                                 ImportResult& result) const
 {
     auto* source_val = binding_node.find("source");
     if (!source_val || source_val->type() != JsonType::String) {
@@ -786,7 +816,10 @@ class ImportResolver final : public ext::InterfaceDispatch<IImportResolver>
 {
 public:
     ImportResolver(const JsonImporter& importer, IStore& store, const JsonImporter::ImportContext& ctx)
-        : importer_(importer), store_(store), ctx_(ctx) {}
+        : importer_(importer),
+          store_(store),
+          ctx_(ctx)
+    {}
 
     IObject::Ptr resolve(string_view path) const override
     {
@@ -819,8 +852,90 @@ private:
     const JsonImporter::ImportContext& ctx_;
 };
 
-void JsonImporter::dispatch_extensions(const JsonValue& root, IStore& store,
-                                       const ImportContext& ctx) const
+void JsonImporter::process_attachments(const JsonValue& root, IStore& store, const ImportContext& ctx,
+                                       ImportResult& result) const
+{
+    auto* attachments = root.find("attachments");
+    if (!attachments || attachments->type() != JsonType::Array) {
+        return;
+    }
+
+    for (auto& entry : attachments->as_array()) {
+        if (entry.type() != JsonType::Object) {
+            continue;
+        }
+
+        auto* targets_val = entry.find("targets");
+        if (!targets_val || targets_val->type() != JsonType::Array) {
+            add_error(result, "attachment missing 'targets' array");
+            continue;
+        }
+
+        auto obj = create_object(entry, result);
+        if (!obj) {
+            continue;
+        }
+
+        auto att = interface_pointer_cast<IInterface>(obj);
+
+        for (auto& target_el : targets_val->as_array()) {
+            if (target_el.type() != JsonType::String) {
+                continue;
+            }
+
+            auto target_obj = resolve_object(store, ctx, target_el.as_string());
+            if (!target_obj) {
+                add_error(result, string("attachment: target '") + target_el.as_string() + "' not found");
+                continue;
+            }
+
+            auto* storage = interface_cast<IObjectStorage>(target_obj);
+            if (!storage) {
+                add_error(result,
+                          string("attachment: target '") + target_el.as_string() + "' has no storage");
+                continue;
+            }
+
+            storage->add_attachment(att);
+        }
+    }
+}
+
+void JsonImporter::discover_type_extensions() const
+{
+    type_extensions_.clear();
+
+    vector<Uid> extension_uids;
+    auto& registry = ::velk::instance().type_registry();
+
+    registry.for_each_class(&extension_uids, [](void* ctx, const ClassInfo& info) -> bool {
+        auto* uids = static_cast<vector<Uid>*>(ctx);
+        for (size_t i = 0; i < info.interfaces.size(); i++) {
+            if (info.interfaces[i].uid == IImporterTypeExtension::UID) {
+                uids->push_back(info.uid);
+                break;
+            }
+        }
+        return true;
+    });
+
+    for (auto uid : extension_uids) {
+        auto instance = registry.create(uid);
+        if (!instance) {
+            continue;
+        }
+        auto ext = interface_pointer_cast<IImporterTypeExtension>(instance);
+        if (!ext) {
+            continue;
+        }
+        auto types = ext->supported_types();
+        for (size_t i = 0; i < types.size(); i++) {
+            type_extensions_[types[i]] = ext;
+        }
+    }
+}
+
+void JsonImporter::dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const
 {
     // Discover all classes implementing IImporterExtension
     vector<Uid> extension_uids;

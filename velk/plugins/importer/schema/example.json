@@ -43,17 +43,27 @@
       "panel_a1": ["btn_b2", "btn_c3", "label_d4"]
     }
   },
+  "attachments": [
+    {
+      "targets": ["panel_a1"],
+      "class": "velk-ui.Stack",
+      "properties": { "axis": 1, "spacing": 10 }
+    },
+    {
+      "targets": ["btn_b2"],
+      "class": "velk-ui.FixedSize",
+      "properties": { "width": 120, "height": 40 }
+    },
+    {
+      "targets": ["btn_c3"],
+      "class": "velk-ui.FixedSize",
+      "properties": { "width": 120, "height": 40 }
+    }
+  ],
   "bindings": [
     {
       "source": "panel_a1.width",
       "targets": ["btn_b2.width"]
-    }
-  ],
-  "transitions": [
-    {
-      "targets": ["btn_b2.width", "btn_b2.height"],
-      "duration": 300000,
-      "easing": "ease_out"
     }
   ]
 }
