@@ -84,6 +84,8 @@ private:
     IInterface::Ptr create(MemberDesc desc) const;
     /** @brief Binds a function instance to the owner's virtual trampoline. */
     void bind(const MemberDesc& m, const IInterface::Ptr& fn) const;
+    /** @brief Notifies all observers_ */
+    void notify_observers(string_view name, Uid interfaceUid) const;
 };
 
 } // namespace velk

@@ -8,6 +8,7 @@
 #include <velk/api/velk.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_function.h>
+#include <velk/interface/intf_metadata.h>
 #include <velk/interface/types.h>
 
 #include <algorithm>
@@ -162,9 +163,20 @@ IFunction::Ptr ObjectStorage::get_function(string_view name, Resolve mode) const
     return interface_pointer_cast<IFunction>(find_or_create(name, MemberKind::Function, mode));
 }
 
+void ObjectStorage::notify_observers(string_view name, Uid interfaceUid) const
+{
+    if (!observers_.empty()) {
+        if (auto* meta = interface_cast<IMetadata>(owner_)) {
+            for (auto* observer : observers_) {
+                observer->on_state_changed(name, *meta, interfaceUid);
+            }
+        }
+    }
+}
+
 void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notification) const
 {
-    // Iterate only metadata entries (skip attachment region)
+    // Fire per-property events for instantiated properties
     for (size_t i = attachment_end_; i < instances_.size(); ++i) {
         auto idx = instances_[i].first;
         auto& m = members_[idx];
@@ -175,12 +187,18 @@ void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notif
         switch (notification) {
         case Notification::Changed:
             if (kind == MemberKind::Property || kind == MemberKind::ArrayProperty) {
-                invoke_property_changed(idx, interface_cast<IProperty>(instances_[i].second));
+                auto* property = interface_cast<IProperty>(instances_[i].second);
+                if (property && idx < member_data_.size() && member_data_[idx]) {
+                    invoke_event(member_data_[idx], property->get_value().get());
+                }
             }
             break;
         default:
             break;
         }
+    }
+    if (notification == Notification::Changed) {
+        notify_observers({}, interfaceUid);
     }
 }
 
@@ -296,15 +314,15 @@ void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* proper
                 break;
             }
         }
-        if (!property) {
-            return;
-        }
     }
-    if (storage_id < member_data_.size() && member_data_[storage_id]) {
+    if (property && storage_id < member_data_.size() && member_data_[storage_id]) {
         invoke_event(member_data_[storage_id], property->get_value().get());
     }
-    for (auto* observer : observers_) {
-        observer->on_property_changed(*property);
+    if (!observers_.empty() && storage_id < members_.size()) {
+        auto& m = members_[storage_id];
+        if (m.interfaceInfo) {
+            notify_observers(m.name, m.interfaceInfo->uid);
+        }
     }
 }
 
