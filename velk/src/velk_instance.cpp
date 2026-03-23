@@ -1,5 +1,6 @@
 #include "velk_instance.h"
 
+#include "file_system/file_protocol.h"
 #include "hive/raw_hive.h"
 #include "object_storage.h"
 
@@ -19,8 +20,11 @@ static IRawHive::Ptr create_metadata_hive()
 VelkInstance::VelkInstance()
     : metadata_hive_(create_metadata_hive()),
       type_registry_(*this),
-      plugin_registry_(*this, type_registry_)
-{}
+      plugin_registry_(*this, type_registry_),
+      file_system_(type_registry_)
+{
+    type_registry_.register_type(FileProtocol::get_factory());
+}
 
 VelkInstance::~VelkInstance()
 {

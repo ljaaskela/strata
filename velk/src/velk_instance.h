@@ -1,6 +1,7 @@
 #ifndef VELK_INSTANCE_H
 #define VELK_INSTANCE_H
 
+#include "file_system/file_system.h"
 #include "plugin_registry.h"
 #include "type_registry.h"
 
@@ -37,6 +38,9 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
+    IFileSystem& file_system() override { return file_system_; }
+    const IFileSystem& file_system() const override { return file_system_; }
+
     IObjectStorage* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
     void destroy_metadata_container(IObjectStorage* storage) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
@@ -58,6 +62,7 @@ private:
     ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
     TypeRegistry type_registry_;        ///< Registry of class factories.
     PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
+    FileSystem file_system_;             ///< URI-based file system service.
     mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
     mutable vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
     mutable vector<DeferredPropertySet>
