@@ -2,7 +2,7 @@
 #define INTF_VELK_H
 
 #include <velk/duration.h>
-#include <velk/interface/intf_file_system.h>
+#include <velk/interface/resource/intf_resource_store.h>
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
@@ -99,10 +99,10 @@ public:
     /** @brief Returns the log interface (const). */
     virtual const ILog& log() const = 0;
 
-    /** @brief Returns the file system service for URI-based resource access. */
-    virtual IFileSystem& file_system() = 0;
-    /** @brief Returns the file system service (const). */
-    virtual const IFileSystem& file_system() const = 0;
+    /** @brief Returns the resource store for URI-based resource access. */
+    virtual IResourceStore& resource_store() = 0;
+    /** @brief Returns the resource store (const). */
+    virtual const IResourceStore& resource_store() const = 0;
 
     /**
      * @brief Enqueues tasks to be executed on the next update() call.

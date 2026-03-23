@@ -39,10 +39,12 @@ add_library(velk SHARED
     src/plugin_registry.h
     src/velk_instance.cpp
     src/velk_instance.h
-    src/file_system/file_system.cpp
-    src/file_system/file_system.h
-    src/file_system/file_protocol.cpp
-    src/file_system/file_protocol.h
+    src/resource/resource_store.cpp
+    src/resource/resource_store.h
+    src/resource/file_protocol.cpp
+    src/resource/file_protocol.h
+    src/resource/file_resource.cpp
+    src/resource/file_resource.h
     src/library_handle.h
     src/platform.h
     src/velk.cpp
@@ -71,8 +73,9 @@ add_library(velk SHARED
     include/velk/interface/intf_object_storage.h
     include/velk/interface/intf_store.h
     include/velk/interface/intf_hierarchy.h
-    include/velk/interface/intf_file_protocol.h
-    include/velk/interface/intf_file_system.h
+    include/velk/interface/resource/intf_resource.h
+    include/velk/interface/resource/intf_resource_protocol.h
+    include/velk/interface/resource/intf_resource_store.h
     include/velk/interface/intf_importer_extension.h
     include/velk/interface/intf_thread_context.h
     include/velk/interface/member_desc.h
@@ -133,7 +136,7 @@ target_include_directories(velk
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/hive
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/file_system
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/resource
 )
 
 option(VELK_ENABLE_BLOCK_POOL "Enable thread-local control_block pooling" ON)

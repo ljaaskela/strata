@@ -1,6 +1,6 @@
 #include "velk_instance.h"
 
-#include "file_system/file_protocol.h"
+#include "resource/file_protocol.h"
 #include "hive/raw_hive.h"
 #include "object_storage.h"
 
@@ -20,10 +20,11 @@ static IRawHive::Ptr create_metadata_hive()
 VelkInstance::VelkInstance()
     : metadata_hive_(create_metadata_hive()),
       type_registry_(*this),
-      plugin_registry_(*this, type_registry_),
-      file_system_(type_registry_)
+      plugin_registry_(*this, type_registry_)
 {
     type_registry_.register_type(FileProtocol::get_factory());
+    auto file_proto = ext::make_object<FileProtocol>();
+    resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(file_proto));
 }
 
 VelkInstance::~VelkInstance()
@@ -110,7 +111,7 @@ void VelkInstance::flush_deferred_properties(vector<DeferredPropertySet>& propSe
     for (auto* prop : notify) {
         if (auto* owned = interface_cast<IStorageOwned>(prop)) {
             ::velk::invoke_property_changed(owned->get_owner(), owned->get_storage_id(), prop);
-        } else {
+        } else if (prop) {
             invoke_event(prop->on_changed(), prop->get_any().get());
         }
     }
