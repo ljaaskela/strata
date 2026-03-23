@@ -85,6 +85,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | [Hive](docs/hive.md) | Storing objects in dense, cache-friendly containers |
 | [Plugins](docs/plugins.md) | Extending Velk with inline or DLL-based plugins |
 | [Performance](docs/performance.md) | Benchmark numbers, memory layout, and object sizes |
+| [Resources](docs/resources.md) | URI-based resource access with pluggable protocol handlers |
 | [Advanced](docs/advanced.md) | Any types and value chains, writing metadata by hand, shared_ptr internals |
 | [C API](docs/c_api.md) | Flat C API for FFI: handles, ref counting, property access, events |
 | **Built-in plugins** | |
@@ -105,6 +106,7 @@ velk/
     hive.md               Dense object storage and hive registry
     performance.md        Performance and memory usage
     plugins.md            Plugin system: writing, loading, dependencies, bundles
+    resources.md          URI-based resource access with pluggable protocols
     advanced.md           Any types, value chains, manual metadata, shared_ptr internals
     plugins/
       importer.md         Importer plugin: JSON import, extensions, format reference

@@ -62,6 +62,9 @@ private:
                                     string_view path) const;
     void process_attachments(const JsonValue& root, IStore& store, const ImportContext& ctx,
                              ImportResult& result) const;
+    void process_resource_protocols(const JsonValue& root, ImportResult& result) const;
+    void process_resources(const JsonValue& root, IStore& store, ImportContext& ctx,
+                           ImportResult& result) const;
     void dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const;
     void discover_type_extensions() const;
 
