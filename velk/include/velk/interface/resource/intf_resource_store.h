@@ -46,6 +46,17 @@ public:
      * @return The protocol handler, or nullptr if not found.
      */
     virtual IResourceProtocol::Ptr find_protocol(string_view scheme) const = 0;
+
+    /**
+     * @brief Resolves a URI and casts the result to the specified resource type.
+     * @tparam T The target resource interface (e.g. IFile).
+     * @return A typed pointer, or nullptr if the scheme is unknown or the cast fails.
+     */
+    template <class T>
+    typename T::Ptr get_resource(string_view uri) const
+    {
+        return interface_pointer_cast<T>(get_resource(uri));
+    }
 };
 
 } // namespace velk

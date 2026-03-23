@@ -7,6 +7,14 @@
 #include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#define velk_getcwd _getcwd
+#else
+#include <unistd.h>
+#define velk_getcwd getcwd
+#endif
+
 namespace velk {
 
 static IRawHive::Ptr create_metadata_hive()
@@ -23,8 +31,28 @@ VelkInstance::VelkInstance()
       plugin_registry_(*this, type_registry_)
 {
     type_registry_.register_type(FileProtocol::get_factory());
+
+    // Register file:// protocol (absolute paths).
     auto file_proto = ext::make_object<FileProtocol>();
     resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(file_proto));
+
+    // Register app:// protocol (relative to working directory).
+    char cwd[4096];
+    if (velk_getcwd(cwd, sizeof(cwd))) {
+        auto app_proto = ext::make_object<FileProtocol>();
+        auto* app_internal = interface_cast<IResourceProtocolInternal>(app_proto);
+        app_internal->set_scheme("app");
+        // Ensure trailing separator.
+        string base(cwd);
+        if (base.size() > 0) {
+            char last = base.data()[base.size() - 1];
+            if (last != '/' && last != '\\') {
+                base.append("/");
+            }
+        }
+        app_internal->set_base_path(base);
+        resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(app_proto));
+    }
 }
 
 VelkInstance::~VelkInstance()
