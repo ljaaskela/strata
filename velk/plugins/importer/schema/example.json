@@ -1,5 +1,15 @@
 {
   "version": 1,
+  "resource-protocols": [
+    { "scheme": "assets", "base_path": "./assets/" }
+  ],
+  "resources": [
+    {
+      "id": "main_font",
+      "class": "velk-ui.Font",
+      "properties": { "uri": "assets://default.ttf" }
+    }
+  ],
   "objects": [
     {
       "id": "panel_a1",

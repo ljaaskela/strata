@@ -151,6 +151,28 @@ auto proto = velk::instance().create<velk::IResourceProtocol>(HttpProtocol::clas
 velk::instance().resource_store().register_protocol(proto);
 ```
 
+## Importer integration
+
+The [importer plugin](plugins/importer.md) supports resource protocols and resource objects in the JSON format:
+
+```json
+{
+    "resource-protocols": [
+        { "scheme": "assets", "base_path": "./assets/" }
+    ],
+    "resources": [
+        { "id": "main_font", "class": "velk-ui.Font", "properties": { "uri": "assets://default.ttf" } }
+    ],
+    "objects": [
+        { "id": "label", "class": "velk-ui.Label", "properties": {
+            "font": { "ref": "resources.main_font" }
+        }}
+    ]
+}
+```
+
+See the [importer documentation](plugins/importer.md#resource-protocols) for details.
+
 ## API reference
 
 ### IResourceStore

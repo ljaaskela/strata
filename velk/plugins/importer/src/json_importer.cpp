@@ -14,6 +14,8 @@
 #include <velk/interface/intf_object_ref.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_type_registry.h>
+#include <velk/interface/resource/intf_resource_protocol.h>
+#include <velk/interface/resource/intf_resource_store.h>
 #include <velk/string.h>
 
 #include <unordered_set>
@@ -74,7 +76,13 @@ ImportResult JsonImporter::import_from(string_view json) const
     // Discover type extensions for custom type deserialization
     discover_type_extensions();
 
+    // Register resource protocols (must be before resources and objects)
+    process_resource_protocols(root, result);
+
     ImportContext ctx;
+
+    // Parse resources (before objects, so refs from objects can find them)
+    process_resources(root, *result.store, ctx, result);
 
     // Parse objects
     auto* objects = root.find("objects");
@@ -499,7 +507,28 @@ IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ct
         return resolve_object_by_path(store, ctx, path);
     }
 
-    // Direct name: try name map first (includes both ids and names), then store lookup
+    // Namespace-qualified lookup: "resources.id" or "objects.id"
+    string_view prefix_resources = "resources.";
+    string_view prefix_objects = "objects.";
+
+    if (path.size() > prefix_resources.size() &&
+        string_view(path.data(), prefix_resources.size()) == prefix_resources) {
+        auto id = path.substr(prefix_resources.size());
+        auto store_key = string("resource:") + string(id);
+        return store.find(store_key);
+    }
+
+    if (path.size() > prefix_objects.size() &&
+        string_view(path.data(), prefix_objects.size()) == prefix_objects) {
+        auto id = path.substr(prefix_objects.size());
+        auto it = ctx.name_to_object.find(to_std_string(id));
+        if (it != ctx.name_to_object.end()) {
+            return it->second;
+        }
+        return store.find(id);
+    }
+
+    // Unqualified: try name map first (includes both ids and names), then store lookup
     auto it = ctx.name_to_object.find(to_std_string(path));
     if (it != ctx.name_to_object.end()) {
         return it->second;
@@ -931,6 +960,83 @@ void JsonImporter::discover_type_extensions() const
         auto types = ext->supported_types();
         for (size_t i = 0; i < types.size(); i++) {
             type_extensions_[types[i]] = ext;
+        }
+    }
+}
+
+void JsonImporter::process_resource_protocols(const JsonValue& root, ImportResult& result) const
+{
+    auto* protocols = root.find("resource-protocols");
+    if (!protocols || protocols->type() != JsonType::Array) {
+        return;
+    }
+
+    auto& store = ::velk::instance().resource_store();
+    for (auto& entry : protocols->as_array()) {
+        if (entry.type() != JsonType::Object) {
+            continue;
+        }
+        auto* scheme_val = entry.find("scheme");
+        auto* path_val = entry.find("base_path");
+        if (!scheme_val || scheme_val->type() != JsonType::String) {
+            add_error(result, "resource-protocol entry missing 'scheme'");
+            continue;
+        }
+        auto proto = ::velk::instance().create<IResourceProtocolInternal>(ClassId::FileProtocol);
+        if (!proto) {
+            add_error(result, "failed to create FileProtocol for resource-protocol");
+            continue;
+        }
+        proto->set_scheme(scheme_val->as_string());
+        if (path_val && path_val->type() == JsonType::String) {
+            auto base = path_val->as_string();
+            // If base_path is a URI (contains ://), resolve it to a filesystem path
+            // by composing the referenced protocol's base_path with the path portion.
+            auto sep = base.find("://");
+            if (sep != string_view::npos) {
+                auto base_scheme = string_view(base.data(), sep);
+                auto path_part = string_view(base.data() + sep + 3, base.size() - sep - 3);
+                auto existing = store.find_protocol(base_scheme);
+                if (existing) {
+                    auto* internal = interface_cast<IResourceProtocolInternal>(existing);
+                    if (internal) {
+                        proto->set_base_path(string(internal->base_path()) + string(path_part));
+                    } else {
+                        proto->set_base_path(base);
+                    }
+                } else {
+                    add_error(result, string("resource-protocol: unknown scheme '") + base_scheme + "' in base_path");
+                }
+            } else {
+                proto->set_base_path(base);
+            }
+        }
+        store.register_protocol(interface_pointer_cast<IResourceProtocol>(proto));
+    }
+}
+
+void JsonImporter::process_resources(const JsonValue& root, IStore& store, ImportContext& ctx,
+                                     ImportResult& result) const
+{
+    auto* resources = root.find("resources");
+    if (!resources || resources->type() != JsonType::Array) {
+        return;
+    }
+
+    for (auto& obj_node : resources->as_array()) {
+        if (obj_node.type() != JsonType::Object) {
+            continue;
+        }
+        auto* id_val = obj_node.find("id");
+        if (!id_val || id_val->type() != JsonType::String) {
+            add_error(result, "resource missing 'id' string field");
+            continue;
+        }
+        auto obj = create_object(obj_node, result);
+        if (obj) {
+            auto store_key = string("resource:") + id_val->as_string();
+            store.add(store_key, obj);
+            register_imported_object(ctx, obj, obj_node, result);
         }
     }
 }

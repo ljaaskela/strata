@@ -25,6 +25,25 @@ static IRawHive::Ptr create_metadata_hive()
     return interface_pointer_cast<IRawHive>(obj);
 }
 
+namespace detail {
+string get_working_directory()
+{
+    string base;
+    char cwd[4096];
+    if (velk_getcwd(cwd, sizeof(cwd))) {
+        // Ensure trailing separator.
+        base.append(cwd);
+        if (!base.empty()) {
+            char last = base.back();
+            if (last != '/' && last != '\\') {
+                base.append("/");
+            }
+        }
+    }
+    return base;
+}
+} // namespace detail
+
 VelkInstance::VelkInstance()
     : metadata_hive_(create_metadata_hive()),
       type_registry_(*this),
@@ -37,21 +56,13 @@ VelkInstance::VelkInstance()
     resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(file_proto));
 
     // Register app:// protocol (relative to working directory).
-    char cwd[4096];
-    if (velk_getcwd(cwd, sizeof(cwd))) {
+    if (auto working = detail::get_working_directory(); !working.empty()) {
         auto app_proto = ext::make_object<FileProtocol>();
-        auto* app_internal = interface_cast<IResourceProtocolInternal>(app_proto);
-        app_internal->set_scheme("app");
-        // Ensure trailing separator.
-        string base(cwd);
-        if (base.size() > 0) {
-            char last = base.data()[base.size() - 1];
-            if (last != '/' && last != '\\') {
-                base.append("/");
-            }
+        if (auto* app_internal = interface_cast<IResourceProtocolInternal>(app_proto)) {
+            app_internal->set_scheme("app");
+            app_internal->set_base_path(working);
+            resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(app_proto));
         }
-        app_internal->set_base_path(base);
-        resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(app_proto));
     }
 }
 

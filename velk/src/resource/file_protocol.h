@@ -24,6 +24,7 @@ public:
     string_view scheme() const override;
     IResource::Ptr resolve(string_view path) const override;
     ReturnValue set_scheme(string_view scheme) override;
+    string_view base_path() const override;
     ReturnValue set_base_path(string_view base_path) override;
 
 private:

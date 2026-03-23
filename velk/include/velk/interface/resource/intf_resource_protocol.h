@@ -43,6 +43,9 @@ public:
     /** @brief Sets the URI scheme this protocol handles. */
     virtual ReturnValue set_scheme(string_view scheme) = 0;
 
+    /** @brief Returns the current base path. */
+    virtual string_view base_path() const = 0;
+
     /** @brief Sets a base path prepended to all resolved paths. */
     virtual ReturnValue set_base_path(string_view base_path) = 0;
 };

@@ -16,6 +16,8 @@ See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json)
   - [Attachments](#attachments)
   - [Hierarchies](#hierarchies)
   - [Bindings](#bindings)
+  - [Resource protocols](#resource-protocols)
+  - [Resources](#resources)
   - [Extension collections](#extension-collections)
 - [Import result](#import-result)
 - [Importer extensions](#importer-extensions)
@@ -202,6 +204,42 @@ Inline bindings can also be created in property values using `{ "bind": "source.
 
 // equivalent to:
 "bindings": [{ "source": "widget_1.width", "targets": ["this_object.width"] }]
+```
+
+### Resource protocols
+
+The `resource-protocols` array registers custom URI schemes backed by the local filesystem. Each entry creates a `FileProtocol` instance with the given scheme and base path:
+
+```json
+"resource-protocols": [
+    { "scheme": "assets", "base_path": "./assets/" }
+]
+```
+
+After import, `assets://font.ttf` resolves to `./assets/font.ttf` via the resource store. Registered protocols persist for the lifetime of the app. See [Resources](../resources.md) for details on the resource system.
+
+### Resources
+
+The `resources` array declares resource objects. These follow the same structure as `objects` (id, class, properties) but are stored separately with a `resource:` prefix in the store:
+
+```json
+"resources": [
+    { "id": "main_font", "class": "velk-ui.Font", "properties": { "uri": "assets://default.ttf" } }
+]
+```
+
+Object properties can reference resources using the `resources.` qualifier in refs:
+
+```json
+"properties": { "font": { "ref": "resources.main_font" } }
+```
+
+Unqualified refs default to the objects section. Explicit `objects.` qualifier is also supported:
+
+```json
+{ "ref": "widget_1" }             // looks up in objects (default)
+{ "ref": "objects.widget_1" }     // explicit objects lookup
+{ "ref": "resources.main_font" }  // explicit resources lookup
 ```
 
 ### Extension collections

@@ -78,6 +78,20 @@ public:
     VELK_CLASS_UID("c0000000-0000-0000-0000-000000000012", "Container");
 };
 
+class ITestResource : public Interface<ITestResource>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, string, uri, "")
+    )
+};
+
+class TestResource : public ext::Object<TestResource, ITestResource>
+{
+public:
+    VELK_CLASS_UID("c0000000-0000-0000-0000-000000000013", "TestResource");
+};
+
 class WidgetPlugin : public ext::Plugin<WidgetPlugin>
 {
 public:
@@ -104,6 +118,7 @@ protected:
         ::velk::instance().type_registry().register_type<TestImportWidget>();
         ::velk::instance().type_registry().register_type<TestImportPanel>();
         ::velk::instance().type_registry().register_type<TestImportContainer>();
+        ::velk::instance().type_registry().register_type<TestResource>();
     }
 
     static void TearDownTestSuite()
@@ -111,6 +126,7 @@ protected:
         ::velk::instance().type_registry().unregister_type<TestImportWidget>();
         ::velk::instance().type_registry().unregister_type<TestImportPanel>();
         ::velk::instance().type_registry().unregister_type<TestImportContainer>();
+        ::velk::instance().type_registry().unregister_type<TestResource>();
     }
 
     void load_importer()
@@ -124,6 +140,7 @@ protected:
         ip->register_class_alias("test.Widget", TestImportWidget::static_class_id());
         ip->register_class_alias("test.Panel", TestImportPanel::static_class_id());
         ip->register_class_alias("test.Container", TestImportContainer::static_class_id());
+        ip->register_class_alias("test.Resource", TestResource::static_class_id());
 
         auto obj = ::velk::instance().create<IStoreImporter>(ClassId::JsonImporter);
         ASSERT_TRUE(obj);
@@ -1206,4 +1223,150 @@ TEST_F(AnimatorImportTest, TrackAutoplayFalse)
     // Advance time but track should not play
     ::velk::instance().update({10'100'000});
     EXPECT_FLOAT_EQ(0.0f, tw->width().get_value());
+}
+
+TEST_F(ImporterTest, ResourceProtocols)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "resource-protocols": [
+            { "scheme": "testassets", "base_path": "./test_assets/" }
+        ],
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 10 } }
+        ]
+    })");
+
+    EXPECT_TRUE(result.errors.empty());
+
+    // Verify the protocol was registered
+    auto proto = ::velk::instance().resource_store().find_protocol("testassets");
+    EXPECT_TRUE(proto);
+    if (proto) {
+        EXPECT_EQ(string_view("testassets"), proto->scheme());
+    }
+
+    // Cleanup
+    if (proto) {
+        ::velk::instance().resource_store().unregister_protocol(proto);
+    }
+}
+
+TEST_F(ImporterTest, Resources)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "resources": [
+            { "id": "font1", "class": "test.Resource", "properties": { "uri": "app://fonts/arial.ttf" } }
+        ],
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 10 } }
+        ]
+    })");
+
+    EXPECT_TRUE(result.errors.empty());
+    ASSERT_TRUE(result.store);
+
+    // Resource is stored with "resource:" prefix
+    auto res = result.store->find("resource:font1");
+    ASSERT_TRUE(res);
+
+    auto* tr = interface_cast<ITestResource>(res);
+    ASSERT_NE(nullptr, tr);
+    EXPECT_EQ(string_view("app://fonts/arial.ttf"), tr->uri().get_value());
+}
+
+TEST_F(ImporterTest, ResourceRef)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "objects": [
+            { "id": "c1", "class": "test.Container", "properties": {
+                "target": { "ref": "resources.font1" }
+            }}
+        ],
+        "resources": [
+            { "id": "font1", "class": "test.Resource", "properties": { "uri": "app://fonts/arial.ttf" } }
+        ]
+    })");
+
+    EXPECT_TRUE(result.errors.empty());
+    ASSERT_TRUE(result.store);
+
+    auto container = result.store->find("c1");
+    ASSERT_TRUE(container);
+
+    auto* tc = interface_cast<ITestImportContainer>(container);
+    ASSERT_NE(nullptr, tc);
+
+    // The ObjectRef should point to the resource
+    auto val = tc->target().get_value();
+    ASSERT_TRUE(val);
+    auto* obj_ref = interface_cast<IObjectRef>(val);
+    ASSERT_TRUE(obj_ref);
+
+    auto target_obj = obj_ref->get_object();
+    ASSERT_TRUE(target_obj);
+
+    auto* tr = interface_cast<ITestResource>(target_obj);
+    ASSERT_NE(nullptr, tr);
+    EXPECT_EQ(string_view("app://fonts/arial.ttf"), tr->uri().get_value());
+}
+
+TEST_F(ImporterTest, ResourceProtocolWithUriBasePath)
+{
+    load_importer();
+
+    auto& rs = ::velk::instance().resource_store();
+
+    // Write a test file in a subdirectory relative to working directory.
+#ifdef _WIN32
+    _mkdir("test_res_dir");
+    FILE* f = nullptr;
+    fopen_s(&f, "test_res_dir/hello.txt", "wb");
+#else
+    mkdir("test_res_dir", 0755);
+    FILE* f = fopen("test_res_dir/hello.txt", "wb");
+#endif
+    ASSERT_NE(nullptr, f);
+    const char* content = "hello from testassets";
+    fwrite(content, 1, strlen(content), f);
+    fclose(f);
+
+    // Import with a protocol whose base_path references app://
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "resource-protocols": [
+            { "scheme": "testres", "base_path": "app://test_res_dir/" }
+        ],
+        "objects": [
+            { "id": "w1", "class": "test.Widget", "properties": { "width": 1 } }
+        ]
+    })");
+
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    // Verify the protocol works: read file through the new scheme
+    auto file = rs.get_resource<IFile>("testres://hello.txt");
+    ASSERT_TRUE(file);
+    EXPECT_TRUE(file->exists());
+
+    ::velk::string text;
+    EXPECT_EQ(ReturnValue::Success, file->read_text(text));
+    EXPECT_EQ(string_view("hello from testassets"), string_view(text));
+
+    // Cleanup
+    auto proto = rs.find_protocol("testres");
+    if (proto) {
+        rs.unregister_protocol(proto);
+    }
+    remove("test_res_dir/hello.txt");
+#ifdef _WIN32
+    _rmdir("test_res_dir");
+#else
+    rmdir("test_res_dir");
+#endif
 }

@@ -19,6 +19,11 @@ ReturnValue FileProtocol::set_scheme(string_view scheme)
     return Success;
 }
 
+string_view FileProtocol::base_path() const
+{
+    return base_path_;
+}
+
 ReturnValue FileProtocol::set_base_path(string_view base_path)
 {
     base_path_ = string(base_path);
