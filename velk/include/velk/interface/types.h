@@ -54,6 +54,9 @@ inline constexpr Uid ThreadContext{"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"};
 /** @brief Flat collection of objects with id-based lookup.
  *  @see velk::Store (api/store.h) */
 inline constexpr Uid Store{"b4dde845-c159-4737-90ed-f63d4bce6c42"};
+/** @brief Local filesystem protocol handler. Supports configurable scheme and base path.
+ *  @see velk::IResourceProtocol (interface/resource/intf_resource_protocol.h) */
+inline constexpr Uid FileProtocol{"0f781b05-29d9-47f5-82c0-ac3cac32319c"};
 } // namespace ClassId
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */

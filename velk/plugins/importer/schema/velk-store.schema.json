@@ -21,6 +21,16 @@
     "bindings": {
       "type": "array",
       "items": { "$ref": "#/$defs/binding" }
+    },
+    "resource-protocols": {
+      "type": "array",
+      "description": "Registers filesystem-backed protocol handlers for custom URI schemes.",
+      "items": { "$ref": "#/$defs/resource_protocol" }
+    },
+    "resources": {
+      "type": "array",
+      "description": "Resource objects (same structure as objects, stored with 'resource:' prefix). Referenced via { \"ref\": \"resources.<id>\" }.",
+      "items": { "$ref": "#/$defs/object" }
     }
   },
   "required": ["version", "objects"],
@@ -126,6 +136,16 @@
         }
       },
       "required": ["targets", "class"]
+    },
+
+    "resource_protocol": {
+      "type": "object",
+      "description": "Registers a FileProtocol instance with a custom scheme and optional base path.",
+      "properties": {
+        "scheme": { "type": "string", "description": "URI scheme to register (e.g. 'assets')." },
+        "base_path": { "type": "string", "description": "Filesystem path prepended to all resolved paths." }
+      },
+      "required": ["scheme"]
     },
 
     "binding": {
