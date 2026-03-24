@@ -1,12 +1,11 @@
 #ifndef ARRAY_PROPERTY_H
 #define ARRAY_PROPERTY_H
 
-#include <velk/common.h>
-#include <velk/ext/core_object.h>
+#include "metadata_item.h"
+
 #include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_array_any.h>
 #include <velk/interface/intf_array_property.h>
-#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 
@@ -15,34 +14,24 @@ namespace velk::impl {
 /**
  * @brief Default IArrayProperty + IPropertyInternal implementation.
  *
- * Nearly identical to PropertyImpl but also implements IArrayProperty by
- * delegating element-level operations to IArrayAny on its backing data_.
- * The data_ is expected to be an ArrayAnyRef<T> (which implements IArrayAny).
+ * Nearly identical to Property but also implements IArrayProperty by
+ * delegating element-level operations to IArrayAny on its backing slot data.
  */
-class ArrayProperty final : public ext::ObjectCore<ArrayProperty, IPropertyInternal, IArrayProperty>
+class ArrayProperty final : public MetadataItem<ArrayProperty, IPropertyInternal, IArrayProperty>
 {
 public:
     VELK_CLASS_UID(ClassId::ArrayProperty, "ArrayProperty");
 
     ArrayProperty() = default;
-
-public: // IStorageOwned
-    IObjectStorage* get_owner() const override { return owner_; }
-    size_t get_storage_id() const override { return storage_id_; }
-    void set_owner(IObjectStorage* storage, size_t id) override
-    {
-        if (!owner_) {
-            owner_ = storage;
-            storage_id_ = id;
-        }
-    }
+    ~ArrayProperty() override;
 
 protected: // IProperty
     ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;
     const IAny::ConstPtr get_value() const override;
     IEvent::Ptr on_changed() const override
     {
-        return ::velk::get_property_event(owner_, storage_id_, Resolve::Create);
+        return is_standalone() ? IEvent::Ptr{}
+                               : ::velk::get_property_event(get_owner(), get_storage_id(), Resolve::Create);
     }
 
 protected: // IPropertyInternal
@@ -63,12 +52,10 @@ protected: // IArrayProperty
     ReturnValue erase_at(size_t index) override;
     void clear_array() override;
 
+    IAny::Ptr& slot_any() const { return slot().data.property.data; }
+
 private:
     IArrayAny* get_array_any() const;
-
-    IAny::Ptr data_;
-    IObjectStorage* owner_{};
-    size_t storage_id_{};
 };
 
 } // namespace velk::impl

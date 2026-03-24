@@ -16,24 +16,13 @@ namespace velk::impl {
  * list: [0, deferred_begin_) for immediate handlers, [deferred_begin_, size())
  * for deferred handlers.
  */
-class Event final : public ext::ObjectCore<Event, IFunctionInternal>
+class Event final : public MetadataItem<Event, IFunctionInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Event, "Event");
 
     Event() = default;
     ~Event();
-
-public: // IStorageOwned
-    IObjectStorage* get_owner() const override { return owner_; }
-    size_t get_storage_id() const override { return storage_id_; }
-    void set_owner(IObjectStorage* storage, size_t id) override
-    {
-        if (!owner_) {
-            owner_ = storage;
-            storage_id_ = id;
-        }
-    }
 
 public: // IFunction
     IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const override;
@@ -55,14 +44,9 @@ private:
     array_view<IFunction::ConstPtr> immediate_handlers() const;
     array_view<IFunction::ConstPtr> deferred_handlers() const;
 
+    auto& cb() const { return slot().data.callback; }
     void release_owned_context();
 
-    IObjectStorage* owner_{};
-    size_t storage_id_{};
-    void* target_context_{};
-    IFunction::BoundFn* target_fn_{};
-    void* owned_context_{};
-    IFunction::ContextDeleter* context_deleter_{};
     /// Partitioned handler list: [0, deferred_begin_) = immediate, [deferred_begin_, size()) = deferred.
     mutable vector<IFunction::ConstPtr> handlers_;
     mutable uint32_t deferred_begin_{};

@@ -6,16 +6,20 @@ namespace velk::impl {
 
 Event::~Event()
 {
-    release_owned_context();
+    if (has_standalone_slot()) {
+        release_owned_context();
+        delete_standalone_slot();
+    }
 }
 
 void Event::release_owned_context()
 {
-    if (context_deleter_ && owned_context_) {
-        context_deleter_(owned_context_);
+    auto& c = cb();
+    if (c.context_deleter && c.owned_context) {
+        c.context_deleter(c.owned_context);
     }
-    owned_context_ = nullptr;
-    context_deleter_ = nullptr;
+    c.owned_context = nullptr;
+    c.context_deleter = nullptr;
 }
 
 IAny::Ptr Event::callback_trampoline(void* ctx, FnArgs args)
@@ -35,8 +39,9 @@ IAny::Ptr Event::invoke(FnArgs args, InvokeType type) const
     }
 
     IAny::Ptr result;
-    if (target_fn_) {
-        result = target_fn_(target_context_, args);
+    auto& c = cb();
+    if (c.target_fn) {
+        result = c.target_fn(c.target_context, args);
     }
     invoke_handlers(args);
     return result;
@@ -82,24 +87,27 @@ void Event::invoke_handlers(FnArgs args) const
 void Event::set_invoke_callback(IFunction::CallableFn* fn)
 {
     release_owned_context();
-    target_context_ = reinterpret_cast<void*>(fn);
-    target_fn_ = fn ? &callback_trampoline : nullptr;
+    auto& c = cb();
+    c.target_context = reinterpret_cast<void*>(fn);
+    c.target_fn = fn ? &callback_trampoline : nullptr;
 }
 
 void Event::bind(void* context, IFunction::BoundFn* fn)
 {
     release_owned_context();
-    target_context_ = context;
-    target_fn_ = fn;
+    auto& c = cb();
+    c.target_context = context;
+    c.target_fn = fn;
 }
 
 void Event::set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter)
 {
     release_owned_context();
-    owned_context_ = context;
-    context_deleter_ = deleter;
-    target_context_ = context;
-    target_fn_ = fn;
+    auto& c = cb();
+    c.owned_context = context;
+    c.context_deleter = deleter;
+    c.target_context = context;
+    c.target_fn = fn;
 }
 
 ReturnValue Event::add_handler(const IFunction::ConstPtr& fn, InvokeType type) const
