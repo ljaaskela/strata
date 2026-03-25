@@ -2,12 +2,55 @@
 #define OBJECT_STORAGE_H
 
 #include <velk/ext/refcounted_dispatch.h>
+#include <velk/interface/intf_function.h>
 #include <velk/interface/intf_metadata_observer.h>
 #include <velk/interface/intf_object_storage.h>
-
 #include <velk/vector.h>
 
+#include <cassert>
+#include <cstring>
+#include <limits>
+
 namespace velk {
+
+/** @brief Per-member data, discriminated by MemberKind via members_[member_index].kind. */
+union MemberData
+{
+    MemberData() { std::memset((void*)this, 0, sizeof(*this)); }
+    ~MemberData() {} // Destruction managed by ObjectStorage::destroy_slot().
+
+    struct property_t
+    {
+        IAny::Ptr data;    ///< The property's type-erased value.
+        IEvent::Ptr event; ///< Lazily created on_changed event.
+    } property;
+    struct callback_t
+    {
+        void* target_context;                       ///< Dispatch target (interface ptr or CallableFn*).
+        IFunction::BoundFn* target_fn;              ///< Primary invoke target.
+        void* owned_context;                        ///< Heap-allocated callable context (owned).
+        IFunction::ContextDeleter* context_deleter; ///< Deleter for owned_context.
+    } callback;
+};
+
+/** @brief Per-member slot holding a lazily created instance and its associated data. */
+struct MemberSlot
+{
+    MemberSlot() = default;
+    explicit MemberSlot(IInterface::Ptr inst) : instance(std::move(inst)) {}
+    ~MemberSlot() {} // Destruction managed by ObjectStorage::destroy_slot().
+    MemberSlot(MemberSlot&& o) noexcept : instance(std::move(o.instance))
+    {
+        std::memcpy((void*)&data, &o.data, sizeof(data));
+        std::memset((void*)&o.data, 0, sizeof(o.data));
+    }
+    MemberSlot& operator=(MemberSlot&&) = delete;
+    MemberSlot(const MemberSlot&) = delete;
+    MemberSlot& operator=(const MemberSlot&) = delete;
+
+    IInterface::Ptr instance; ///< The created Property/Event/Function (null until first access).
+    MemberData data{}; ///< Per-kind data: property value+event or function callback.
+};
 
 /**
  * @brief Runtime object storage that lazily creates property/event/function instances
@@ -15,11 +58,7 @@ namespace velk {
  *
  * Holds a static array_view<MemberDesc> (from VELK_INTERFACE) and creates runtime
  * impl::Property/impl::Function instances on first access via get_property()/get_event()/
- * get_function(). Created instances are cached for subsequent lookups.
- *
- * The instances_ vector is partitioned: [0, attachment_end_) holds attachments,
- * [attachment_end_, size()) holds metadata instances. Attachment entries use SIZE_MAX
- * as the index sentinel.
+ * get_function(). Created instances are cached in metadata_ slots.
  *
  * Does not inherit RefCountedDispatch; lifetime is managed by the owning Object
  * (allocated by VelkInstance at construction, deleted in Object's destructor).
@@ -33,6 +72,7 @@ public:
      * @param owner The owning object, used to bind function trampolines and resolve property state.
      */
     explicit ObjectStorage(array_view<MemberDesc> members, IInterface* owner = nullptr);
+    ~ObjectStorage() override;
 
 public: // IObject (inherited via IObjectStorage; not used as an IObject)
     Uid get_class_uid() const override { return {}; }
@@ -64,17 +104,27 @@ public: // IObjectStorage (property events + observers)
     void add_observer(IMetadataObserver* observer) override;
     void remove_observer(IMetadataObserver* observer) override;
 
+public:
+    /** @brief Returns the metadata slot at the given index. */
+    MemberSlot& slot(size_t id) const
+    {
+        assert(id < 0xffff && "Slot id out of range");
+        return metadata_[id];
+    }
+    /** @brief Returns the MemberData at the given index. */
+    MemberData& data(size_t id) const
+    {
+        assert(id < 0xffff && "Slot id out of range");
+        return metadata_[id].data;
+    }
+
 private:
     array_view<MemberDesc> members_; ///< Static metadata descriptors from VELK_INTERFACE.
     IInterface* owner_{};            ///< Owning object for trampoline binding and state access.
 
-    /// Lazily populated cache: [0, attachment_end_) = attachments (idx == SIZE_MAX),
-    ///                         [attachment_end_, size()) = metadata instances.
-    mutable vector<std::pair<size_t, IInterface::Ptr>> instances_;
-    mutable uint32_t attachment_end_{0}; ///< Boundary between attachments and metadata entries.
+    mutable vector<IInterface::Ptr> attachments_; ///< Object attachments
+    mutable vector<MemberSlot> metadata_;         ///< Sparse: one slot per lazily created member.
 
-    /// One slot per metadata member, indexed by storage id. Null until first access.
-    mutable vector<IEvent::Ptr> member_data_;
     /// Object-level observers for property change notifications.
     vector<IMetadataObserver*> observers_;
 
@@ -82,8 +132,12 @@ private:
     IInterface::Ptr find_or_create(string_view name, MemberKind kind, Resolve mode) const;
     /** @brief Creates a runtime instance (impl::Property or impl::Function) from a member descriptor. */
     IInterface::Ptr create(MemberDesc desc) const;
-    /** @brief Binds a function instance to the owner's virtual trampoline. */
-    void bind(const MemberDesc& m, const IInterface::Ptr& fn) const;
+    /** @brief Binds a function trampoline directly into the slot's callback data. */
+    void bind(const MemberDesc& m, uint16_t slot_index) const;
+    /** @brief Releases owned callback in a slot. */
+    void release_callback(MemberSlot& slot) const;
+    /** @brief Destroys the union arm of a slot based on its member kind. */
+    void destroy_slot(MemberSlot& slot) const;
     /** @brief Notifies all observers_ */
     void notify_observers(string_view name, Uid interfaceUid) const;
 };

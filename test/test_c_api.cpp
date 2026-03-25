@@ -270,7 +270,7 @@ TEST_F(CApi, GetFunctionAndInvoke)
 
     // Verify the function actually ran by checking the C++ side
     auto* raw = reinterpret_cast<velk::IInterface*>(obj);
-    auto* iw = velk::interface_cast<ICApiWidget>(raw);
+    auto* iw = interface_cast<ICApiWidget>(raw);
     ASSERT_NE(iw, nullptr);
     EXPECT_EQ(static_cast<CApiWidget*>(iw)->reset_count, 1);
 
@@ -301,7 +301,7 @@ TEST_F(CApi, InvokeWithArgs)
     EXPECT_GE(r, 0);
 
     // Verify the result on the C++ side
-    auto* iw = velk::interface_cast<ICApiWidget>(reinterpret_cast<velk::IInterface*>(obj));
+    auto* iw = interface_cast<ICApiWidget>(reinterpret_cast<velk::IInterface*>(obj));
     ASSERT_NE(iw, nullptr);
     EXPECT_EQ(static_cast<CApiWidget*>(iw)->last_add_result, 7);
 

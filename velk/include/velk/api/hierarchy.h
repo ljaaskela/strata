@@ -177,107 +177,92 @@ public:
 
     /** @brief Wraps an existing IHierarchy pointer. */
     explicit Hierarchy(IHierarchy::Ptr h)
-        : Object(h ? interface_pointer_cast<IObject>(h) : IObject::Ptr{}),
-          hierarchy_(h.get())
+        : Object(h ? interface_pointer_cast<IObject>(h) : IObject::Ptr{})
     {}
 
     /** @brief Sets the root object. */
     ReturnValue set_root(const IObject::Ptr& root)
     {
-        auto* h = intf();
-        return h ? h->set_root(root) : ReturnValue::InvalidArgument;
+        return with_or<IHierarchy>([&](auto& h) { return h.set_root(root); }, ReturnValue::InvalidArgument);
     }
 
     /** @brief Appends a child to the given parent. */
     ReturnValue add(const IObject::Ptr& parent, const IObject::Ptr& child)
     {
-        auto* h = intf();
-        return h ? h->add(parent, child) : ReturnValue::InvalidArgument;
+        return with_or<IHierarchy>([&](auto& h) { return h.add(parent, child); }, ReturnValue::InvalidArgument);
     }
 
     /** @brief Inserts a child at the given index under the parent. */
     ReturnValue insert(const IObject::Ptr& parent, size_t index, const IObject::Ptr& child)
     {
-        auto* h = intf();
-        return h ? h->insert(parent, index, child) : ReturnValue::InvalidArgument;
+        return with_or<IHierarchy>([&](auto& h) { return h.insert(parent, index, child); },
+                                   ReturnValue::InvalidArgument);
     }
 
     /** @brief Removes an object and all its descendants. */
     ReturnValue remove(const IObject::Ptr& object)
     {
-        auto* h = intf();
-        return h ? h->remove(object) : ReturnValue::InvalidArgument;
+        return with_or<IHierarchy>([&](auto& h) { return h.remove(object); }, ReturnValue::InvalidArgument);
     }
 
     /** @brief Replaces an object in-place, preserving position and reparenting children. */
     ReturnValue replace(const IObject::Ptr& old_child, const IObject::Ptr& new_child)
     {
-        auto* h = intf();
-        return h ? h->replace(old_child, new_child) : ReturnValue::InvalidArgument;
+        return with_or<IHierarchy>([&](auto& h) { return h.replace(old_child, new_child); },
+                                   ReturnValue::InvalidArgument);
     }
 
     /** @brief Removes all objects from the hierarchy. */
     void clear()
     {
-        if (auto* h = intf()) {
-            h->clear();
-        }
+        with<IHierarchy>([](auto& h) { h.clear(); });
     }
 
     /** @brief Returns the root as a Node, or empty if no root is set. */
     Node root() const
     {
-        auto* h = intf();
-        if (!h) {
-            return {};
-        }
-        auto r = h->root();
-        return r ? Node(h->node_of(r)) : Node{};
+        return with<IHierarchy>([](auto& h) {
+            auto r = h.root();
+            return r ? Node(h.node_of(r)) : Node{};
+        });
     }
 
     /** @brief Returns a Node for the given object. */
     Node node_of(const IObject::Ptr& object) const
     {
-        auto* h = intf();
-        return h ? Node(h->node_of(object)) : Node{};
+        return with<IHierarchy>([&](auto& h) { return Node(h.node_of(object)); });
     }
 
     /** @brief Returns the parent as a Node, or empty if root or not found. */
     Node parent_of(const IObject::Ptr& object) const
     {
-        auto* h = intf();
-        if (!h) {
-            return {};
-        }
-        auto p = h->parent_of(object);
-        return p ? Node(h->node_of(p)) : Node{};
+        return with<IHierarchy>([&](auto& h) {
+            auto p = h.parent_of(object);
+            return p ? Node(h.node_of(p)) : Node{};
+        });
     }
 
     /** @brief Returns the children as Nodes. */
     vector<Node> children_of(const IObject::Ptr& object) const
     {
-        auto* h = intf();
-        if (!h) {
-            return {};
-        }
-        auto all = h->children_of(object);
-        vector<Node> result;
-        result.reserve(all.size());
-        for (auto& child : all) {
-            result.push_back(Node(h->node_of(child)));
-        }
-        return result;
+        return with<IHierarchy>([&](auto& h) {
+            auto all = h.children_of(object);
+            vector<Node> result;
+            result.reserve(all.size());
+            for (auto& child : all) {
+                result.push_back(Node(h.node_of(child)));
+            }
+            return result;
+        });
     }
 
     /** @brief Returns the child at the given index as a Node, or empty. */
     Node child_at(const IObject::Ptr& object, size_t index) const
     {
-        auto* h = intf();
-        if (!h) {
-            return {};
-        }
-        auto c = h->child_at(object, index);
-        return c ? Node(h->node_of(c)) : Node{};
+        return with<IHierarchy>([&](auto& h) {
+            auto c = h.child_at(object, index);
+            return c ? Node(h.node_of(c)) : Node{};
+        });
     }
 
     /** @brief Iterates children of the given object with a typed callback. */
@@ -286,42 +271,37 @@ public:
     {
         static_assert(std::is_invocable_v<std::decay_t<Fn>, T&>,
                       "Hierarchy::for_each_child visitor must be callable as void(T&) or bool(T&)");
-        auto* h = intf();
-        if (!h) {
-            return;
-        }
-        h->for_each_child(object, &fn, [](void* ctx, const IObject::Ptr& child) -> bool {
-            auto& callback = *static_cast<std::decay_t<Fn>*>(ctx);
-            if (auto* typed = interface_cast<T>(child)) {
-                if constexpr (std::is_same_v<decltype(callback(*typed)), bool>) {
-                    return callback(*typed);
-                } else {
-                    callback(*typed);
+        with<IHierarchy>([&](auto& h) {
+            h.for_each_child(object, &fn, [](void* ctx, const IObject::Ptr& child) -> bool {
+                auto& callback = *static_cast<std::decay_t<Fn>*>(ctx);
+                if (auto* typed = interface_cast<T>(child)) {
+                    if constexpr (std::is_same_v<decltype(callback(*typed)), bool>) {
+                        return callback(*typed);
+                    } else {
+                        callback(*typed);
+                    }
                 }
-            }
-            return true;
+                return true;
+            });
         });
     }
 
     /** @brief Returns the number of children of the given object. */
     size_t child_count(const IObject::Ptr& object) const
     {
-        auto* h = intf();
-        return h ? h->child_count(object) : 0;
+        return with<IHierarchy>([&](auto& h) { return h.child_count(object); });
     }
 
     /** @brief Returns true if the object is in this hierarchy. */
     bool contains(const IObject::Ptr& object) const
     {
-        auto* h = intf();
-        return h && h->contains(object);
+        return with<IHierarchy>([&](auto& h) { return h.contains(object); });
     }
 
     /** @brief Returns the total number of objects in this hierarchy. */
     size_t size() const
     {
-        auto* h = intf();
-        return h ? h->size() : 0;
+        return with<IHierarchy>([](auto& h) { return h.size(); });
     }
 
     /** @brief Returns true if the hierarchy is empty. */
@@ -334,7 +314,6 @@ public:
         if (!storage) {
             return;
         }
-        // Remove any existing thread context attachment
         if (auto existing = storage->find_attachment<IThreadContext>()) {
             storage->remove_attachment(existing);
         }
@@ -351,17 +330,6 @@ public:
 
     /** @brief Implicit conversion to IHierarchy::Ptr. */
     operator IHierarchy::Ptr() const { return as_ptr<IHierarchy>(); }
-
-private:
-    IHierarchy* intf() const
-    {
-        if (!hierarchy_ && get()) {
-            hierarchy_ = interface_cast<IHierarchy>(get());
-        }
-        return hierarchy_;
-    }
-
-    mutable IHierarchy* hierarchy_ = nullptr;
 };
 
 /** @brief Creates a new Hierarchy instance. */

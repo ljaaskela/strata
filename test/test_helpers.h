@@ -70,7 +70,7 @@ PropOwner<T> create_owned_property(const T& value = {})
     } else if constexpr (std::is_same_v<T, float>) {
         obj = ::velk::instance().create<::velk::IObject>(TestFloatObj::static_class_id());
     }
-    auto iprop = ::velk::interface_cast<::velk::IMetadata>(obj)->get_property("value");
+    auto iprop = interface_cast<::velk::IMetadata>(obj)->get_property("value");
     PropOwner<T> r(std::move(obj), iprop);
     if (value != T{}) r.set_value(value);
     return r;

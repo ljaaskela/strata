@@ -1,11 +1,10 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
-#include <velk/common.h>
-#include <velk/ext/core_object.h>
+#include "metadata_item.h"
+
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_function.h>
-#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/types.h>
 
 namespace velk {
@@ -59,27 +58,16 @@ namespace velk::impl {
  * 3. **Owned callback** (set_owned_callback()): heap-allocated callable with
  *    type-erased context and deleter. Used by Callback for capturing lambdas.
  *
- * Does not support event handlers. Use EventImpl (ClassId::Event) for event
+ * Does not support event handlers. Use Event (ClassId::Event) for event
  * functionality with add_handler/remove_handler support.
  */
-class Function final : public ext::ObjectCore<Function, IFunctionInternal>
+class Function final : public MetadataItem<Function, IFunctionInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Function, "Function");
 
     Function() = default;
     ~Function();
-
-public: // IStorageOwned
-    IObjectStorage* get_owner() const override { return owner_; }
-    size_t get_storage_id() const override { return storage_id_; }
-    void set_owner(IObjectStorage* storage, size_t id) override
-    {
-        if (!owner_) {
-            owner_ = storage;
-            storage_id_ = id;
-        }
-    }
 
 public: // IFunction
     IAny::Ptr invoke(FnArgs args, InvokeType type = Auto) const override;
@@ -90,24 +78,16 @@ public: // IFunctionInternal
     void set_owned_callback(void* context, IFunction::BoundFn* fn,
                             IFunction::ContextDeleter* deleter) override;
 
-public: // IEvent (stubs; use EventImpl for handler support)
+public: // IEvent (stubs; use Event for handler support)
     ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Auto) const override;
     ReturnValue remove_handler(const IFunction::ConstPtr& fn) const override;
     bool has_handlers() const override;
 
+    auto& cb() const { return slot().data.callback; }
+
 private:
     static IAny::Ptr callback_trampoline(void* ctx, FnArgs args);
-
     void release_owned_context();
-
-    IObjectStorage* owner_{};
-    size_t storage_id_{};
-    void* target_context_{}; ///< Context for target_fn_: interface ptr (bind) or CallableFn*
-                             ///< (set_invoke_callback).
-    IFunction::BoundFn*
-        target_fn_{}; ///< Primary invoke target. Uses callback_trampoline when set via set_invoke_callback.
-    void* owned_context_{};                        ///< Heap-allocated callable context (owned).
-    IFunction::ContextDeleter* context_deleter_{}; ///< Deleter for owned_context_.
 };
 
 } // namespace velk::impl

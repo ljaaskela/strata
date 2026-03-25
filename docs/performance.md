@@ -222,34 +222,34 @@ An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The
 A minimal object implements a single interface with one property. `ext::Object` adds `IObjectStorage`, giving 2 interfaces in the dispatch pack (IObjectStorage, IToggle). IObject is not prepended because it is reachable via IObjectStorage's parent chain (IObjectStorage → IMetadata → IPropertyState → IObject). The ObjectStorage is allocated lazily on first runtime metadata or attachment access.
 
 ```
-Toggle (48 bytes)                           ObjectStorage (72 bytes, heap, lazy)
-┌──────────────────────────────────┐      ┌────────────────────────────────┐
-│ MI base layout               16  │      │ base (InterfaceDispatch)   16  │
-│   (2 vptrs)                      │      │ members_ (array_view)      16  │
-│ flags + padding               8  │      │ owner_ (pointer)            8  │
-│ block*                        8  │      │ instances_ (vector)        24  │
-│ storage_ (pointer)            8  │      │ attachment_end_ + padding   8  │
-│ IToggle::State                8  │      └────────────────────────────────┘
-│   (enabled: bool + padding)      │
+Toggle (48 bytes)                           ObjectStorage (104 bytes, heap, lazy)
+┌──────────────────────────────────┐      ┌──────────────────────────────────┐
+│ MI base layout               16  │      │ base (InterfaceDispatch)      8  │
+│   (2 vptrs)                      │      │ members_ (array_view)        16  │
+│ flags + padding               8  │      │ owner_ (pointer)              8  │
+│ block*                        8  │      │ attachments_ (vector)        24  │
+│ storage_ (pointer)            8  │      │ metadata_ (vector)           24  │
+│ IToggle::State                8  │      │ observers_ (vector)          24  │
+│   (enabled: bool + padding)      │      └──────────────────────────────────┘
 └──────────────────────────────────┘
 ```
 
-With no members accessed, the ObjectStorage is not allocated. The total footprint is **48 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **144 bytes**.
+With no members accessed, the ObjectStorage is not allocated. The total footprint is **48 bytes** (object only). On first runtime metadata access the container is lazily allocated (104 bytes). Accessing the one property then adds a 48-byte `MemberSlot` to `metadata_`, bringing the total to **208 bytes**.
 
 ### Example: MyWidget with 6 members
 
 MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IObjectStorage, totaling 3 interfaces in the dispatch pack (IObjectStorage, IMyWidget, ISerializable). IObject is not prepended because it is reachable via IObjectStorage's parent chain. The ObjectStorage is allocated lazily on first runtime metadata or attachment access.
 
 ```
-MyWidget (80 bytes)                         ObjectStorage (72 bytes, heap, lazy)
-┌──────────────────────────────────┐      ┌────────────────────────────────┐
-│ MI base layout               24  │      │ base (InterfaceDispatch)   16  │
-│   (3 vptrs)                      │      │ members_ (array_view)      16  │
-│ flags + padding               8  │      │ owner_ (pointer)            8  │
-│ block*                        8  │      │ instances_ (vector)        24  │
-│ storage_ (pointer)            8  │      │ attachment_end_ + padding   8  │
-│ IMyWidget::State              8  │      └────────────────────────────────┘
-│   (width, height: 2× float)      │
+MyWidget (80 bytes)                         ObjectStorage (104 bytes, heap, lazy)
+┌──────────────────────────────────┐      ┌──────────────────────────────────┐
+│ MI base layout               24  │      │ base (InterfaceDispatch)      8  │
+│   (3 vptrs)                      │      │ members_ (array_view)        16  │
+│ flags + padding               8  │      │ owner_ (pointer)              8  │
+│ block*                        8  │      │ attachments_ (vector)        24  │
+│ storage_ (pointer)            8  │      │ metadata_ (vector)           24  │
+│ IMyWidget::State              8  │      │ observers_ (vector)          24  │
+│   (width, height: 2× float)      │      └──────────────────────────────────┘
 │ ISerializable::State         24  │
 │   (name: velk::String)           │
 └──────────────────────────────────┘
@@ -259,15 +259,17 @@ MyWidget (80 bytes)                         ObjectStorage (72 bytes, heap, lazy)
 
 The MI base layout contains one vtable pointer per interface chain, plus MSVC multiple-inheritance adjustment padding. The exact layout is compiler-specific; sizes are derived from `sizeof(ObjectCore<...>)` minus non-MI fields (ObjectData + meta_). The self-pointer (`IObject*`) is stored in `control_block::ptr` rather than inline, so it costs no per-object space beyond the already-allocated block.
 
-Member instances are created lazily, only when first accessed via `get_property()`, `get_event()`, or `get_function()`. Each accessed member adds a **24-byte** entry to the `instances_` vector: an 8-byte metadata index (`size_t`) plus a 16-byte `shared_ptr<IInterface>`.
+Member instances are created lazily, only when first accessed via `get_property()`, `get_event()`, or `get_function()`. Each accessed member adds a **48-byte** `MemberSlot` to the `metadata_` vector: a 16-byte `shared_ptr<IInterface>` (the instance) and a 32-byte `MemberData` union (property data+event or function callback). The member index is stored on the instance itself (via `IStorageOwned::get_member_index()`), keeping the slot compact. The `MemberData` union avoids storing per-member data on the instances themselves, keeping Property/Function/Event objects thin.
 
-| Scenario | Object | ObjectStorage | Cached members | Total |
+| Scenario | Object | ObjectStorage | MemberSlots | Total |
 |---|---|---|---|---|
 | Toggle, no members accessed | 48 | 0 (lazy) | 0 | **48 bytes** |
-| Toggle, 1 member accessed | 48 | 72 | 1 × 24 = 24 | **144 bytes** |
+| Toggle, 1 member accessed | 48 | 104 | 1 × 48 = 48 | **200 bytes** |
 | MyWidget, no members accessed | 80 | 0 (lazy) | 0 | **80 bytes** |
-| MyWidget, 3 members accessed | 80 | 72 | 3 × 24 = 72 | **224 bytes** |
-| MyWidget, all 6 members accessed | 80 | 72 | 6 × 24 = 144 | **296 bytes** |
+| MyWidget, 3 members accessed | 80 | 104 | 3 × 48 = 144 | **328 bytes** |
+| MyWidget, all 6 members accessed | 80 | 104 | 6 × 48 = 288 | **472 bytes** |
+
+These totals exclude the heap-allocated impl instances themselves (Property 48 bytes, Function 48 bytes, Event 80 bytes each) and their control blocks (16 bytes each). The MemberSlot holds a shared_ptr to the instance but does not include its allocation. Per-member data (property value/event, callback pointers) lives in the MemberSlot's 32-byte `MemberData` union rather than on the impl instance.
 
 The `states_` tuple contains one `State` struct per interface that declares properties via `VELK_INTERFACE`. Each `State` struct holds one field per `PROP` member, initialized with its declared default value. Properties backed by state storage use `ext::AnyRef<T>` to read/write directly into these fields.
 
@@ -301,20 +303,32 @@ AnyValue<float> (32 bytes)          ArrayAnyValue<float> (48 bytes)
 │ data_ (float) + pad     8  │      │ data_ (vector<float>)  24  │
 └────────────────────────────┘      └────────────────────────────┘
 
-ClassId::Property (72 bytes)        ClassId::Function (64 bytes)        ClassId::Event (96 bytes)
+ClassId::Property (48 bytes)        ClassId::Function (48 bytes)        ClassId::Event (80 bytes)
 ┌────────────────────────────┐      ┌────────────────────────────┐      ┌────────────────────────────┐
 │ MI base layout          16 │      │ MI base layout          16 │      │ MI base layout          16 │
 │   (2 vptrs)                │      │   (2 vptrs)                │      │   (2 vptrs)                │
 │ flags + padding          8 │      │ flags + padding          8 │      │ flags + padding          8 │
 │ block*                   8 │      │ block*                   8 │      │ block*                   8 │
-│ data_ (shared_ptr)      16 │      │ target_context_          8 │      │ target_context_          8 │
-│ owner_ (pointer)         8 │      │ target_fn_               8 │      │ target_fn_               8 │
-│ storage_id_ (size_t)     8 │      │ owned_context_           8 │      │ owned_context_           8 │
-│ external_ (bool) + pad   8 │      │ context_deleter_         8 │      │ context_deleter_         8 │
-│ (total verified: 72)       │      │ (total verified: 64)       │      │ handlers_ (vector)      24 │
+│ owner_ / standalone_    8* │      │ owner_ / standalone_    8* │      │ owner_ / standalone_    8* │
+│ member_index_ + pad      8 │      │ member_index_ + pad      8 │      │ member_index_ + pad      8 │
+│   storage_id_, external_   │      │   storage_id_              │      │   storage_id_              │
+│ (total verified: 48)       │      │ (total verified: 48)       │      │ handlers_ (vector)      24 │
 └────────────────────────────┘      └────────────────────────────┘      │ deferred_begin_ + pad    8 │
-                                                                        │ (total verified: 96)       │
-                                                                        └────────────────────────────┘
+                                                                        │ (total verified: 80)       │
+* owner_ and standalone_slot_                                           └────────────────────────────┘
+  share a union (8 bytes).
+  Per-member data (property value,
+  callback pointers) lives in
+  MemberSlot::MemberData (32-byte
+  union in ObjectStorage).
+
+MemberSlot (48 bytes)
+┌────────────────────────────┐
+│ instance (shared_ptr)   16 │
+│ MemberData (union)      32 │
+│   property: data + event   │
+│   callback: ctx/fn/own/del │
+└────────────────────────────┘
 ```
 
 Internal interface types use inheritance to reduce MI chains: `IPropertyInternal` inherits `IProperty`, `IFunctionInternal` inherits `IEvent` (which inherits `IFunction`), and `IFutureInternal` inherits `IFuture`. This means each impl class only needs one entry in its interface pack (the Internal variant), halving the MI vptr overhead compared to listing both the public and internal interfaces separately.

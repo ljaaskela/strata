@@ -131,6 +131,8 @@ protected:
     ~Interface() override = default;
 };
 
+} // namespace velk
+
 /**
  * @brief Casts a shared pointer to a derived interface type.
  * @tparam T The target interface type.
@@ -141,7 +143,7 @@ protected:
  * When T is U or a base of U, the cast is a no-op (no virtual dispatch).
  */
 template <class T, class U, class = std::enable_if_t<!std::is_const_v<U>>>
-typename T::Ptr interface_pointer_cast(const shared_ptr<U>& obj)
+typename T::Ptr interface_pointer_cast(const velk::shared_ptr<U>& obj)
 {
     if constexpr (std::is_base_of_v<T, U>) {
         return typename T::Ptr(obj.get(), obj.block());
@@ -163,7 +165,7 @@ typename T::Ptr interface_pointer_cast(const shared_ptr<U>& obj)
  * When T is U or a base of U, the cast is a no-op (no virtual dispatch).
  */
 template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
-typename T::ConstPtr interface_pointer_cast(const shared_ptr<U>& obj)
+typename T::ConstPtr interface_pointer_cast(const velk::shared_ptr<U>& obj)
 {
     if constexpr (std::is_base_of_v<T, std::remove_const_t<U>>) {
         return typename T::ConstPtr(obj.get(), obj.block());
@@ -207,7 +209,7 @@ const T* interface_cast(U* obj)
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T, class U, class = std::enable_if_t<!std::is_const_v<U>>>
-T* interface_cast(const shared_ptr<U>& obj)
+T* interface_cast(const velk::shared_ptr<U>& obj)
 {
     if constexpr (std::is_base_of_v<T, U>) {
         return obj.get();
@@ -221,7 +223,7 @@ T* interface_cast(const shared_ptr<U>& obj)
  * @tparam U Deduced element type of the shared_ptr. Must be const-qualified (SFINAE).
  */
 template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
-const T* interface_cast(const shared_ptr<U>& obj)
+const T* interface_cast(const velk::shared_ptr<U>& obj)
 {
     if constexpr (std::is_base_of_v<T, std::remove_const_t<U>>) {
         return obj.get();
@@ -229,7 +231,5 @@ const T* interface_cast(const shared_ptr<U>& obj)
         return obj ? obj->template get_interface<T>() : nullptr;
     }
 }
-
-} // namespace velk
 
 #endif // VELK_INTF_INTERFACE_H

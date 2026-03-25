@@ -34,6 +34,21 @@ detail::StateReader<T> read_state(const shared_ptr<U>& object)
     return read_state<T>(object.get());
 }
 
+/** @brief Reads a single member from an object's interface state. Returns default if null. */
+template <class Interface, class T>
+T read_state_value(const IInterface* object, T Interface::State::* member)
+{
+    auto r = read_state<Interface>(object);
+    return r ? (*r).*member : T{};
+}
+
+/** @brief Reads a single member from an object's interface state (shared_ptr overload). */
+template <class Interface, class T, class U>
+T read_state_value(const shared_ptr<U>& object, T Interface::State::* member)
+{
+    return read_state_value<Interface>(object.get(), member);
+}
+
 /** @brief Convenience free function: write access to T::State via IMetadata. */
 template <class T, class U>
 detail::StateWriter<T> write_state(U* object)
@@ -104,6 +119,22 @@ template <class T, class U, class Fn>
 void write_state(const shared_ptr<U>& object, Fn&& fn, InvokeType type = Auto)
 {
     write_state<T>(object.get(), std::forward<Fn>(fn), type);
+}
+
+/** @brief Writes a single member of an object's interface state. Fires on_changed. */
+template <class Interface, class T>
+void write_state_value(IInterface* object, T Interface::State::*member, const T& value)
+{
+    write_state<Interface>(object, [member, &value](typename Interface::State& s) {
+        s.*member = value;
+    });
+}
+
+/** @brief Writes a single member of an object's interface state (shared_ptr overload). */
+template <class Interface, class T, class U>
+void write_state_value(const shared_ptr<U>& object, T Interface::State::*member, const T& value)
+{
+    write_state_value<Interface>(object.get(), member, value);
 }
 
 } // namespace velk

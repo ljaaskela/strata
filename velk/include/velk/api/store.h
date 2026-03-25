@@ -29,36 +29,31 @@ public:
 
     /** @brief Wraps an existing IStore pointer. */
     explicit Store(IStore::Ptr s)
-        : Object(s ? interface_pointer_cast<IObject>(s) : IObject::Ptr{}),
-          store_(s.get())
+        : Object(s ? interface_pointer_cast<IObject>(s) : IObject::Ptr{})
     {}
 
     /** @brief Returns an object by its string id, or nullptr. */
     IObject::Ptr find(string_view id) const
     {
-        auto* s = intf();
-        return s ? s->find(id) : IObject::Ptr{};
+        return with<IStore>([&](auto& s) { return s.find(id); });
     }
 
     /** @brief Returns the number of objects in the store. */
     size_t object_count() const
     {
-        auto* s = intf();
-        return s ? s->object_count() : 0;
+        return with<IStore>([](auto& s) { return s.object_count(); });
     }
 
     /** @brief Returns the object at the given index, or nullptr. */
     IObject::Ptr object_at(size_t index) const
     {
-        auto* s = intf();
-        return s ? s->object_at(index) : IObject::Ptr{};
+        return with<IStore>([&](auto& s) { return s.object_at(index); });
     }
 
     /** @brief Adds an object with the given id. */
     ReturnValue add(string_view id, const IObject::Ptr& object)
     {
-        auto* s = intf();
-        return s ? s->add(id, object) : ReturnValue::InvalidArgument;
+        return with_or<IStore>([&](auto& s) { return s.add(id, object); }, ReturnValue::InvalidArgument);
     }
 
     /** @brief Returns true if the store is empty. */
@@ -66,17 +61,6 @@ public:
 
     /** @brief Implicit conversion to IStore::Ptr. */
     operator IStore::Ptr() const { return as_ptr<IStore>(); }
-
-private:
-    IStore* intf() const
-    {
-        if (!store_ && get()) {
-            store_ = interface_cast<IStore>(get());
-        }
-        return store_;
-    }
-
-    mutable IStore* store_ = nullptr;
 };
 
 /** @brief Creates a new Store instance. */
