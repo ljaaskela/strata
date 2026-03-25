@@ -216,6 +216,13 @@ protected:
         return p ? fn(*p) : std::forward<Default>(fallback);
     }
 
+    /** @brief Returns the input object if it is convertible to @tparam Interface */
+    template <class Interface>
+    static IObject::Ptr check_object(IObject::Ptr obj)
+    {
+        return interface_cast<Interface>(obj) ? std::move(obj) : IObject::Ptr{};
+    }
+
 private:
     IObject::Ptr obj_;
 };
