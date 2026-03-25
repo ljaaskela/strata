@@ -7,6 +7,7 @@
 #include <velk/interface/intf_object_storage.h>
 #include <velk/vector.h>
 
+#include <cassert>
 #include <cstring>
 #include <limits>
 
@@ -107,13 +108,13 @@ public:
     /** @brief Returns the metadata slot at the given index. */
     MemberSlot& slot(size_t id) const
     {
-        assert(id < std::numeric_limits<uint16_t>::max());
+        assert(id < 0xffff && "Slot id out of range");
         return metadata_[id];
     }
     /** @brief Returns the MemberData at the given index. */
     MemberData& data(size_t id) const
     {
-        assert(id < std::numeric_limits<uint16_t>::max());
+        assert(id < 0xffff && "Slot id out of range");
         return metadata_[id].data;
     }
 
