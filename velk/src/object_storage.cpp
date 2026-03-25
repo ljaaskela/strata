@@ -12,17 +12,21 @@
 #include <velk/interface/types.h>
 
 #include <algorithm>
-#include <limits>
 
 namespace velk {
 
-static constexpr size_t AttachmentSentinel = std::numeric_limits<size_t>::max();
-
 ObjectStorage::ObjectStorage(array_view<MemberDesc> members, IInterface* owner)
     : members_(members),
-      owner_(owner),
-      member_data_(members.size())
+      owner_(owner)
 {}
+
+ObjectStorage::~ObjectStorage()
+{
+    for (auto& s : metadata_) {
+        destroy_slot(s);
+    }
+    metadata_.clear();
+}
 
 array_view<MemberDesc> ObjectStorage::get_static_metadata() const
 {
@@ -31,83 +35,73 @@ array_view<MemberDesc> ObjectStorage::get_static_metadata() const
 
 IInterface::Ptr ObjectStorage::create(MemberDesc desc) const
 {
-    // instantiate directly to avoid factory lookups
-    IInterface::Ptr created;
     switch (desc.kind) {
     case MemberKind::Property: {
-        {
-            auto* pk = desc.propertyKind();
-            created = ext::make_object<impl::Property>(pk ? pk->flags : ObjectFlags::None);
-        }
-        if (auto* pi = created->get_interface<IPropertyInternal>()) {
-            if (auto* pk = desc.propertyKind()) {
-                // Try state-backed ref first
-                if (pk->createRef && owner_) {
-                    if (auto* ps = interface_cast<IPropertyState>(owner_)) {
-                        if (void* base = ps->get_property_state(desc.interfaceInfo->uid)) {
-                            if (auto ref = pk->createRef(base)) {
-                                pi->set_any(ref);
-                            }
-                        }
-                    }
-                }
-                // Fallback to cloning default
-                if (!pi->get_any() && pk->getDefault) {
-                    if (auto* def = pk->getDefault()) {
-                        if (auto any = def->clone()) {
-                            pi->set_any(any);
-                        }
-                    }
-                }
-            }
-        }
-        break;
+        auto* pk = desc.propertyKind();
+        return ext::make_object<impl::Property>(pk ? pk->flags : ObjectFlags::None);
     }
     case MemberKind::ArrayProperty: {
         auto* pk = desc.propertyKind();
-        created = ext::make_object<impl::ArrayProperty>(pk ? pk->flags : ObjectFlags::None);
-        if (auto* pi = created->get_interface<IPropertyInternal>()) {
-            if (pk) {
-                if (pk->createRef && owner_) {
-                    if (auto* ps = interface_cast<IPropertyState>(owner_)) {
-                        if (void* base = ps->get_property_state(desc.interfaceInfo->uid)) {
-                            if (auto ref = pk->createRef(base)) {
-                                pi->set_any(ref);
-                            }
-                        }
-                    }
-                }
-                if (!pi->get_any() && pk->getDefault) {
-                    if (auto* def = pk->getDefault()) {
-                        if (auto any = def->clone()) {
-                            pi->set_any(any);
-                        }
-                    }
-                }
-            }
-        }
-        break;
+        return ext::make_object<impl::ArrayProperty>(pk ? pk->flags : ObjectFlags::None);
     }
     case MemberKind::Event:
-        created = ext::make_object<impl::Event>();
-        break;
+        return ext::make_object<impl::Event>();
     case MemberKind::Function:
-        created = ext::make_object<impl::Function>();
-        break;
+        return ext::make_object<impl::Function>();
     }
-    return created;
+    return {};
 }
 
-void ObjectStorage::bind(const MemberDesc& m, const IInterface::Ptr& fn) const
+void ObjectStorage::bind(const MemberDesc& m, uint16_t slot_index) const
 {
     auto* fk = m.functionKind();
     if (fk && fk->trampoline && owner_) {
-        if (auto* fi = interface_cast<IFunctionInternal>(fn)) {
-            void* intf_ptr = owner_->get_interface(m.interfaceInfo->uid);
-            if (intf_ptr) {
-                fi->bind(intf_ptr, fk->trampoline);
-            }
+        void* intf_ptr = owner_->get_interface(m.interfaceInfo->uid);
+        if (intf_ptr) {
+            auto& cb = data(slot_index).callback;
+            cb.target_context = intf_ptr;
+            cb.target_fn = fk->trampoline;
         }
+    }
+}
+
+static uint16_t member_index_of(const IInterface::Ptr& inst)
+{
+    auto* owned = interface_cast<IStorageOwned>(inst);
+    return owned ? owned->get_member_index() : IStorageOwned::InvalidIndex;
+}
+
+void ObjectStorage::release_callback(MemberSlot& s) const
+{
+    auto& cb = s.data.callback;
+    if (cb.context_deleter && cb.owned_context) {
+        cb.context_deleter(cb.owned_context);
+    }
+    cb.owned_context = nullptr;
+    cb.context_deleter = nullptr;
+}
+
+void ObjectStorage::destroy_slot(MemberSlot& s) const
+{
+    auto index = member_index_of(s.instance);
+    if (index == IStorageOwned::InvalidIndex) {
+        VELK_LOG(E, "ObjectStorage: Invalid slot index for slot destruction");
+        return;
+    }
+    auto kind = members_[index].kind;
+    if (kind == MemberKind::Property || kind == MemberKind::ArrayProperty) {
+        // Walk the extension chain before destroying the property instance,
+        // so extensions can clean up (e.g. break ref cycles).
+        auto current = std::move(s.data.property.data);
+        while (auto* ext = interface_cast<IAnyExtension>(current)) {
+            current = ext->take_inner(*s.instance);
+        }
+        s.instance.reset();
+        s.data.property.data.~shared_ptr();
+        s.data.property.event.~shared_ptr();
+    } else {
+        s.instance.reset();
+        release_callback(s);
     }
 }
 
@@ -115,10 +109,11 @@ IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind,
 {
     auto matches = [&](const MemberDesc& m) { return m.kind == kind && m.name == name; };
 
-    // Check cache first (skip attachment region)
-    for (size_t i = attachment_end_; i < instances_.size(); ++i) {
-        if (matches(members_[instances_[i].first])) {
-            return instances_[i].second;
+    // Check cache first
+    for (auto& s : metadata_) {
+        if (auto idx = member_index_of(s.instance);
+            idx != IStorageOwned::InvalidIndex && matches(members_[idx])) {
+            return s.instance;
         }
     }
     if (mode == Resolve::Existing) {
@@ -128,17 +123,36 @@ IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind,
     // Find in static metadata and create if found
     for (size_t i = 0; i < members_.size(); ++i) {
         auto& m = members_[i];
-        if (matches(m)) {
-            // Create
-            created = create(m);
-            // Bind (if function)
-            bind(m, created);
-            // Set owner back-pointer for IStorageOwned
-            if (auto* owned = interface_cast<IStorageOwned>(created)) {
-                owned->set_owner(const_cast<ObjectStorage*>(this), i);
+        if (!matches(m)) {
+            continue;
+        }
+        created = create(m);
+        auto slot_index = static_cast<uint16_t>(metadata_.size());
+        // Push slot first (zero-initialized union), then set owner so storage_id is valid
+        metadata_.push_back(MemberSlot(created));
+        if (auto* owned = interface_cast<IStorageOwned>(created)) {
+            owned->set_owner(const_cast<ObjectStorage*>(this), static_cast<uint16_t>(i), slot_index);
+        }
+        // Init property data or bind function trampoline
+        if (kind == MemberKind::Property || kind == MemberKind::ArrayProperty) {
+            // Write initial data directly to slot (no change notification during creation).
+            auto& pd = data(slot_index).property;
+            if (auto* pk = m.propertyKind()) {
+                if (pk->createRef && owner_) {
+                    if (auto* ps = interface_cast<IPropertyState>(owner_)) {
+                        if (void* base = ps->get_property_state(m.interfaceInfo->uid)) {
+                            pd.data = pk->createRef(base);
+                        }
+                    }
+                }
+                if (!pd.data && pk->getDefault) {
+                    if (auto* def = pk->getDefault()) {
+                        pd.data = def->clone();
+                    }
+                }
             }
-            // Add to metadata
-            instances_.emplace_back(i, created);
+        } else {
+            bind(m, slot_index);
         }
     }
     return created;
@@ -176,10 +190,8 @@ void ObjectStorage::notify_observers(string_view name, Uid interfaceUid) const
 
 void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notification) const
 {
-    // Fire per-property events for instantiated properties
-    for (size_t i = attachment_end_; i < instances_.size(); ++i) {
-        auto idx = instances_[i].first;
-        auto& m = members_[idx];
+    for (auto& s : metadata_) {
+        auto& m = members_[member_index_of(s.instance)];
         if (m.kind != kind || !m.interfaceInfo || m.interfaceInfo->uid != interfaceUid) {
             continue;
         }
@@ -187,9 +199,9 @@ void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notif
         switch (notification) {
         case Notification::Changed:
             if (kind == MemberKind::Property || kind == MemberKind::ArrayProperty) {
-                auto* property = interface_cast<IProperty>(instances_[i].second);
-                if (property && idx < member_data_.size() && member_data_[idx]) {
-                    invoke_event(member_data_[idx], property->get_value().get());
+                auto* property = interface_cast<IProperty>(s.instance);
+                if (property && s.data.property.event) {
+                    invoke_event(s.data.property.event, property->get_value().get());
                 }
             }
             break;
@@ -207,9 +219,12 @@ ReturnValue ObjectStorage::add_attachment(const IInterface::Ptr& attachment)
     if (!attachment) {
         return ReturnValue::InvalidArgument;
     }
-    instances_.insert(instances_.begin() + attachment_end_, {AttachmentSentinel, attachment});
-    attachment_end_++;
-    return ReturnValue::Success;
+    auto it = std::find(attachments_.begin(), attachments_.end(), attachment);
+    if (it == attachments_.end()) {
+        attachments_.push_back(attachment);
+        return ReturnValue::Success;
+    }
+    return ReturnValue::NothingToDo; // Already there
 }
 
 ReturnValue ObjectStorage::remove_attachment(const IInterface::Ptr& attachment)
@@ -217,27 +232,22 @@ ReturnValue ObjectStorage::remove_attachment(const IInterface::Ptr& attachment)
     if (!attachment) {
         return ReturnValue::InvalidArgument;
     }
-    for (uint32_t i = 0; i < attachment_end_; ++i) {
-        if (instances_[i].second.get() == attachment.get()) {
-            instances_.erase(instances_.begin() + i);
-            attachment_end_--;
-            return ReturnValue::Success;
-        }
+    auto it = std::find(attachments_.begin(), attachments_.end(), attachment);
+    if (it != attachments_.end()) {
+        attachments_.erase(it);
+        return ReturnValue::Success;
     }
-    return ReturnValue::NothingToDo;
+    return ReturnValue::Fail; // Not found
 }
 
 size_t ObjectStorage::attachment_count() const
 {
-    return attachment_end_;
+    return attachments_.size();
 }
 
 IInterface::Ptr ObjectStorage::get_attachment(size_t index) const
 {
-    if (index < attachment_end_) {
-        return instances_[index].second;
-    }
-    return {};
+    return index < attachments_.size() ? attachments_[index] : IInterface::Ptr{};
 }
 
 IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Resolve mode)
@@ -245,8 +255,7 @@ IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Res
     const bool matchInterface = query.interfaceUid != Uid{};
     const bool matchClass = query.classUid != Uid{};
 
-    for (uint32_t i = 0; i < attachment_end_; ++i) {
-        auto& att = instances_[i].second;
+    for (auto& att : attachments_) {
         if (matchInterface && !att->get_interface(query.interfaceUid)) {
             continue;
         }
@@ -274,8 +283,7 @@ vector<IInterface::Ptr> ObjectStorage::find_attachments(const AttachmentQuery& q
     vector<IInterface::Ptr> matches;
     const bool matchInterface = query.interfaceUid != Uid{};
     const bool matchClass = query.classUid != Uid{};
-    for (uint32_t i = 0; i < attachment_end_; ++i) {
-        auto& att = instances_[i].second;
+    for (auto& att : attachments_) {
         bool match = false;
         if (matchInterface && att->get_interface(query.interfaceUid)) {
             match = true;
@@ -296,30 +304,31 @@ vector<IInterface::Ptr> ObjectStorage::find_attachments(const AttachmentQuery& q
 
 IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) const
 {
-    if (storage_id >= member_data_.size()) {
+    if (storage_id >= metadata_.size()) {
         return {};
     }
-    if (!member_data_[storage_id] && mode == Resolve::Create) {
-        instance().type_registry().create_event_once(member_data_[storage_id]);
+    auto& pd = data(storage_id).property;
+    if (!pd.event && mode == Resolve::Create) {
+        instance().type_registry().create_event_once(pd.event);
     }
-    return member_data_[storage_id];
+    return pd.event;
 }
 
 void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* property) const
 {
+    if (storage_id >= metadata_.size()) {
+        return;
+    }
+    auto& s = slot(storage_id);
     if (!property) {
-        for (size_t i = attachment_end_; i < instances_.size(); ++i) {
-            if (instances_[i].first == storage_id) {
-                property = interface_cast<IProperty>(instances_[i].second);
-                break;
-            }
-        }
+        property = interface_cast<IProperty>(s.instance);
     }
-    if (property && storage_id < member_data_.size() && member_data_[storage_id]) {
-        invoke_event(member_data_[storage_id], property->get_value().get());
+    auto& event = s.data.property.event;
+    if (property && event) {
+        invoke_event(event, property->get_value().get());
     }
-    if (!observers_.empty() && storage_id < members_.size()) {
-        auto& m = members_[storage_id];
+    if (!observers_.empty()) {
+        auto& m = members_[member_index_of(s.instance)];
         if (m.interfaceInfo) {
             notify_observers(m.name, m.interfaceInfo->uid);
         }
@@ -329,15 +338,20 @@ void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* proper
 void ObjectStorage::add_observer(IMetadataObserver* observer)
 {
     if (observer) {
-        observers_.push_back(observer);
+        auto it = std::find(observers_.begin(), observers_.end(), observer);
+        if (it == observers_.end()) {
+            observers_.push_back(observer);
+        }
     }
 }
 
 void ObjectStorage::remove_observer(IMetadataObserver* observer)
 {
-    auto it = std::find(observers_.begin(), observers_.end(), observer);
-    if (it != observers_.end()) {
-        observers_.erase(it);
+    if (observer) {
+        auto it = std::find(observers_.begin(), observers_.end(), observer);
+        if (it != observers_.end()) {
+            observers_.erase(it);
+        }
     }
 }
 

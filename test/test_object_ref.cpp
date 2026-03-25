@@ -120,7 +120,7 @@ TEST(ObjectRef, CopyFrom)
 
     EXPECT_EQ(dst->copy_from(*src), velk::ReturnValue::Success);
 
-    auto* dst_ref = velk::interface_cast<velk::IObjectRef>(dst);
+    auto* dst_ref = interface_cast<velk::IObjectRef>(dst);
     ASSERT_TRUE(dst_ref);
     EXPECT_EQ(dst_ref->get_object(), target);
 }
@@ -231,7 +231,7 @@ TEST(ObjectRefProperty, SetAndGetViaProperty)
     auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
     ASSERT_TRUE(obj);
 
-    auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
+    auto* intf = interface_cast<IObjectRefPropTest>(obj);
     ASSERT_TRUE(intf);
 
     auto prop = intf->child();
@@ -249,7 +249,7 @@ TEST(ObjectRefProperty, SetAndGetViaProperty)
     // Get via property: the backing IAny is the ObjectRefImpl itself
     auto val = prop.get_value();
     ASSERT_TRUE(val);
-    auto* obj_ref = velk::interface_cast<velk::IObjectRef>(val);
+    auto* obj_ref = interface_cast<velk::IObjectRef>(val);
     ASSERT_TRUE(obj_ref);
     EXPECT_EQ(obj_ref->get_object(), target);
 }
@@ -257,10 +257,10 @@ TEST(ObjectRefProperty, SetAndGetViaProperty)
 TEST(ObjectRefProperty, StateStructAccess)
 {
     auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
-    auto* meta = velk::interface_cast<velk::IMetadata>(obj);
+    auto* meta = interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 
-    auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
+    auto* intf = interface_cast<IObjectRefPropTest>(obj);
     ASSERT_TRUE(intf);
 
     // Access the property once to trigger createRef (initializes the ObjectRef in state)
@@ -284,7 +284,7 @@ TEST(ObjectRefProperty, StateStructAccess)
 TEST(ObjectRefProperty, OnChangedFires)
 {
     auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
-    auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
+    auto* intf = interface_cast<IObjectRefPropTest>(obj);
     ASSERT_TRUE(intf);
 
     auto prop = intf->child();
@@ -321,10 +321,10 @@ TEST(ObjectRefProperty, OnChangedFires)
 TEST(ObjectRefProperty, OwningModeViaWrapper)
 {
     auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
-    auto* meta = velk::interface_cast<velk::IMetadata>(obj);
+    auto* meta = interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 
-    auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
+    auto* intf = interface_cast<IObjectRefPropTest>(obj);
     auto prop = intf->child();
 
     auto target = ::velk::instance().create<velk::IObject>(velk::ClassId::Property);
@@ -345,10 +345,10 @@ TEST(ObjectRefProperty, ConstraintViaWrapper)
 {
     {
         auto obj = ::velk::instance().create<velk::IObject>(ObjectRefPropTestImpl::static_class_id());
-        auto* meta = velk::interface_cast<velk::IMetadata>(obj);
+        auto* meta = interface_cast<velk::IMetadata>(obj);
         ASSERT_TRUE(meta);
 
-        auto* intf = velk::interface_cast<IObjectRefPropTest>(obj);
+        auto* intf = interface_cast<IObjectRefPropTest>(obj);
         auto prop = intf->child();
 
         {

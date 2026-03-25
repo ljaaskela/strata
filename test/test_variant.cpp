@@ -27,7 +27,7 @@ TEST(Variant, StoredType)
 {
     auto any = ::velk::instance().create_variant();
     ASSERT_TRUE(any);
-    auto* va = velk::interface_cast<velk::IVariant>(any);
+    auto* va = interface_cast<velk::IVariant>(any);
     ASSERT_TRUE(va);
 
     EXPECT_EQ(va->stored_type(), velk::Uid{});
@@ -93,7 +93,7 @@ TEST(Variant, CanConvertTo)
 {
     auto any = ::velk::instance().create_variant();
     ASSERT_TRUE(any);
-    auto* va = velk::interface_cast<velk::IVariant>(any);
+    auto* va = interface_cast<velk::IVariant>(any);
     ASSERT_TRUE(va);
 
     float value = 1.f;
@@ -147,7 +147,7 @@ TEST(Variant, CopyFromVariant)
 TEST(Variant, SetDataChangesType)
 {
     auto any = ::velk::instance().create_variant();
-    auto* va = velk::interface_cast<velk::IVariant>(any);
+    auto* va = interface_cast<velk::IVariant>(any);
 
     float fval = 1.f;
     any->set_data(&fval, sizeof(float), velk::type_uid<float>());
@@ -204,7 +204,7 @@ TEST(VariantProperty, SetAndGetFloat)
     auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
     ASSERT_TRUE(obj);
 
-    auto* intf = velk::interface_cast<IVariantPropTest>(obj);
+    auto* intf = interface_cast<IVariantPropTest>(obj);
     ASSERT_TRUE(intf);
 
     auto prop = intf->value();
@@ -223,7 +223,7 @@ TEST(VariantProperty, SetAndGetFloat)
 TEST(VariantProperty, SetFloatThenString)
 {
     auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
-    auto* intf = velk::interface_cast<IVariantPropTest>(obj);
+    auto* intf = interface_cast<IVariantPropTest>(obj);
     ASSERT_TRUE(intf);
 
     auto prop = intf->value();
@@ -244,7 +244,7 @@ TEST(VariantProperty, SetFloatThenString)
 TEST(VariantProperty, OnChangedFires)
 {
     auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
-    auto* intf = velk::interface_cast<IVariantPropTest>(obj);
+    auto* intf = interface_cast<IVariantPropTest>(obj);
     ASSERT_TRUE(intf);
 
     auto prop = intf->value();
@@ -275,11 +275,11 @@ TEST(VariantProperty, OnChangedFires)
 TEST(VariantProperty, StateStructAccess)
 {
     auto obj = ::velk::instance().create<velk::IObject>(VariantPropTestImpl::static_class_id());
-    auto* meta = velk::interface_cast<velk::IMetadata>(obj);
+    auto* meta = interface_cast<velk::IMetadata>(obj);
     ASSERT_TRUE(meta);
 
     // Access the property once to trigger createRef (initializes the Variant in state)
-    auto* intf = velk::interface_cast<IVariantPropTest>(obj);
+    auto* intf = interface_cast<IVariantPropTest>(obj);
     ASSERT_TRUE(intf);
     auto prop = intf->value();
     ASSERT_TRUE(prop);

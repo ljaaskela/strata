@@ -5,6 +5,16 @@
 
 namespace velk::impl {
 
+ArrayProperty::~ArrayProperty()
+{
+    if (has_standalone_slot()) {
+        auto& d = data();
+        d.property.data.~shared_ptr();
+        d.property.event.~shared_ptr();
+        delete_standalone_slot();
+    }
+}
+
 // IProperty
 
 ReturnValue ArrayProperty::set_value(const IAny& from, InvokeType type)
@@ -13,18 +23,18 @@ ReturnValue ArrayProperty::set_value(const IAny& from, InvokeType type)
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
-    if (!data_) {
+    if (!slot_any()) {
         return ReturnValue::Fail;
     }
     if (type == Deferred) {
-        auto clone = data_->clone();
+        auto clone = slot_any()->clone();
         if (clone && clone->copy_from(from) == ReturnValue::Success) {
             instance().queue_deferred_property({get_self<IPropertyInternal>(), std::move(clone)});
             return ReturnValue::Success;
         }
         return ReturnValue::Fail;
     }
-    auto ret = data_->copy_from(from);
+    auto ret = slot_any()->copy_from(from);
     if (ret == ReturnValue::Success) {
         invoke_on_changed();
     }
@@ -33,7 +43,7 @@ ReturnValue ArrayProperty::set_value(const IAny& from, InvokeType type)
 
 const IAny::ConstPtr ArrayProperty::get_value() const
 {
-    return data_;
+    return slot_any();
 }
 
 // IPropertyInternal
@@ -43,19 +53,19 @@ bool ArrayProperty::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
     if (previous) {
         *previous = {};
     }
-    if (data_ && value) {
+    if (slot_any() && value) {
         if (previous) {
-            *previous = data_;
+            *previous = slot_any();
         }
     }
-    data_ = value;
+    slot_any() = value;
     invoke_on_changed();
     return true;
 }
 
 IAny::ConstPtr ArrayProperty::get_any() const
 {
-    return data_;
+    return slot_any();
 }
 
 ReturnValue ArrayProperty::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
@@ -64,18 +74,18 @@ ReturnValue ArrayProperty::set_data(const void* data, size_t size, Uid type, Inv
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
-    if (!data_) {
+    if (!slot_any()) {
         return ReturnValue::Fail;
     }
     if (invokeType == Deferred) {
-        auto clone = data_->clone();
+        auto clone = slot_any()->clone();
         if (clone && clone->set_data(data, size, type) == ReturnValue::Success) {
             instance().queue_deferred_property({get_self<IPropertyInternal>(), std::move(clone)});
             return ReturnValue::Success;
         }
         return ReturnValue::Fail;
     }
-    auto ret = data_->set_data(data, size, type);
+    auto ret = slot_any()->set_data(data, size, type);
     if (ret == ReturnValue::Success) {
         invoke_on_changed();
     }
@@ -87,10 +97,10 @@ ReturnValue ArrayProperty::set_value_silent(const IAny& from)
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
     }
-    if (!data_) {
+    if (!slot_any()) {
         return ReturnValue::Fail;
     }
-    return data_->copy_from(from);
+    return slot_any()->copy_from(from);
 }
 
 bool ArrayProperty::install_extension(const IAnyExtension::Ptr& extension)
@@ -98,7 +108,7 @@ bool ArrayProperty::install_extension(const IAnyExtension::Ptr& extension)
     if (!extension) {
         return false;
     }
-    if (!extension->set_inner(data_, IInterface::WeakPtr(get_self<IInterface>()))) {
+    if (!extension->set_inner(slot_any(), IInterface::WeakPtr(get_self<IInterface>()))) {
         return false;
     }
     set_any(interface_pointer_cast<IAny>(extension));
@@ -107,7 +117,7 @@ bool ArrayProperty::install_extension(const IAnyExtension::Ptr& extension)
 
 bool ArrayProperty::remove_extension(const IAnyExtension::Ptr& extension)
 {
-    if (!extension || !data_) {
+    if (!extension || !slot_any()) {
         return false;
     }
 
@@ -115,14 +125,15 @@ bool ArrayProperty::remove_extension(const IAnyExtension::Ptr& extension)
 
     IInterface& self = *get_interface<IInterface>();
 
-    if (data_ == ext_as_any) {
+    auto& any = slot_any();
+    if (any == ext_as_any) {
         auto inner = extension->take_inner(self);
         set_any(inner);
         return true;
     }
 
     auto weakSelf = IInterface::WeakPtr(get_self<IInterface>());
-    auto* prev = interface_cast<IAnyExtension>(data_);
+    auto* prev = interface_cast<IAnyExtension>(any);
     while (prev) {
         auto inner = prev->take_inner(self);
         if (inner == ext_as_any) {
@@ -136,11 +147,12 @@ bool ArrayProperty::remove_extension(const IAnyExtension::Ptr& extension)
     return false;
 }
 
-// IArrayProperty (delegates to IArrayAny on data_)
+// IArrayProperty (delegates to IArrayAny on slot_data())
 
 IArrayAny* ArrayProperty::get_array_any() const
 {
-    return data_ ? interface_cast<IArrayAny>(data_) : nullptr;
+    auto& any = slot_any();
+    return any ? interface_cast<IArrayAny>(any) : nullptr;
 }
 
 size_t ArrayProperty::array_size() const
@@ -218,8 +230,11 @@ void ArrayProperty::clear_array()
 
 void ArrayProperty::invoke_on_changed() const
 {
+    if (is_standalone()) {
+        return;
+    }
     auto* self = const_cast<ArrayProperty*>(this)->get_interface<IProperty>();
-    ::velk::invoke_property_changed(owner_, storage_id_, self);
+    ::velk::invoke_property_changed(get_owner(), get_storage_id(), self);
 }
 
 } // namespace velk::impl

@@ -217,7 +217,7 @@ public: // IObjectStorage overrides
         ensure_object_storage(mode);
         return storage_find_attachment(query, mode);
     }
-    vector<IInterface::Ptr> find_attachments(const AttachmentQuery& query) const
+    vector<IInterface::Ptr> find_attachments(const AttachmentQuery& query) const override
     {
         return storage_find_attachments(query);
     }
