@@ -6,6 +6,7 @@
 #include <velk/ext/interface_dispatch.h>
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_type_registry.h>
+#include <velk/interface/intf_velk.h>
 #include <velk/vector.h>
 
 #include <shared_mutex>
@@ -52,6 +53,9 @@ public:
                                          IFunction::ContextDeleter* deleter) const override;
     Uid find_class_by_name(string_view name) const override;
     void for_each_class(void* ctx, ClassVisitorFn visitor) const override;
+
+    /** @brief Gathers per-type stats for all registered types. */
+    vector<TypeStats> gather_type_stats() const;
 
 private:
     /** @brief Registry entry mapping a class UID to its factory. */

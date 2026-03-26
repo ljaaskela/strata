@@ -63,8 +63,11 @@ public:
     /** @brief Returns the UID identifying the element type stored in this hive. */
     virtual Uid get_element_uid() const = 0;
 
-    /** @brief Returns the number of live elements in the hive. */
+    /** @brief Returns the number of active (hive-owned) elements. */
     virtual size_t size() const = 0;
+
+    /** @brief Returns the total number of allocated slots (active + zombie). */
+    virtual size_t allocated_count() const = 0;
 
     /** @brief Returns true if the hive contains no elements. */
     virtual bool empty() const = 0;

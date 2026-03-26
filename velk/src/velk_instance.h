@@ -41,6 +41,7 @@ public:
     IResourceStore& resource_store() override { return resource_store_; }
     const IResourceStore& resource_store() const override { return resource_store_; }
 
+    VelkStats get_stats() const override;
     IObjectStorage* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
     void destroy_metadata_container(IObjectStorage* storage) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;

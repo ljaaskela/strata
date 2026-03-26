@@ -206,6 +206,16 @@ size_t ObjectHive::size() const
     return live_count_;
 }
 
+size_t ObjectHive::allocated_count() const
+{
+    std::shared_lock lock(mutex_);
+    size_t total = 0;
+    for (const auto& page : pages_) {
+        total += page->live_count;
+    }
+    return total;
+}
+
 bool ObjectHive::empty() const
 {
     return live_count_ == 0;

@@ -81,6 +81,31 @@ struct UpdateInfo
  * auto& s = ::velk::instance(); // velk::IVelk&
  * @endcode
  */
+/** @brief Per-type runtime statistics. */
+struct TypeStats
+{
+    const IObjectFactory* factory; ///< Factory for this type (ClassInfo, interfaces, members).
+    Uid owner;                     ///< Plugin that registered it, empty = builtin.
+    size_t instance_count;         ///< Hive size. 0 if no hive or heap-allocated.
+    CreationPolicy policy;
+};
+
+/** @brief Per-plugin runtime statistics. */
+struct PluginStats
+{
+    Uid plugin_uid;
+    string_view plugin_name;
+    uint32_t version;
+    bool update_enabled;
+};
+
+/** @brief Snapshot of the velk instance runtime state. */
+struct VelkStats
+{
+    vector<TypeStats> types;
+    vector<PluginStats> plugins;
+};
+
 class IVelk : public Interface<IVelk>
 {
 public:
@@ -119,6 +144,9 @@ public:
      * @param time Current time in microseconds. If zero, the system clock is used.
      */
     virtual void update(Duration time = {}) const = 0;
+
+    /** @brief Returns a snapshot of the runtime state (registered types, plugins, instance counts). */
+    virtual VelkStats get_stats() const = 0;
 
     /** @brief Creates an ObjectStorage for the given class info and owner. */
     virtual IObjectStorage* create_metadata_container(const ClassInfo& info, IInterface* owner) const = 0;
