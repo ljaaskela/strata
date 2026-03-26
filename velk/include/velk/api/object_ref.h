@@ -103,6 +103,18 @@ inline ObjectRef create_weak_object_ref(const IObject::Ptr& obj)
     return ref;
 }
 
+/** @brief Sets @p object on @p ref. If @p ref is uninitialized, initializes it first. */
+template <class I>
+inline void set_object_ref(ObjectRef& ref, const I& object)
+{
+    auto o = interface_pointer_cast<IObject>(object);
+    if (ref) {
+        ref.set(o);
+    } else {
+        ref = create_object_ref(o);
+    }
+}
+
 } // namespace velk
 
 #endif // VELK_API_OBJECT_REF_H
