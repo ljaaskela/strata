@@ -68,6 +68,7 @@ public:
     size_t size() const override;
     bool empty() const override;
     void clear() override;
+    size_t allocated_count() const override;
     HivePageCapacity get_page_capacity() const override;
     void set_page_capacity(const HivePageCapacity& capacity) override;
 

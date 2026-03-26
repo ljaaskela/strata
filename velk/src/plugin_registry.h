@@ -42,6 +42,9 @@ public:
     /** @brief Calls post_update on opted-in plugins with the same UpdateInfo from pre_update. */
     void post_update_plugins(const IPlugin::PostUpdateInfo& info) const;
 
+    /** @brief Gathers per-plugin stats for all loaded plugins. */
+    vector<PluginStats> gather_plugin_stats() const;
+
 private:
     /** @brief Plugin registry entry. */
     struct PluginEntry

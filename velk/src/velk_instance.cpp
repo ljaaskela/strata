@@ -156,6 +156,14 @@ void VelkInstance::flush_deferred_properties(vector<DeferredPropertySet>& propSe
     }
 }
 
+VelkStats VelkInstance::get_stats() const
+{
+    VelkStats stats;
+    stats.types = type_registry_.gather_type_stats();
+    stats.plugins = plugin_registry_.gather_plugin_stats();
+    return stats;
+}
+
 void VelkInstance::update(Duration time) const
 {
     // Pre-update: let plugins produce work (tasks, deferred property updates).

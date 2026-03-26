@@ -383,4 +383,22 @@ void PluginRegistry::post_update_plugins(const IPlugin::PostUpdateInfo& info) co
     }
 }
 
+vector<PluginStats> PluginRegistry::gather_plugin_stats() const
+{
+    std::shared_lock lock(mutex_);
+    vector<PluginStats> result;
+    result.reserve(plugins_.size());
+    for (const auto& entry : plugins_) {
+        PluginStats ps{};
+        ps.plugin_uid = entry.uid;
+        if (entry.plugin) {
+            ps.plugin_name = entry.plugin->get_name();
+            ps.version = entry.plugin->get_version();
+        }
+        ps.update_enabled = entry.config.enableUpdate;
+        result.push_back(ps);
+    }
+    return result;
+}
+
 } // namespace velk
