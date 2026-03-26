@@ -33,6 +33,8 @@ public:
     /** @brief Returns the object's flags, or 0 if invalid. */
     uint32_t flags() const { return obj_ ? obj_->get_object_flags() : 0; }
 
+    operator IObject::Ptr() const { return obj_; }
+
     /** @brief Casts the object to interface T (raw pointer). */
     template <class T>
     T* as() const
@@ -44,49 +46,45 @@ public:
     template <class T>
     typename T::Ptr as_ptr() const
     {
-        return obj_ ? interface_pointer_cast<T>(obj_) : typename T::Ptr{};
+        return interface_pointer_cast<T>(obj_);
     }
 
     /** @brief Returns a property by name, optionally creating it on first access. */
     IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const
     {
-        auto* meta = as<IMetadata>();
-        return meta ? meta->get_property(name, mode) : IProperty::Ptr{};
+        return with<IMetadata>([&](auto& m) { return m.get_property(name, mode); });
     }
 
     /** @brief Returns an event by name, optionally creating it on first access. */
     IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const
     {
-        auto* meta = as<IMetadata>();
-        return meta ? meta->get_event(name, mode) : IEvent::Ptr{};
+        return with<IMetadata>([&](auto& m) { return m.get_event(name, mode); });
     }
 
     /** @brief Returns a function by name, optionally creating it on first access. */
     IFunction::Ptr get_function(string_view name, Resolve mode = Resolve::Create) const
     {
-        auto* meta = as<IMetadata>();
-        return meta ? meta->get_function(name, mode) : IFunction::Ptr{};
+        return with<IMetadata>([&](auto& m) { return m.get_function(name, mode); });
     }
 
     /** @brief Returns the static metadata descriptors for this object's class. */
     array_view<MemberDesc> static_metadata() const
     {
-        auto* meta = as<IMetadata>();
-        return meta ? meta->get_static_metadata() : array_view<MemberDesc>{};
+        return with<IMetadata>([](auto& m) { return m.get_static_metadata(); });
     }
 
     /** @brief Read-only access to T::State. */
     template <class T>
     detail::StateReader<T> read_state() const
     {
-        return obj_ ? ::velk::read_state<T>(obj_.get()) : detail::StateReader<T>();
+        return ::velk::read_state<T>(obj_.get());
     }
 
     /** @brief Write access to T::State (fires on_changed on destruction). */
     template <class T>
     detail::StateWriter<T> write_state()
     {
-        return obj_ ? ::velk::write_state<T>(obj_.get()) : detail::StateWriter<T>();
+        return ::velk::write_state<T>(obj_.get());
     }
 
     /** @brief Writes to T::State via a callback, with optional deferral. */
@@ -99,23 +97,17 @@ public:
     }
 
     /** @brief Invokes a function by name with no arguments. */
-    IAny::Ptr invoke_function(string_view name) const
-    {
-        return obj_ ? ::velk::invoke_function(obj_.get(), name) : nullptr;
-    }
+    IAny::Ptr invoke_function(string_view name) const { return ::velk::invoke_function(obj_.get(), name); }
 
     /** @brief Invokes a function by name with multiple value arguments (auto-wrapped in Any). */
     template <class... Args, detail::require_value_args<Args...> = 0>
     IAny::Ptr invoke_function(string_view name, const Args&... args) const
     {
-        return obj_ ? ::velk::invoke_function(obj_.get(), name, args...) : nullptr;
+        return ::velk::invoke_function(obj_.get(), name, args...);
     }
 
     /** @brief Invokes an event by name with no arguments. */
-    ReturnValue invoke_event(string_view name) const
-    {
-        return obj_ ? ::velk::invoke_event(obj_.get(), name) : ReturnValue::InvalidArgument;
-    }
+    ReturnValue invoke_event(string_view name) const { return ::velk::invoke_event(obj_.get(), name); }
 
     /** @brief Adds an attachment to this object's storage. */
     ReturnValue add_attachment(const IInterface::Ptr& attachment)

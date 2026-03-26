@@ -1,5 +1,8 @@
 #include "type_registry.h"
 
+#include <velk/interface/hive/intf_hive.h>
+#include <velk/interface/intf_velk.h>
+
 #include "array_property.h"
 #include "binding.h"
 #include "event.h"
@@ -102,6 +105,7 @@ ReturnValue TypeRegistry::register_type(const IObjectFactory& factory, const Typ
                      info.name.data());
 
     CreationPolicy resolved = options.policy;
+
     if (resolved == CreationPolicy::Auto) {
         resolved = factory.get_instance_size() < 1024 ? CreationPolicy::Hive : CreationPolicy::Alloc;
     }
@@ -404,6 +408,27 @@ IProperty::Ptr TypeRegistry::create_property(Uid type, const IAny::Ptr& value, u
         }
     }
     return {};
+}
+
+vector<TypeStats> TypeRegistry::gather_type_stats() const
+{
+    std::shared_lock lock(mutex_);
+    vector<TypeStats> result;
+    result.reserve(types_.size());
+    for (const auto& entry : types_) {
+        if (entry.factory) {
+            TypeStats ts{};
+            ts.factory = entry.factory;
+            ts.owner = entry.owner;
+            ts.policy = entry.resolved_policy;
+            if (entry.hive) {
+                auto* hive = interface_cast<IHive>(entry.hive.get());
+                ts.instance_count = hive ? hive->allocated_count() : 0;
+            }
+            result.emplace_back(std::move(ts));
+        }
+    }
+    return result;
 }
 
 } // namespace velk

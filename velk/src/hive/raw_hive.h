@@ -55,6 +55,7 @@ public:
     HiveType get_hive_type() const override { return HiveType::RawHive; }
     Uid get_element_uid() const override;
     size_t size() const override;
+    size_t allocated_count() const override { return size(); }
     bool empty() const override;
     void clear() override;
 
