@@ -268,6 +268,30 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
         }
         uint64_t v = static_cast<uint64_t>(val.as_number());
         pi.set_data(&v, sizeof(v), typeUid);
+    } else if (typeUid == type_uid<uint8_t>()) {
+        if (val.type() != JsonType::Number) {
+            return;
+        }
+        uint8_t v = static_cast<uint8_t>(val.as_number());
+        pi.set_data(&v, sizeof(v), typeUid);
+    } else if (typeUid == type_uid<int8_t>()) {
+        if (val.type() != JsonType::Number) {
+            return;
+        }
+        int8_t v = static_cast<int8_t>(val.as_number());
+        pi.set_data(&v, sizeof(v), typeUid);
+    } else if (typeUid == type_uid<uint16_t>()) {
+        if (val.type() != JsonType::Number) {
+            return;
+        }
+        uint16_t v = static_cast<uint16_t>(val.as_number());
+        pi.set_data(&v, sizeof(v), typeUid);
+    } else if (typeUid == type_uid<int16_t>()) {
+        if (val.type() != JsonType::Number) {
+            return;
+        }
+        int16_t v = static_cast<int16_t>(val.as_number());
+        pi.set_data(&v, sizeof(v), typeUid);
     } else if (typeUid == type_uid<bool>()) {
         if (val.type() != JsonType::Bool) {
             return;
