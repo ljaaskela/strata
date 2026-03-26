@@ -103,6 +103,7 @@ struct aabb
     vec3 position{};
     size extent{};
 
+    static constexpr aabb from_size(size s) { return {{}, s}; };
     static constexpr aabb zero() { return {}; }
 
     constexpr vec3 min() const { return position; }
