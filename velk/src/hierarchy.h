@@ -58,9 +58,16 @@ private:
     // Fires on_changing or on_changed if handlers exist. Invoked outside the lock.
     void fire_event(string_view name, HierarchyChange change);
 
+    // Returns the canonical IObject* for identity comparison.
+    // Different interface shared_ptrs for the same object always resolve to the same key.
+    static IObject* identity(const IObject::Ptr& obj)
+    {
+        return obj.get();
+    }
+
     mutable std::shared_mutex mutex_;             // Shared for reads, exclusive for mutations.
     IObject::Ptr root_;                           // Root object, or null if empty.
-    std::unordered_map<IObject*, Entry> entries_; // All nodes keyed by raw pointer.
+    std::unordered_map<IObject*, Entry> entries_; // All nodes keyed by canonical IObject*.
 };
 
 } // namespace velk::impl

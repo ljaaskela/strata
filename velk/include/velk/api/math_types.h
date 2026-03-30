@@ -1,6 +1,8 @@
 #ifndef VELK_API_MATH_TYPES_H
 #define VELK_API_MATH_TYPES_H
 
+#include <cmath>
+
 namespace velk {
 
 /// @brief 2D float vector.
@@ -189,6 +191,16 @@ struct mat4
         r.m[0]  = s.x;
         r.m[5]  = s.y;
         r.m[10] = s.z;
+        return r;
+    }
+
+    static mat4 rotate_z(float radians)
+    {
+        float c = std::cos(radians);
+        float s = std::sin(radians);
+        mat4 r{};
+        r.m[0] = c;  r.m[1] = s;
+        r.m[4] = -s; r.m[5] = c;
         return r;
     }
 };

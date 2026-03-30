@@ -66,7 +66,7 @@ ReturnValue Hierarchy::set_root(const IObject::Ptr& root)
         collect_all(removed);
         root_ = root;
         entries_.clear();
-        entries_[root.get()] = {root, nullptr, {}};
+        entries_[identity(root)] = {root, nullptr, {}};
     }
 
     notify_left(removed);
@@ -99,15 +99,15 @@ ReturnValue Hierarchy::add(const IObject::Ptr& parent, const IObject::Ptr& child
 
     {
         std::lock_guard lock(mutex_);
-        auto pit = entries_.find(parent.get());
+        auto pit = entries_.find(identity(parent));
         if (pit == entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
-        if (entries_.find(child.get()) != entries_.end()) {
+        if (entries_.find(identity(child)) != entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
         pit->second.children.push_back(child);
-        entries_[child.get()] = {child, parent.get(), {}};
+        entries_[identity(child)] = {child, identity(parent), {}};
     }
 
     if (auto* listener = interface_cast<IHierarchyAware>(child)) {
@@ -138,11 +138,11 @@ ReturnValue Hierarchy::insert(const IObject::Ptr& parent, size_t index, const IO
 
     {
         std::lock_guard lock(mutex_);
-        auto pit = entries_.find(parent.get());
+        auto pit = entries_.find(identity(parent));
         if (pit == entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
-        if (entries_.find(child.get()) != entries_.end()) {
+        if (entries_.find(identity(child)) != entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
         auto& children = pit->second.children;
@@ -150,7 +150,7 @@ ReturnValue Hierarchy::insert(const IObject::Ptr& parent, size_t index, const IO
             return ReturnValue::InvalidArgument;
         }
         children.insert(children.begin() + static_cast<ptrdiff_t>(index), child);
-        entries_[child.get()] = {child, parent.get(), {}};
+        entries_[identity(child)] = {child, identity(parent), {}};
     }
 
     if (auto* listener = interface_cast<IHierarchyAware>(child)) {
@@ -170,6 +170,7 @@ ReturnValue Hierarchy::remove(const IObject::Ptr& object)
         return ReturnValue::InvalidArgument;
     }
 
+    auto* id = identity(object);
     auto self = get_self<IHierarchy>();
 
     if (auto* listener = interface_cast<IHierarchyAware>(object)) {
@@ -181,11 +182,11 @@ ReturnValue Hierarchy::remove(const IObject::Ptr& object)
     IObject::Ptr parent_obj;
     {
         std::shared_lock lock(mutex_);
-        auto it = entries_.find(object.get());
+        auto it = entries_.find(id);
         if (it == entries_.end()) {
             return ReturnValue::NothingToDo;
         }
-        parent_obj = lookup_parent(object.get());
+        parent_obj = lookup_parent(id);
     }
 
     fire_event("on_changing", {HierarchyChange::Type::Remove, {}, parent_obj, object});
@@ -193,14 +194,14 @@ ReturnValue Hierarchy::remove(const IObject::Ptr& object)
     vector<IObject::Ptr> removed;
     {
         std::lock_guard lock(mutex_);
-        auto it = entries_.find(object.get());
+        auto it = entries_.find(id);
         if (it == entries_.end()) {
             return ReturnValue::NothingToDo;
         }
         // Re-read parent under exclusive lock in case hierarchy was modified
         // between the shared lock and here.
-        parent_obj = lookup_parent(object.get());
-        if (object.get() == root_.get()) {
+        parent_obj = lookup_parent(id);
+        if (id == identity(root_)) {
             collect_all(removed);
             root_.reset();
             entries_.clear();
@@ -211,14 +212,14 @@ ReturnValue Hierarchy::remove(const IObject::Ptr& object)
                 if (pit != entries_.end()) {
                     auto& siblings = pit->second.children;
                     for (auto sit = siblings.begin(); sit != siblings.end(); ++sit) {
-                        if (sit->get() == object.get()) {
+                        if (identity(*sit) == id) {
                             siblings.erase(sit);
                             break;
                         }
                     }
                 }
             }
-            remove_recursive(object.get(), removed);
+            remove_recursive(id, removed);
         }
     }
 
@@ -237,19 +238,21 @@ ReturnValue Hierarchy::replace(const IObject::Ptr& old_child, const IObject::Ptr
         return ReturnValue::InvalidArgument;
     }
 
+    auto* old_id = identity(old_child);
+    auto* new_id = identity(new_child);
     auto self = get_self<IHierarchy>();
 
     IObject::Ptr parent_obj;
     {
         std::shared_lock lock(mutex_);
-        auto it = entries_.find(old_child.get());
+        auto it = entries_.find(old_id);
         if (it == entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
-        if (entries_.find(new_child.get()) != entries_.end()) {
+        if (entries_.find(new_id) != entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
-        parent_obj = lookup_parent(old_child.get());
+        parent_obj = lookup_parent(old_id);
     }
 
     if (auto* listener = interface_cast<IHierarchyAware>(new_child)) {
@@ -262,11 +265,11 @@ ReturnValue Hierarchy::replace(const IObject::Ptr& old_child, const IObject::Ptr
 
     {
         std::lock_guard lock(mutex_);
-        auto it = entries_.find(old_child.get());
+        auto it = entries_.find(old_id);
         if (it == entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
-        if (entries_.find(new_child.get()) != entries_.end()) {
+        if (entries_.find(new_id) != entries_.end()) {
             return ReturnValue::InvalidArgument;
         }
         auto* parentPtr = it->second.parent;
@@ -278,7 +281,7 @@ ReturnValue Hierarchy::replace(const IObject::Ptr& old_child, const IObject::Ptr
             auto pit = entries_.find(parentPtr);
             if (pit != entries_.end()) {
                 for (auto& c : pit->second.children) {
-                    if (c.get() == old_child.get()) {
+                    if (identity(c) == old_id) {
                         c = new_child;
                         break;
                     }
@@ -288,13 +291,13 @@ ReturnValue Hierarchy::replace(const IObject::Ptr& old_child, const IObject::Ptr
             root_ = new_child;
         }
 
-        entries_[new_child.get()] = {new_child, parentPtr, std::move(old_children)};
+        entries_[new_id] = {new_child, parentPtr, std::move(old_children)};
 
-        auto& newEntry = entries_[new_child.get()];
+        auto& newEntry = entries_[new_id];
         for (auto& c : newEntry.children) {
-            auto cit = entries_.find(c.get());
+            auto cit = entries_.find(identity(c));
             if (cit != entries_.end()) {
-                cit->second.parent = new_child.get();
+                cit->second.parent = new_id;
             }
         }
     }
@@ -343,7 +346,7 @@ IHierarchy::Node Hierarchy::node_of(const IObject::Ptr& object) const
         return {};
     }
     std::shared_lock lock(mutex_);
-    auto it = entries_.find(object.get());
+    auto it = entries_.find(identity(object));
     if (it == entries_.end()) {
         return {};
     }
@@ -357,7 +360,7 @@ IObject::Ptr Hierarchy::parent_of(const IObject::Ptr& object) const
         return {};
     }
     std::shared_lock lock(mutex_);
-    return lookup_parent(object.get());
+    return lookup_parent(identity(object));
 }
 
 // Returns a copy of the children vector. Ref-count bumps dominate cost for wide nodes.
@@ -367,7 +370,7 @@ vector<IObject::Ptr> Hierarchy::children_of(const IObject::Ptr& object) const
         return {};
     }
     std::shared_lock lock(mutex_);
-    auto it = entries_.find(object.get());
+    auto it = entries_.find(identity(object));
     if (it == entries_.end()) {
         return {};
     }
@@ -386,7 +389,7 @@ IObject::Ptr Hierarchy::child_at(const IObject::Ptr& object, size_t index) const
         return {};
     }
     std::shared_lock lock(mutex_);
-    auto it = entries_.find(object.get());
+    auto it = entries_.find(identity(object));
     if (it == entries_.end() || index >= it->second.children.size()) {
         return {};
     }
@@ -400,7 +403,7 @@ size_t Hierarchy::child_count(const IObject::Ptr& object) const
         return 0;
     }
     std::shared_lock lock(mutex_);
-    auto it = entries_.find(object.get());
+    auto it = entries_.find(identity(object));
     return it != entries_.end() ? it->second.children.size() : 0;
 }
 
@@ -416,7 +419,7 @@ void Hierarchy::for_each_child(const IObject::Ptr& object, void* context, ChildV
     vector<IObject::Ptr> snapshot;
     {
         std::shared_lock lock(mutex_);
-        auto it = entries_.find(object.get());
+        auto it = entries_.find(identity(object));
         if (it == entries_.end()) {
             return;
         }
@@ -436,7 +439,7 @@ bool Hierarchy::contains(const IObject::Ptr& object) const
         return false;
     }
     std::shared_lock lock(mutex_);
-    return entries_.find(object.get()) != entries_.end();
+    return entries_.find(identity(object)) != entries_.end();
 }
 
 // Returns total node count. O(1) via unordered_map::size().
@@ -458,7 +461,7 @@ void Hierarchy::remove_recursive(IObject* obj, vector<IObject::Ptr>& removed)
     removed.push_back(it->second.object);
     entries_.erase(it);
     for (auto& c : children) {
-        remove_recursive(c.get(), removed);
+        remove_recursive(identity(c), removed);
     }
 }
 
