@@ -219,8 +219,11 @@ inline IAny::Ptr invoke_function(const IInterface* o, string_view name, const IA
  */
 inline ReturnValue invoke_event(const IInterface* o, string_view name, FnArgs args = {})
 {
-    auto meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::InvalidArgument;
+    if (auto meta = interface_cast<IMetadata>(o)) {
+        auto evt = meta->get_event(name, Resolve::Existing);
+        return evt ? invoke_event(evt, args) : ReturnValue::NothingToDo;
+    }
+    return ReturnValue::InvalidArgument;
 }
 
 /**
