@@ -46,6 +46,13 @@ typename T::Ptr get_self(U* object)
     return obj ? interface_pointer_cast<T>(obj->get_self()) : typename T::Ptr{};
 }
 
+/** @brief Converts any interface shared_ptr to IObject::Ptr. */
+template <class T>
+IObject::Ptr as_object(const shared_ptr<T>& ptr)
+{
+    return interface_pointer_cast<IObject>(ptr);
+}
+
 } // namespace velk
 
 #endif // VELK_INTF_OBJECT_H
