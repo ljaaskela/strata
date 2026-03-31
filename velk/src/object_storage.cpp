@@ -6,6 +6,7 @@
 #include "property.h"
 
 #include <velk/api/velk.h>
+#include <velk/ext/any.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_function.h>
 #include <velk/interface/intf_metadata.h>
@@ -26,6 +27,12 @@ ObjectStorage::~ObjectStorage()
         destroy_slot(s);
     }
     metadata_.clear();
+
+    for (auto& s : dynamic_metadata_) {
+        destroy_dynamic_slot(s);
+    }
+    dynamic_metadata_.clear();
+    dynamic_members_.clear();
 }
 
 array_view<MemberDesc> ObjectStorage::get_static_metadata() const
@@ -105,9 +112,14 @@ void ObjectStorage::destroy_slot(MemberSlot& s) const
     }
 }
 
-IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind, Resolve mode) const
+IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind, Resolve mode,
+                                              Uid interfaceUid) const
 {
-    auto matches = [&](const MemberDesc& m) { return m.kind == kind && m.name == name; };
+    auto matches = [&](const MemberDesc& m) {
+        if (m.kind != kind || m.name != name) return false;
+        if (interfaceUid != Uid{} && m.interfaceInfo && m.interfaceInfo->uid != interfaceUid) return false;
+        return true;
+    };
 
     // Check cache first
     for (auto& s : metadata_) {
@@ -158,13 +170,29 @@ IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind,
     return created;
 }
 
-IProperty::Ptr ObjectStorage::get_property(string_view name, Resolve mode) const
+IProperty::Ptr ObjectStorage::get_property(string_view name, Uid interfaceUid, Resolve mode) const
 {
-    auto result = find_or_create(name, MemberKind::Property, mode);
-    if (!result) {
-        result = find_or_create(name, MemberKind::ArrayProperty, mode);
+    bool search_static = (interfaceUid == Uid{}) || (interfaceUid != IDynamicMetadata::UID);
+    bool search_dynamic = (interfaceUid == Uid{}) || (interfaceUid == IDynamicMetadata::UID);
+    bool static_only = (interfaceUid != Uid{}) && (interfaceUid != IDynamicMetadata::UID);
+
+    if (search_static) {
+        auto result = find_or_create(name, MemberKind::Property, mode,
+                                     static_only ? interfaceUid : Uid{});
+        if (!result) {
+            result = find_or_create(name, MemberKind::ArrayProperty, mode,
+                                    static_only ? interfaceUid : Uid{});
+        }
+        if (result) {
+            return interface_pointer_cast<IProperty>(result);
+        }
     }
-    return interface_pointer_cast<IProperty>(result);
+
+    if (search_dynamic) {
+        return find_dynamic_property(name, mode);
+    }
+
+    return {};
 }
 
 IEvent::Ptr ObjectStorage::get_event(string_view name, Resolve mode) const
@@ -304,7 +332,9 @@ vector<IInterface::Ptr> ObjectStorage::find_attachments(const AttachmentQuery& q
 
 IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) const
 {
-    if (storage_id >= metadata_.size()) {
+    bool is_dynamic = (storage_id & DynamicBit) != 0;
+    size_t idx = is_dynamic ? (storage_id & ~DynamicBit) : storage_id;
+    if (is_dynamic ? (idx >= dynamic_metadata_.size()) : (idx >= metadata_.size())) {
         return {};
     }
     auto& pd = data(storage_id).property;
@@ -316,7 +346,9 @@ IEvent::Ptr ObjectStorage::get_property_event(size_t storage_id, Resolve mode) c
 
 void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* property) const
 {
-    if (storage_id >= metadata_.size()) {
+    bool is_dynamic = (storage_id & DynamicBit) != 0;
+    size_t idx = is_dynamic ? (storage_id & ~DynamicBit) : storage_id;
+    if (is_dynamic ? (idx >= dynamic_metadata_.size()) : (idx >= metadata_.size())) {
         return;
     }
     auto& s = slot(storage_id);
@@ -328,9 +360,15 @@ void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* proper
         invoke_event(event, property->get_value().get());
     }
     if (!observers_.empty()) {
-        auto& m = members_[member_index_of(s.instance)];
-        if (m.interfaceInfo) {
-            notify_observers(m.name, m.interfaceInfo->uid);
+        if (is_dynamic) {
+            if (idx < dynamic_members_.size()) {
+                notify_observers(dynamic_members_[idx].desc.name, IDynamicMetadata::UID);
+            }
+        } else {
+            auto& m = members_[member_index_of(s.instance)];
+            if (m.interfaceInfo) {
+                notify_observers(m.name, m.interfaceInfo->uid);
+            }
         }
     }
 }
@@ -353,6 +391,132 @@ void ObjectStorage::remove_observer(IMetadataObserver* observer)
             observers_.erase(it);
         }
     }
+}
+
+void ObjectStorage::destroy_dynamic_slot(MemberSlot& s) const
+{
+    s.instance.reset();
+    s.data.property.data.~shared_ptr();
+    s.data.property.event.~shared_ptr();
+}
+
+IProperty::Ptr ObjectStorage::find_dynamic_property(string_view name, Resolve mode) const
+{
+    // Check existing dynamic slots
+    for (size_t i = 0; i < dynamic_members_.size(); ++i) {
+        if (dynamic_members_[i].desc.name == name && dynamic_metadata_[i].instance) {
+            return interface_pointer_cast<IProperty>(dynamic_metadata_[i].instance);
+        }
+    }
+    return {};
+}
+
+IProperty::Ptr ObjectStorage::add_property(string_view name, Uid typeUid,
+                                           const IAny* defaultValue) const
+{
+    // Check if a dynamic property with this name already exists
+    for (size_t i = 0; i < dynamic_members_.size(); ++i) {
+        if (dynamic_members_[i].desc.name == name) {
+            return interface_pointer_cast<IProperty>(dynamic_metadata_[i].instance);
+        }
+    }
+
+    // Build the dynamic member descriptor
+    DynamicMemberDesc dmd;
+    dmd.name_storage = string(name.data(), name.size());
+    dmd.property_kind.typeUid = typeUid;
+    dmd.property_kind.getDefault = nullptr;
+    dmd.property_kind.createRef = nullptr;
+    dmd.property_kind.flags = ObjectFlags::None;
+    dmd.desc.name = string_view(dmd.name_storage.data(), dmd.name_storage.size());
+    dmd.desc.kind = MemberKind::Property;
+    dmd.desc.interfaceInfo = &IDynamicMetadata::INFO;
+    dmd.desc.ext = &dmd.property_kind;
+
+    // Create the property instance
+    auto prop_inst = create(dmd.desc);
+    if (!prop_inst) {
+        return {};
+    }
+
+    auto slot_index = static_cast<uint16_t>(dynamic_metadata_.size());
+
+    // Push the member desc first (so desc.name string_view stays valid)
+    dynamic_members_.push_back(std::move(dmd));
+
+    // Fix up desc.name and desc.ext to point into the stored DynamicMemberDesc
+    auto& stored = dynamic_members_.back();
+    stored.desc.name = string_view(stored.name_storage.data(), stored.name_storage.size());
+    stored.desc.ext = &stored.property_kind;
+
+    // Push slot
+    dynamic_metadata_.push_back(MemberSlot(prop_inst));
+
+    // Set owner: use a member_index that encodes "dynamic" (offset by members_.size())
+    if (auto* owned = interface_cast<IStorageOwned>(prop_inst)) {
+        // Use member_index = members_.size() + index to distinguish from static.
+        // storage_id encodes the dynamic slot index with high bit set (0x8000).
+        owned->set_owner(const_cast<ObjectStorage*>(this),
+                         static_cast<uint16_t>(members_.size() + dynamic_members_.size() - 1),
+                         static_cast<uint16_t>(slot_index | 0x8000));
+    }
+
+    // Initialize property data
+    auto& pd = dynamic_metadata_[slot_index].data.property;
+    if (defaultValue) {
+        pd.data = defaultValue->clone();
+    }
+
+    notify_observers(stored.desc.name, IDynamicMetadata::UID);
+    return interface_pointer_cast<IProperty>(prop_inst);
+}
+
+ReturnValue ObjectStorage::remove_property(string_view name) const
+{
+    // Search dynamic properties first
+    for (size_t i = 0; i < dynamic_members_.size(); ++i) {
+        if (dynamic_members_[i].desc.name == name) {
+            destroy_dynamic_slot(dynamic_metadata_[i]);
+            // Tombstone: clear the name so it won't match lookups
+            dynamic_members_[i].name_storage.clear();
+            dynamic_members_[i].desc.name = {};
+            return ReturnValue::Success;
+        }
+    }
+
+    // Search static properties: remove cached wrapper only (tombstone the slot)
+    for (auto& s : metadata_) {
+        auto idx = member_index_of(s.instance);
+        if (idx != IStorageOwned::InvalidIndex && members_[idx].name == name
+            && (members_[idx].kind == MemberKind::Property
+                || members_[idx].kind == MemberKind::ArrayProperty)) {
+            destroy_slot(s);
+            return ReturnValue::Success;
+        }
+    }
+
+    return ReturnValue::Fail;
+}
+
+vector<PropertyInfo> ObjectStorage::get_properties() const
+{
+    vector<PropertyInfo> result;
+
+    // Static properties from member descriptors
+    for (auto& m : members_) {
+        if (m.kind == MemberKind::Property || m.kind == MemberKind::ArrayProperty) {
+            auto* pk = m.propertyKind();
+            Uid iuid = m.interfaceInfo ? m.interfaceInfo->uid : Uid{};
+            result.push_back({m.name, pk ? pk->typeUid : Uid{}, iuid});
+        }
+    }
+
+    // Dynamic properties
+    for (auto& dm : dynamic_members_) {
+        result.push_back({dm.desc.name, dm.property_kind.typeUid, IDynamicMetadata::UID});
+    }
+
+    return result;
 }
 
 } // namespace velk

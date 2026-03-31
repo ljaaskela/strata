@@ -166,6 +166,14 @@ constexpr MemberDesc FunctionDesc(string_view name, const InterfaceInfo* info = 
     return {name, MemberKind::Function, info, fk};
 }
 
+/** @brief Lightweight descriptor for enumerating properties without instantiating wrappers. */
+struct PropertyInfo
+{
+    string_view name;    ///< Property name.
+    Uid typeUid;         ///< type_uid<T>() for the property's value type.
+    Uid interfaceUid;    ///< Interface that owns this property (IDynamicMetadata::UID for dynamic).
+};
+
 } // namespace velk
 
 #endif // VELK_MEMBER_DESC_H

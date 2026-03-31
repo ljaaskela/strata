@@ -29,7 +29,7 @@ public: // IStorageOwned
     uint16_t get_storage_id() const override { return storage_id_; }
     void set_owner(IObjectStorage* storage, uint16_t member_index, uint16_t storage_id) override
     {
-        if (is_standalone()) {
+        if (is_standalone() || owner_ == storage) {
             owner_ = storage;
             member_index_ = member_index;
             storage_id_ = storage_id;
