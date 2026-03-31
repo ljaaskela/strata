@@ -148,6 +148,13 @@ template <class FinalClass, class... Interfaces>
 class ObjectCore
     : public ObjectCoreBase<(detail::has_iobject_in_chain<Interfaces>() || ...), Interfaces...>::type
 {
+    // TODO: enable once IAnyExtension->IAny->IObject chain is resolved (see docs/iobject_inheritance.md)
+    // static_assert(
+    //     (0 + ... + (detail::has_iobject_in_chain<Interfaces>() ? 1 : 0)) <= 1,
+    //     "Multiple interfaces inherit IObject. Only one interface chain should reach IObject "
+    //     "to avoid duplicate IObject subobjects. Use Interface<T> (not Interface<T, IObject>) "
+    //     "for interfaces that don't need to be the IObject root.");
+
 public:
     ObjectCore() = default;
     ~ObjectCore() override = default;
