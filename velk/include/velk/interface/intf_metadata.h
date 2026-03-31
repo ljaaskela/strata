@@ -102,6 +102,17 @@ private:
 
 } // namespace detail
 
+/**
+ * @brief Tag interface whose UID identifies dynamically added metadata members.
+ *
+ * Dynamic properties added via IMetadata::add_property() use this interface's UID
+ * as their interfaceUid, allowing callers to distinguish them from static properties
+ * declared via VELK_INTERFACE.
+ */
+class IDynamicMetadata : public Interface<IDynamicMetadata>
+{
+};
+
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
 class IMetadata : public Interface<IMetadata, IPropertyState>
 {
@@ -109,8 +120,22 @@ public:
     /** @brief Returns the static metadata descriptors for this object's class. */
     virtual array_view<MemberDesc> get_static_metadata() const = 0;
 
-    /** @brief Returns the runtime property instance for the named member, or nullptr. */
-    virtual IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const = 0;
+    /**
+     * @brief Returns the runtime property instance for the named member, or nullptr.
+     * @param name Property name to look up.
+     * @param interfaceUid Scope filter: {} searches static then dynamic (static wins),
+     *        IDynamicMetadata::UID searches only dynamic, a specific interface UID
+     *        searches only that interface's static members.
+     * @param mode Resolve::Create to lazily create, Resolve::Existing to only return cached.
+     */
+    virtual IProperty::Ptr get_property(string_view name, Uid interfaceUid = {},
+                                        Resolve mode = Resolve::Create) const = 0;
+
+    /** @brief Convenience overload: search all scopes with an explicit resolve mode. */
+    IProperty::Ptr get_property(string_view name, Resolve mode) const
+    {
+        return get_property(name, {}, mode);
+    }
     /** @brief Returns the runtime event instance for the named member, or nullptr. */
     virtual IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const = 0;
     /** @brief Returns the runtime function instance for the named member, or nullptr. */
@@ -118,6 +143,33 @@ public:
 
     /** @brief Broadcasts a notification to all instantiated members of the given kind and interface. */
     virtual void notify(MemberKind kind, Uid interfaceUid, Notification notification) const = 0;
+
+    /**
+     * @brief Adds a dynamic property to this object.
+     * @param name Property name (an owned copy is stored).
+     * @param typeUid The property's value type UID.
+     * @param defaultValue Initial value (cloned), or nullptr for default-initialized.
+     * @return The created property instance, or nullptr on failure.
+     */
+    virtual IProperty::Ptr add_property(string_view name, Uid typeUid,
+                                        const IAny* defaultValue) const = 0;
+
+    /**
+     * @brief Removes a property by name.
+     *
+     * For dynamic properties: removes both the wrapper and the backing data.
+     * For static properties: removes only the cached wrapper instance. The state
+     * struct data is unaffected and can be re-accessed via get_property() later.
+     *
+     * @return Success, NothingToDo (not instantiated), or Fail (not found).
+     */
+    virtual ReturnValue remove_property(string_view name) const = 0;
+
+    /**
+     * @brief Returns descriptors for all properties (static + dynamic) without
+     *        instantiating property wrappers.
+     */
+    virtual vector<PropertyInfo> get_properties() const = 0;
 
     /** @brief Returns a read-only accessor to the State struct of interface @p T. */
     template <class T>
@@ -158,9 +210,10 @@ detail::StateWriter<T>::~StateWriter()
  * @param name Property name to look up.
  * @return The runtime property instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IProperty::Ptr get_property(const IMetadata* meta, string_view name, Resolve mode = Resolve::Create)
+inline IProperty::Ptr get_property(const IMetadata* meta, string_view name, Uid interfaceUid = {},
+                                   Resolve mode = Resolve::Create)
 {
-    return meta ? meta->get_property(name, mode) : nullptr;
+    return meta ? meta->get_property(name, interfaceUid, mode) : nullptr;
 }
 
 /**

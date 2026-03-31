@@ -5,6 +5,7 @@
 #include <velk/interface/intf_function.h>
 #include <velk/interface/intf_metadata_observer.h>
 #include <velk/interface/intf_object_storage.h>
+#include <velk/string.h>
 #include <velk/vector.h>
 
 #include <cassert>
@@ -52,6 +53,14 @@ struct MemberSlot
     MemberData data{}; ///< Per-kind data: property value+event or function callback.
 };
 
+/** @brief Owned storage for a dynamically added property's metadata. */
+struct DynamicMemberDesc
+{
+    string name_storage;       ///< Owned copy of the property name.
+    MemberDesc desc{};         ///< desc.name points into name_storage.
+    PropertyKind property_kind{}; ///< Owned PropertyKind (typeUid, no createRef).
+};
+
 /**
  * @brief Runtime object storage that lazily creates property/event/function instances
  *        and supports arbitrary attachments.
@@ -85,10 +94,15 @@ public: // IPropertyState (inherited via IMetadata; state lives in the Object, n
 
 public: // IMetadata
     array_view<MemberDesc> get_static_metadata() const override;
-    IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const override;
+    IProperty::Ptr get_property(string_view name, Uid interfaceUid,
+                                Resolve mode) const override;
     IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const override;
     IFunction::Ptr get_function(string_view name, Resolve mode = Resolve::Create) const override;
     void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override;
+    IProperty::Ptr add_property(string_view name, Uid typeUid,
+                                const IAny* defaultValue) const override;
+    ReturnValue remove_property(string_view name) const override;
+    vector<PropertyInfo> get_properties() const override;
 
 public: // IObjectStorage (attachment operations)
     ReturnValue add_attachment(const IInterface::Ptr& attachment) override;
@@ -105,31 +119,37 @@ public: // IObjectStorage (property events + observers)
     void remove_observer(IMetadataObserver* observer) override;
 
 public:
-    /** @brief Returns the metadata slot at the given index. */
+    static constexpr uint16_t DynamicBit = 0x8000;
+
+    /** @brief Returns the metadata slot at the given index. High bit set = dynamic slot. */
     MemberSlot& slot(size_t id) const
     {
-        assert(id < 0xffff && "Slot id out of range");
+        if (id & DynamicBit) {
+            return dynamic_metadata_[id & ~DynamicBit];
+        }
         return metadata_[id];
     }
     /** @brief Returns the MemberData at the given index. */
     MemberData& data(size_t id) const
     {
-        assert(id < 0xffff && "Slot id out of range");
-        return metadata_[id].data;
+        return slot(id).data;
     }
 
 private:
     array_view<MemberDesc> members_; ///< Static metadata descriptors from VELK_INTERFACE.
     IInterface* owner_{};            ///< Owning object for trampoline binding and state access.
 
-    mutable vector<IInterface::Ptr> attachments_; ///< Object attachments
-    mutable vector<MemberSlot> metadata_;         ///< Sparse: one slot per lazily created member.
+    mutable vector<IInterface::Ptr> attachments_;      ///< Object attachments
+    mutable vector<MemberSlot> metadata_;              ///< Sparse: one slot per lazily created member.
+    mutable vector<DynamicMemberDesc> dynamic_members_; ///< Dynamically added property descriptors.
+    mutable vector<MemberSlot> dynamic_metadata_;       ///< Slots for dynamic properties.
 
     /// Object-level observers for property change notifications.
     vector<IMetadataObserver*> observers_;
 
     /** @brief Finds a static member by name and kind, creating its runtime instance if needed. */
-    IInterface::Ptr find_or_create(string_view name, MemberKind kind, Resolve mode) const;
+    IInterface::Ptr find_or_create(string_view name, MemberKind kind, Resolve mode,
+                                   Uid interfaceUid = {}) const;
     /** @brief Creates a runtime instance (impl::Property or impl::Function) from a member descriptor. */
     IInterface::Ptr create(MemberDesc desc) const;
     /** @brief Binds a function trampoline directly into the slot's callback data. */
@@ -138,6 +158,10 @@ private:
     void release_callback(MemberSlot& slot) const;
     /** @brief Destroys the union arm of a slot based on its member kind. */
     void destroy_slot(MemberSlot& slot) const;
+    /** @brief Destroys a dynamic property slot (always a Property with owned data). */
+    void destroy_dynamic_slot(MemberSlot& slot) const;
+    /** @brief Finds an existing dynamic property by name, or creates its wrapper. */
+    IProperty::Ptr find_dynamic_property(string_view name, Resolve mode) const;
     /** @brief Notifies all observers_ */
     void notify_observers(string_view name, Uid interfaceUid) const;
 };
