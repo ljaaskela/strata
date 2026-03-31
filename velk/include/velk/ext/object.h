@@ -67,9 +67,9 @@ protected:
             created->add_observer(observer);
         }
     }
-    IProperty::Ptr storage_get_property(string_view name, Resolve mode = Resolve::Create) const
+    IProperty::Ptr storage_get_property(string_view name, Uid interfaceUid, Resolve mode) const
     {
-        return with_storage([&](auto& s) { return s.get_property(name, mode); });
+        return with_storage([&](auto& s) { return s.get_property(name, interfaceUid, mode); });
     }
     IEvent::Ptr storage_get_event(string_view name, Resolve mode = Resolve::Create) const
     {
@@ -82,6 +82,18 @@ protected:
     void storage_notify(MemberKind kind, Uid interfaceUid, Notification notification) const
     {
         return with_storage([&](auto& s) { return s.notify(kind, interfaceUid, notification); });
+    }
+    IProperty::Ptr storage_add_property(string_view name, Uid typeUid, const IAny* defaultValue) const
+    {
+        return with_storage([&](auto& s) { return s.add_property(name, typeUid, defaultValue); });
+    }
+    ReturnValue storage_remove_property(string_view name) const
+    {
+        return with_storage([&](auto& s) { return s.remove_property(name); }, ReturnValue::Fail);
+    }
+    vector<PropertyInfo> storage_get_properties() const
+    {
+        return with_storage([&](auto& s) { return s.get_properties(); }, vector<PropertyInfo>{});
     }
     ReturnValue storage_add_attachment(const IInterface::Ptr& attachment) const
     {
@@ -176,10 +188,10 @@ private:
 
 public: // IMetadata overrides
     array_view<MemberDesc> get_static_metadata() const override { return class_metadata; }
-    IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const override
+    IProperty::Ptr get_property(string_view name, Uid interfaceUid, Resolve mode) const override
     {
         ensure_object_storage(mode);
-        return storage_get_property(name, mode);
+        return storage_get_property(name, interfaceUid, mode);
     }
     IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const override
     {
@@ -198,6 +210,13 @@ public: // IMetadata overrides
         }
         storage_notify(kind, interfaceUid, notification);
     }
+    IProperty::Ptr add_property(string_view name, Uid typeUid, const IAny* defaultValue) const override
+    {
+        ensure_object_storage();
+        return storage_add_property(name, typeUid, defaultValue);
+    }
+    ReturnValue remove_property(string_view name) const override { return storage_remove_property(name); }
+    vector<PropertyInfo> get_properties() const override { return storage_get_properties(); }
 
 public: // IObjectStorage overrides
     ReturnValue add_attachment(const IInterface::Ptr& attachment) override
@@ -234,10 +253,7 @@ public: // IObjectStorage overrides
         ensure_object_storage();
         storage_add_observer(observer);
     }
-    void remove_observer(IMetadataObserver* observer) override
-    {
-        storage_remove_observer(observer);
-    }
+    void remove_observer(IMetadataObserver* observer) override { storage_remove_observer(observer); }
 
 public: // IPropertyState override
     /** @brief Returns a pointer to the State struct for the given interface UID. */
@@ -249,7 +265,8 @@ public: // IPropertyState override
     {
         return static_cast<typename T::State*>(get_property_state(T::UID));
     }
-    /** @brief Const type-safe state access. Safe because state is always mutable storage owned by the object. */
+    /** @brief Const type-safe state access. Safe because state is always mutable storage owned by the object.
+     */
     template <class T>
     const typename T::State* interface_state() const
     {
@@ -297,7 +314,6 @@ private:
             return nullptr;
         }
     }
-
 };
 
 } // namespace velk::ext
