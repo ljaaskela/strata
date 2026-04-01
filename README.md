@@ -91,6 +91,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | **Built-in plugins** | |
 | [Importer](docs/plugins/importer.md) | JSON scene import with extensible collections |
 | [Animator](docs/plugins/animator.md) | Implicit animations and transitions for properties |
+| [Scripting](docs/plugins/scripting.md) | JavaScript scripting via QuickJS-ng: expression bindings and event handlers |
 
 ## Project structure
 
@@ -111,6 +112,7 @@ velk/
     plugins/
       importer.md         Importer plugin: JSON import, extensions, format reference
       animator.md         Animator plugin: transitions, easing, interpolators
+      scripting.md        Scripting plugin: JavaScript expression bindings, event handlers
   velk/
     include/              Public API (consumers depend only on these headers)
       interface/          Abstract interfaces (ABI contracts)
@@ -124,7 +126,7 @@ velk/
 
 ## Building
 
-Requires CMake 3.14+ and a C++17 compiler. Tested with MSVC 2019.
+Requires CMake 3.14+ and a C++17 compiler with a C compiler (for QuickJS). Tested with MSVC 2019.
 
 ```bash
 cmake -B build
@@ -136,6 +138,7 @@ Output:
 * `build/bin/Release/velk_c.dll` (C API shared library)
 * `build/bin/Release/velk_importer.dll` (shared library)
 * `build/bin/Release/velk_animator.dll` (shared library)
+* `build/bin/Release/velk_js.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
 * `build/bin/Release/benchmarks.exe` (benchmarks)
