@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(velk VERSION 0.1.0 LANGUAGES CXX)
+project(velk VERSION 0.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin/)
 add_subdirectory(velk)
 add_subdirectory(velk/plugins/animator)
 add_subdirectory(velk/plugins/importer)
+add_subdirectory(velk/plugins/script/js)
 add_subdirectory(velk/c_api)
 add_subdirectory(demo)
 add_subdirectory(test)
