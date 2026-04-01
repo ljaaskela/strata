@@ -6,6 +6,8 @@ add_library(quickjs_obj OBJECT
     third_party/quickjs/libunicode.c
 )
 
+set_target_properties(quickjs_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(quickjs_obj PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/quickjs
 )
