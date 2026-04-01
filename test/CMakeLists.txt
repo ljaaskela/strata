@@ -43,12 +43,14 @@ add_executable(tests
     test_thread_context.cpp
     test_importer.cpp
     test_resource_store.cpp
+    test_js.cpp
 )
 
 target_link_libraries(tests PRIVATE velk velk_c GTest::gtest_main)
 target_include_directories(tests PRIVATE
     $<TARGET_PROPERTY:velk_animator,INTERFACE_INCLUDE_DIRECTORIES>
     $<TARGET_PROPERTY:velk_importer,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:velk_js,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 # Pass the test plugin DLL path as a compile definition so tests can find it.
@@ -57,6 +59,7 @@ target_compile_definitions(tests PRIVATE
     TEST_PLUGIN_DLL_PATH="$<TARGET_FILE:test_plugin_dll>"
     TEST_ANIMATOR_DLL_PATH="$<TARGET_FILE:velk_animator>"
     TEST_IMPORTER_DLL_PATH="$<TARGET_FILE:velk_importer>"
+    TEST_JS_DLL_PATH="$<TARGET_FILE:velk_js>"
 )
 
 include(GoogleTest)
