@@ -41,6 +41,9 @@ inline constexpr Uid Hierarchy{"b7d3e1a2-5f48-4c96-9e0a-1d2b3c4e5f67"};
 /** @brief Reactive link that propagates value changes from a source property to one or more targets.
  *  @see velk::Binding (api/binding.h) */
 inline constexpr Uid Binding{"c4e8f2a1-6b39-47d5-8e1c-3a9d5f7b2e04"};
+/** @brief Standalone property for runtime-created and dynamic object properties.
+ *  @see velk::StandaloneProperty (src/standalone_property.h) */
+inline constexpr Uid StandaloneProperty{"c1f97544-35af-42b6-8748-f24e86ba8a07"};
 /** @brief Dynamically-typed value container. Declared via `(PROP, Variant, name, {})` in VELK_INTERFACE.
  *  @see velk::Variant (api/variant.h) */
 inline constexpr Uid Variant{"e5f2a7b3-8c14-4d69-9e2f-3a1b5c6d7e80"};

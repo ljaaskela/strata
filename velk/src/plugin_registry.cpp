@@ -226,10 +226,10 @@ ReturnValue PluginRegistry::unload_plugin(Uid pluginId)
                                      __FILE__,
                                      __LINE__,
                                      "Cannot unload plugin '%.*s': plugin '%.*s' depends on it",
-                                     static_cast<int>(it->plugin->get_name().size()),
-                                     it->plugin->get_name().data(),
-                                     static_cast<int>(pe.plugin->get_name().size()),
-                                     pe.plugin->get_name().data());
+                                     static_cast<int>(it->plugin->get_plugin_info().name.size()),
+                                     it->plugin->get_plugin_info().name.data(),
+                                     static_cast<int>(pe.plugin->get_plugin_info().name.size()),
+                                     pe.plugin->get_plugin_info().name.data());
                     return ReturnValue::Fail;
                 }
             }
@@ -392,7 +392,7 @@ vector<PluginStats> PluginRegistry::gather_plugin_stats() const
         PluginStats ps{};
         ps.plugin_uid = entry.uid;
         if (entry.plugin) {
-            ps.plugin_name = entry.plugin->get_name();
+            ps.plugin_name = entry.plugin->get_plugin_info().name;
             ps.version = entry.plugin->get_version();
         }
         ps.update_enabled = entry.config.enableUpdate;

@@ -13,6 +13,7 @@
 #include "hive/raw_hive.h"
 #include "object_ref.h"
 #include "property.h"
+#include "standalone_property.h"
 #include "store.h"
 #include "thread_context.h"
 #include "variant.h"
@@ -354,7 +355,7 @@ Uid TypeRegistry::find_class_by_name(string_view name) const
                 continue;
             }
             auto plugin = reg.find_plugin(entry.owner);
-            if (plugin && plugin->get_name() == plugin_name) {
+            if (plugin && plugin->get_plugin_info().name == plugin_name) {
                 auto& info = entry.factory->get_class_info();
                 if (info.name == class_name) {
                     return info.uid;
@@ -391,7 +392,7 @@ void TypeRegistry::for_each_class(void* ctx, ClassVisitorFn visitor) const
 
 IProperty::Ptr TypeRegistry::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
 {
-    static const auto& factory = impl::Property::get_factory();
+    static const auto& factory = impl::StandaloneProperty::get_factory();
     auto property = interface_pointer_cast<IProperty>(factory.create_instance(flags));
     if (auto pi = interface_cast<IPropertyInternal>(property)) {
         if (value && is_compatible(value, type)) {

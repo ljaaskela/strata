@@ -7,6 +7,8 @@ add_library(velk SHARED
     src/dependency_tracker.h
     src/property.cpp
     src/property.h
+    src/standalone_property.cpp
+    src/standalone_property.h
     src/event.cpp
     src/event.h
     src/function.cpp

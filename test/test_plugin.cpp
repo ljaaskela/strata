@@ -533,7 +533,7 @@ TEST_F(PluginTest, LoadFromPathSuccess)
 
     auto plugin = reg.find_plugin(DllTestPluginUid);
     ASSERT_TRUE(plugin);
-    EXPECT_EQ(string_view("DllTestPlugin"), plugin->get_name());
+    EXPECT_EQ(string_view("DllTestPlugin"), plugin->get_plugin_info().name);
 }
 
 TEST_F(PluginTest, LoadFromPathDoubleLoadReturnsNothingToDo)
@@ -562,7 +562,7 @@ TEST_F(PluginTest, LoadFromPathMultiPlugin)
     EXPECT_EQ(builtin_count_ + 2, reg.plugin_count());
     EXPECT_TRUE(reg.find_plugin(DllTestPluginUid));
     EXPECT_TRUE(reg.find_plugin(DllSubPluginUid));
-    EXPECT_EQ(string_view("DllSubPlugin"), reg.find_plugin(DllSubPluginUid)->get_name());
+    EXPECT_EQ(string_view("DllSubPlugin"), reg.find_plugin(DllSubPluginUid)->get_plugin_info().name);
 
     // Unloading the host should also unload the sub-plugin (via shutdown)
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));

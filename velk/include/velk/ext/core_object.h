@@ -190,6 +190,8 @@ public: // IObject
 
     uint32_t get_object_flags() const override { return this->get_object_data().flags; }
 
+    string get_name() const override { return {}; }
+
     template <class T>
     typename T::Ptr get_self() const
     {
