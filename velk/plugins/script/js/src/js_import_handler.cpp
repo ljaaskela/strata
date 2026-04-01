@@ -25,14 +25,27 @@ IProperty::Ptr resolve_property(const IImportResolver& resolver, string_view pat
 
 IEvent::Ptr resolve_event(const IImportResolver& resolver, string_view path)
 {
-    auto dot = path.rfind('.');
-    if (dot == string_view::npos) {
+    // Supported formats:
+    //   "object.property.on_changed"  ->  property change event
+    //   "object.event_name"           ->  named event (EVT member)
+    auto last_dot = path.rfind('.');
+    if (last_dot == string_view::npos) {
         return {};
     }
-    auto obj_path = path.substr(0, dot);
-    auto event_name = path.substr(dot + 1);
 
-    auto obj = resolver.resolve(obj_path);
+    auto last_segment = path.substr(last_dot + 1);
+    auto prefix = path.substr(0, last_dot);
+
+    // "object.property.on_changed" -> resolve as property path, get on_changed
+    if (last_segment == string_view("on_changed", 10)) {
+        auto prop = resolve_property(resolver, prefix);
+        if (prop) {
+            return prop->on_changed();
+        }
+    }
+
+    // "object.event_name" -> resolve object, look up named event
+    auto obj = resolver.resolve(prefix);
     if (!obj) {
         return {};
     }
@@ -40,25 +53,7 @@ IEvent::Ptr resolve_event(const IImportResolver& resolver, string_view path)
     if (!meta) {
         return {};
     }
-    // Handle "on_changed_<prop>" pattern: get the property's on_changed event
-    constexpr char prefix[] = "on_changed_";
-    constexpr size_t prefix_len = sizeof(prefix) - 1;
-    if (event_name.size() > prefix_len) {
-        bool matches = true;
-        for (size_t i = 0; i < prefix_len && matches; ++i) {
-            matches = event_name[i] == prefix[i];
-        }
-        if (matches) {
-            auto prop_name = event_name.substr(prefix_len);
-            auto prop = meta->get_property(prop_name, {}, Resolve::Create);
-            if (prop) {
-                return prop->on_changed();
-            }
-        }
-    }
-
-    // Try as a named event (EVT members)
-    return meta->get_event(event_name, Resolve::Create);
+    return meta->get_event(last_segment, Resolve::Create);
 }
 
 string join_handler_lines(const IImportData& data)

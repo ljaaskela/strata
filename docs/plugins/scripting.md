@@ -56,17 +56,17 @@ The result is type-converted to match the target property automatically (e.g. a 
 
 ### Event handlers
 
-An event handler runs a JavaScript statement when an event fires. Use `on_changed_<property>` to react to property changes.
+An event handler runs a JavaScript statement when an event fires. Use `object.property.on_changed` to react to property changes.
 
 ```json
 {
     "scripts": [
-        { "event": "btn.on_changed_label", "handler": "status.count = 42" }
+        { "event": "btn.label.on_changed", "handler": "status.count = 42" }
     ]
 }
 ```
 
-The `on_changed_<property>` pattern resolves the named property and subscribes to its `on_changed()` event. Named events declared with `EVT` in `VELK_INTERFACE` are also supported (e.g. `"event": "btn.on_clicked"`).
+The `object.property.on_changed` pattern resolves the named property and subscribes to its `on_changed()` event. Named events declared with `EVT` in `VELK_INTERFACE` are also supported (e.g. `"event": "btn.on_clicked"`).
 
 Event handlers are invoked as deferred tasks, executing during the next `instance().update()` call.
 
@@ -78,7 +78,7 @@ Handler source can be an array of strings, joined with newlines before compilati
 {
     "scripts": [
         {
-            "event": "btn.on_changed_width",
+            "event": "btn.width.on_changed",
             "handler": [
                 "let w = btn.width;",
                 "status.count = w * 10;"

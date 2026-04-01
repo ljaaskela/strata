@@ -252,7 +252,7 @@ TEST_F(JsTest, EventHandler)
             { "id": "w1", "name": "w1", "class": "test.JsWidget", "properties": { "label": "before" } }
         ],
         "scripts": [
-            { "event": "w1.on_changed_label", "handler": "w1.count = 99" }
+            { "event": "w1.label.on_changed", "handler": "w1.count = 99" }
         ]
     })");
     ASSERT_TRUE(result.store);
@@ -279,7 +279,7 @@ TEST_F(JsTest, MultiLineHandler)
         ],
         "scripts": [
             {
-                "event": "w1.on_changed_width",
+                "event": "w1.width.on_changed",
                 "handler": [
                     "let w = w1.width;",
                     "w1.count = w * 10;"
