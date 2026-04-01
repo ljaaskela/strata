@@ -6,6 +6,7 @@
 #include <velk/array_view.h>
 #include <velk/common.h>
 #include <velk/interface/intf_interface.h>
+#include <velk/string.h>
 
 #include <cstdint>
 
@@ -169,7 +170,7 @@ constexpr MemberDesc FunctionDesc(string_view name, const InterfaceInfo* info = 
 /** @brief Lightweight descriptor for enumerating properties without instantiating wrappers. */
 struct PropertyInfo
 {
-    string_view name;    ///< Property name.
+    string name;         ///< Property name.
     Uid typeUid;         ///< type_uid<T>() for the property's value type.
     Uid interfaceUid;    ///< Interface that owns this property (IDynamicMetadata::UID for dynamic).
 };

@@ -53,13 +53,6 @@ struct MemberSlot
     MemberData data{}; ///< Per-kind data: property value+event or function callback.
 };
 
-/** @brief Owned storage for a dynamically added property's metadata. */
-struct DynamicMemberDesc
-{
-    string name_storage;       ///< Owned copy of the property name.
-    MemberDesc desc{};         ///< desc.name points into name_storage.
-    PropertyKind property_kind{}; ///< Owned PropertyKind (typeUid, no createRef).
-};
 
 /**
  * @brief Runtime object storage that lazily creates property/event/function instances
@@ -88,6 +81,7 @@ public: // IObject (inherited via IObjectStorage; not used as an IObject)
     string_view get_class_name() const override { return {}; }
     IObject::Ptr get_self() const override { return {}; }
     uint32_t get_object_flags() const override { return 0; }
+    string get_name() const override { return {}; }
 
 public: // IPropertyState (inherited via IMetadata; state lives in the Object, not here)
     void* get_property_state(Uid) override { return nullptr; }
@@ -119,14 +113,9 @@ public: // IObjectStorage (property events + observers)
     void remove_observer(IMetadataObserver* observer) override;
 
 public:
-    static constexpr uint16_t DynamicBit = 0x8000;
-
-    /** @brief Returns the metadata slot at the given index. High bit set = dynamic slot. */
+    /** @brief Returns the metadata slot at the given index. */
     MemberSlot& slot(size_t id) const
     {
-        if (id & DynamicBit) {
-            return dynamic_metadata_[id & ~DynamicBit];
-        }
         return metadata_[id];
     }
     /** @brief Returns the MemberData at the given index. */
@@ -139,10 +128,8 @@ private:
     array_view<MemberDesc> members_; ///< Static metadata descriptors from VELK_INTERFACE.
     IInterface* owner_{};            ///< Owning object for trampoline binding and state access.
 
-    mutable vector<IInterface::Ptr> attachments_;      ///< Object attachments
-    mutable vector<MemberSlot> metadata_;              ///< Sparse: one slot per lazily created member.
-    mutable vector<DynamicMemberDesc> dynamic_members_; ///< Dynamically added property descriptors.
-    mutable vector<MemberSlot> dynamic_metadata_;       ///< Slots for dynamic properties.
+    mutable vector<IInterface::Ptr> attachments_; ///< Attachments and dynamic properties.
+    mutable vector<MemberSlot> metadata_;        ///< Sparse: one slot per lazily created static member.
 
     /// Object-level observers for property change notifications.
     vector<IMetadataObserver*> observers_;
@@ -158,10 +145,10 @@ private:
     void release_callback(MemberSlot& slot) const;
     /** @brief Destroys the union arm of a slot based on its member kind. */
     void destroy_slot(MemberSlot& slot) const;
-    /** @brief Destroys a dynamic property slot (always a Property with owned data). */
-    void destroy_dynamic_slot(MemberSlot& slot) const;
-    /** @brief Finds an existing dynamic property by name, or creates its wrapper. */
-    IProperty::Ptr find_dynamic_property(string_view name, Resolve mode) const;
+    /** @brief Finds an existing dynamic property by name in the attachments list. */
+    IProperty::Ptr find_dynamic_property(string_view name) const;
+    /** @brief Callback for StandaloneProperty to notify observers on value change. */
+    static void on_runtime_property_changed(void* ctx, string_view name, IProperty* prop);
     /** @brief Notifies all observers_ */
     void notify_observers(string_view name, Uid interfaceUid) const;
 };

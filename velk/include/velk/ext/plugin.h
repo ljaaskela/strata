@@ -84,6 +84,9 @@ public:
     /** @brief Returns the static plugin descriptor. */
     const PluginInfo& get_plugin_info() const override { return plugin_info(); }
 
+    /** @brief Returns the human-readable name of this plugin. */
+    string get_name() const override { return string(get_plugin_info().name); }
+
     /** @brief Default no-op pre-update handler. Override to receive pre-update notifications. */
     void pre_update(const IPlugin::PreUpdateInfo&) override {}
     /** @brief Default no-op post-update handler. Override to receive post-update notifications. */

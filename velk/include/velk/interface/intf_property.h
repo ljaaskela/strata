@@ -77,6 +77,16 @@ public:
     virtual bool remove_extension(const IAnyExtension::Ptr& extension) = 0;
 };
 
+/** @brief Interface for standalone (runtime-created) properties with name and notify support. */
+class IStandaloneProperty : public Interface<IStandaloneProperty, IPropertyInternal>
+{
+public:
+    /** @brief Sets the instance name of this property. */
+    virtual void set_name(string_view name) = 0;
+    /** @brief Sets or clears a callback invoked after the property value changes. */
+    virtual void set_notify(void* ctx, void (*fn)(void*, string_view, IProperty*)) = 0;
+};
+
 /**
  * @brief Walks the IAnyExtension chain of a property's value, collecting each node.
  * @param property The property whose value chain to walk.

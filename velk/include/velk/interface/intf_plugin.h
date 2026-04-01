@@ -102,8 +102,6 @@ public:
     /** @brief Returns the static plugin descriptor. */
     virtual const PluginInfo& get_plugin_info() const = 0;
 
-    /** @brief Returns the human-readable name of this plugin. */
-    string_view get_name() const { return get_plugin_info().name; }
     /** @brief Returns the plugin version. */
     uint32_t get_version() const { return get_plugin_info().version; }
     /** @brief Returns the dependencies of this plugin. */
