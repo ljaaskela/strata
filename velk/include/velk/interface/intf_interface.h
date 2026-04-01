@@ -109,7 +109,7 @@ public:
     /** @brief Compile-time unique identifier for this interface type. */
     static constexpr Uid UID = get_interface_uid();
     /** @brief Static descriptor containing the UID and human-readable name. */
-    static constexpr InterfaceInfo INFO{get_interface_uid(), get_name<T>()};
+    static constexpr InterfaceInfo INFO{get_interface_uid(), ::velk::get_name<T>()};
     /** @brief Shared pointer to a mutable T. */
     using Ptr = shared_ptr<T>;
     /** @brief Shared pointer to a const T. */

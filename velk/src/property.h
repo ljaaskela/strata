@@ -24,13 +24,15 @@ public:
     Property() = default;
     ~Property() override;
 
+    /** @brief Returns the member name from the owning ObjectStorage's static metadata. */
+    string get_name() const override;
+
 protected: // IProperty
     ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;
     const IAny::ConstPtr get_value() const override;
     IEvent::Ptr on_changed() const override
     {
-        return is_standalone() ? IEvent::Ptr{}
-                               : ::velk::get_property_event(get_owner(), get_storage_id(), Resolve::Create);
+        return ::velk::get_property_event(get_owner(), get_storage_id(), Resolve::Create);
     }
 
 protected: // IPropertyInternal
