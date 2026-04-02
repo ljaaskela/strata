@@ -29,14 +29,9 @@ void add_error(ImportResult& result, const char* msg)
     result.errors.push_back(::velk::string(msg));
 }
 
-void add_error(ImportResult& result, const ::velk::string& msg)
+void add_error(ImportResult& result, const ::velk::string_view msg)
 {
     result.errors.push_back(msg);
-}
-
-std::string to_std_string(string_view sv)
-{
-    return std::string(sv.data(), sv.size());
 }
 
 const MemberDesc* find_property_desc(const ClassInfo& info, string_view name)
@@ -410,11 +405,11 @@ void JsonImporter::register_imported_object(ImportContext& ctx, IObject::Ptr obj
     auto* id_val = obj_node.find("id");
     const auto& id_str = id_val->as_string();
 
-    ctx.name_to_object[to_std_string(id_str)] = obj;
+    ctx.name_to_object[id_str] = obj;
     auto* name_val = obj_node.find("name");
     if (name_val && name_val->type() == JsonType::String) {
         const auto& nm = name_val->as_string();
-        ctx.name_to_object[to_std_string(nm)] = obj;
+        ctx.name_to_object[nm] = obj;
         ctx.object_to_name[obj.get()] = nm;
     } else {
         ctx.object_to_name[obj.get()] = id_str;
@@ -451,23 +446,21 @@ void JsonImporter::build_hierarchy(string_view name, const JsonValue& tree_json,
 
     // Format: { "parent_id": ["child_id", ...], ... }
     // Root is a node that appears as a key but never in any child array.
-    std::unordered_set<std::string> all_children;
+    std::unordered_set<::velk::string> all_children;
     for (auto& [parent_id, children_val] : tree_json.as_object()) {
         if (children_val.type() != JsonType::Array) {
             continue;
         }
         for (auto& child_val : children_val.as_array()) {
             if (child_val.type() == JsonType::String) {
-                const auto& cs = child_val.as_string();
-                all_children.insert(to_std_string(cs));
+                all_children.insert(child_val.as_string());
             }
         }
     }
 
     string root_id;
     for (auto& [parent_id, children_val] : tree_json.as_object()) {
-        auto pid = to_std_string(parent_id);
-        if (all_children.find(pid) == all_children.end()) {
+        if (all_children.find(parent_id) == all_children.end()) {
             root_id = parent_id;
             break;
         }
@@ -545,7 +538,7 @@ IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ct
     if (path.size() > prefix_objects.size() &&
         string_view(path.data(), prefix_objects.size()) == prefix_objects) {
         auto id = path.substr(prefix_objects.size());
-        auto it = ctx.name_to_object.find(to_std_string(id));
+        auto it = ctx.name_to_object.find(id);
         if (it != ctx.name_to_object.end()) {
             return it->second;
         }
@@ -553,7 +546,7 @@ IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ct
     }
 
     // Unqualified: try name map first (includes both ids and names), then store lookup
-    auto it = ctx.name_to_object.find(to_std_string(path));
+    auto it = ctx.name_to_object.find(path);
     if (it != ctx.name_to_object.end()) {
         return it->second;
     }

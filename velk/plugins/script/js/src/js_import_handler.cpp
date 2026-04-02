@@ -204,8 +204,7 @@ void JsImportHandler::process(const IImportData& data, IStore& store,
                 continue;
             }
 
-            auto binding = create_binding(
-                IFunction::ConstPtr(js_fn), InvokeType::Auto);
+            auto binding = create_binding(IFunction::ConstPtr(js_fn), InvokeType::Deferred);
             if (!binding) {
                 VELK_LOG(E, "Failed to create script binding");
                 continue;

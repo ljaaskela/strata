@@ -580,4 +580,14 @@ inline string to_string(Uid uid)
 
 } // namespace velk
 
+template <>
+struct std::hash<velk::string>
+{
+    size_t operator()(const velk::string& s) const noexcept
+    {
+        velk::Uid h = velk::make_hash(s);
+        return static_cast<size_t>(h.hi ^ h.lo);
+    }
+};
+
 #endif // VELK_STRING_H

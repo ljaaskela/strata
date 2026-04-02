@@ -29,7 +29,7 @@ private:
 
     struct ImportContext
     {
-        std::unordered_map<std::string, IObject::Ptr> name_to_object;
+        std::unordered_map<string, IObject::Ptr> name_to_object;
         std::unordered_map<IObject*, string> object_to_name;
         std::unordered_map<IObject*, const ClassInfo*> object_to_class_info;
     };
