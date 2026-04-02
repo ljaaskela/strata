@@ -73,6 +73,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | **Extensible** | <p>[Plugin registry](docs/plugins.md) for inline or DLL-based plugins with declarative dependencies and multi-plugin bundles<p>[Type registry](#query-metadata-without-instance) for UID-based creation and runtime introspection<p>[Attachments](docs/guide.md#attachments) for injecting capabilities (decorators, custom behaviors) into objects at runtime<p>[External hierarchy](docs/guide.md#hierarchy) that manages parent/child trees without per-object overhead |
 | **[Hive](docs/hive.md) storage** | Dense, cache-friendly containers with slot reuse, zombie lifecycle, and automatic page management |
 | **[Performance](docs/performance.md)-focused** | <p>Inline state structs, lazy instantiation, single-indirect-call dispatch, and direct state access with zero overhead<p>No RTTI or exceptions, builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
+| **[Scriptable](docs/plugins/scripting.md)** | Bindings, functions, event handlers optionally in JavaScript. |
 | **[C API](docs/c_api.md)** | Flat C API (`velk_c.dll`) with opaque typed handles for FFI consumption from any language |
 
 ## Documentation

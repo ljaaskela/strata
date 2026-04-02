@@ -1,6 +1,6 @@
 # Scripting plugin
 
-The scripting plugin (`velk_js`) adds JavaScript scripting to Velk via [QuickJS-ng](https://github.com/nickg/quickjs). It enables expression bindings and event handlers declared in JSON store files.
+The scripting plugin (`velk_js`) adds JavaScript scripting via [QuickJS-ng](https://quickjs-ng.github.io/quickjs/). It enables expression bindings and event handlers declared in a [JSON file](importer.md).
 
 ## Contents
 
@@ -21,12 +21,9 @@ The scripting plugin (`velk_js`) adds JavaScript scripting to Velk via [QuickJS-
 
 // Load (requires the importer plugin to be loaded first)
 instance().plugin_registry().load_plugin_from_path("velk_js.dll");
-
-// Unload
-instance().plugin_registry().unload_plugin(PluginId::JsPlugin);
 ```
 
-The plugin registers a `JsImportHandler` that handles the `"scripts"` top-level collection in JSON store files. It must be loaded before calling `import_from()` for scripts to be processed.
+The plugin registers a `JsImportHandler` that handles the `"scripts"` top-level collection in JSON store files. It must be loaded before loading a JSON file for the scripts to be processed.
 
 ## JSON format
 
@@ -56,20 +53,28 @@ The result is type-converted to match the target property automatically (e.g. a 
 
 ### Event handlers
 
-An event handler runs a JavaScript statement when an event fires. Use `object.property.on_changed` to react to property changes.
+Named events declared with `EVT` in `VELK_INTERFACE` are can be tied to a JavaScript statement. Use `object.event_name` to react to such events.
 
 ```json
 {
     "scripts": [
-        { "event": "btn.label.on_changed", "handler": "status.count = 42" }
+        { "event": "btn.on_clicked", "handler": "status.clicked = true" }
     ]
 }
 ```
-
-The `object.property.on_changed` pattern resolves the named property and subscribes to its `on_changed()` event. Named events declared with `EVT` in `VELK_INTERFACE` are also supported (e.g. `"event": "btn.on_clicked"`).
-
 Event handlers are invoked as deferred tasks, executing during the next `instance().update()` call.
 
+#### Property value change
+
+A special handler is defined for properties. The `object.property.on_changed` pattern resolves the named property and subscribes to its `on_changed()` event. 
+
+```json
+{
+    "scripts": [
+        { "event": "btn.text.on_changed", "handler": "status.count = 42" }
+    ]
+}
+```
 ### Multi-line handlers
 
 Handler source can be an array of strings, joined with newlines before compilation:
