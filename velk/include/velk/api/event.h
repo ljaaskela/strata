@@ -14,6 +14,9 @@ namespace velk {
 class Event
 {
 public:
+    /** @brief Default-constructs an empty Event (null-safe, all methods are no-ops). */
+    Event() = default;
+
     /** @brief Wraps an existing IEvent pointer. */
     explicit Event(IEvent::Ptr existing) : event_(std::move(existing)) {}
 
