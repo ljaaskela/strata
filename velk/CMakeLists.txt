@@ -33,6 +33,7 @@ add_library(velk SHARED
     src/variant.h
     src/hierarchy.cpp
     src/hierarchy.h
+    src/generic_object.h
     src/future.cpp
     src/future.h
     src/type_registry.cpp
