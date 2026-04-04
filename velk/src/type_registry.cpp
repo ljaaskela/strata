@@ -1,13 +1,11 @@
 #include "type_registry.h"
 
-#include <velk/interface/hive/intf_hive.h>
-#include <velk/interface/intf_velk.h>
-
 #include "array_property.h"
 #include "binding.h"
 #include "event.h"
 #include "function.h"
 #include "future.h"
+#include "generic_object.h"
 #include "hierarchy.h"
 #include "hive/hive_store.h"
 #include "hive/raw_hive.h"
@@ -21,7 +19,9 @@
 #include <velk/api/math_types.h>
 #include <velk/api/velk.h>
 #include <velk/ext/any.h>
+#include <velk/interface/hive/intf_hive.h>
 #include <velk/interface/intf_log.h>
+#include <velk/interface/intf_velk.h>
 #include <velk/string.h>
 
 #include <algorithm>
@@ -45,6 +45,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<impl::ObjectRef>();
     ITypeRegistry::register_type<impl::Store>();
     ITypeRegistry::register_type<impl::ThreadContext>();
+    ITypeRegistry::register_type<impl::GenericObject>();
 
     ITypeRegistry::register_type<ext::AnyValue<bool>>();
     ITypeRegistry::register_type<ext::AnyValue<float>>();
@@ -135,7 +136,8 @@ ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
         if (it->hive) {
             auto* hive = static_cast<impl::ObjectHive*>(it->hive.get());
             if (hive->has_outstanding_refs()) {
-                VELK_LOG(E, "unregister_type: hive for '%s' has outstanding refs",
+                VELK_LOG(E,
+                         "unregister_type: hive for '%s' has outstanding refs",
                          it->factory->get_class_info().name.data());
             }
         }
@@ -219,7 +221,8 @@ size_t TypeRegistry::check_owner_hives(Uid uid) const
         if (e.owner == uid && e.hive) {
             auto* hive = static_cast<impl::ObjectHive*>(e.hive.get());
             if (hive->has_outstanding_refs()) {
-                VELK_LOG(E, "check_owner_hives: hive for '%s' has outstanding refs",
+                VELK_LOG(E,
+                         "check_owner_hives: hive for '%s' has outstanding refs",
                          e.factory->get_class_info().name.data());
                 ++count;
             }

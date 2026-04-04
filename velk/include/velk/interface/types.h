@@ -20,10 +20,12 @@ struct ClassInfo
 
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
-/** @brief Typed value container for object members. Declared via `(PROP, T, name, default)` in VELK_INTERFACE.
+/** @brief Typed value container for object members. Declared via `(PROP, T, name, default)` in
+ * VELK_INTERFACE.
  *  @see velk::Property (api/property.h) */
 inline constexpr Uid Property{"a66badbf-c750-4580-b035-b5446806d67e"};
-/** @brief Callable object that can be invoked with typed arguments. Declared via `(FN, name)` in VELK_INTERFACE.
+/** @brief Callable object that can be invoked with typed arguments. Declared via `(FN, name)` in
+ * VELK_INTERFACE.
  *  @see velk::Function (api/function.h) */
 inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
 /** @brief Observable multicast delegate. Declared via `(EVT, name)` in VELK_INTERFACE.
@@ -60,6 +62,9 @@ inline constexpr Uid Store{"b4dde845-c159-4737-90ed-f63d4bce6c42"};
 /** @brief Local filesystem protocol handler. Supports configurable scheme and base path.
  *  @see velk::IResourceProtocol (interface/resource/intf_resource_protocol.h) */
 inline constexpr Uid FileProtocol{"0f781b05-29d9-47f5-82c0-ac3cac32319c"};
+/** @brief Bare object with metadata support for holding dynamic properties.
+ *  @see velk::create_object (api/object.h) */
+inline constexpr Uid Object{"a51b001b-d5ad-4e03-9bb4-9b14c500e591"};
 } // namespace ClassId
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */
@@ -100,7 +105,8 @@ inline constexpr bool failed(ReturnValue ret)
     return ret < 0;
 }
 
-/** @brief Combines two return values. If the left side already failed, keeps it; otherwise takes the right side. */
+/** @brief Combines two return values. If the left side already failed, keeps it; otherwise takes the right
+ * side. */
 inline constexpr ReturnValue operator&(ReturnValue a, ReturnValue b)
 {
     return failed(a) ? a : b;
@@ -109,7 +115,9 @@ inline constexpr ReturnValue operator&(ReturnValue a, ReturnValue b)
 /** @brief Compound assignment: preserves the first failure across a chain of operations. */
 inline constexpr ReturnValue& operator&=(ReturnValue& a, ReturnValue b)
 {
-    if (!failed(a)) a = b;
+    if (!failed(a)) {
+        a = b;
+    }
     return a;
 }
 

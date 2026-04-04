@@ -48,8 +48,14 @@ public:
         return any_ ? interface_pointer_cast<T>(any_->get_object()) : nullptr;
     }
 
-    /** @brief Sets the referenced object. */
-    ReturnValue set(const IObject::Ptr& obj) { return any_ ? any_->set_object(obj) : ReturnValue::Fail; }
+    /** @brief Sets the referenced object. Creates the internal ref if needed. */
+    ReturnValue set(const IObject::Ptr& obj)
+    {
+        if (!any_) {
+            any_ = instance().create_object_ref();
+        }
+        return any_ ? any_->set_object(obj) : ReturnValue::Fail;
+    }
 
     /** @brief Returns true if this ref holds a strong (owning) reference. */
     bool is_owning() const { return any_ ? any_->is_owning() : true; }

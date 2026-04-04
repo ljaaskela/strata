@@ -185,8 +185,7 @@ protected:
     template <class I, class Fn>
     auto with(Fn&& fn) const -> std::invoke_result_t<Fn, I&>
     {
-        static_assert(std::is_invocable_v<Fn, I&>,
-                      "with<I>(fn): fn must be callable with I&");
+        static_assert(std::is_invocable_v<Fn, I&>, "with<I>(fn): fn must be callable with I&");
         auto* p = as<I>();
         using R = decltype(fn(*p));
         if constexpr (std::is_void_v<R>) {
@@ -202,8 +201,7 @@ protected:
     template <class I, class Fn, class Default>
     auto with_or(Fn&& fn, Default&& fallback) const -> std::invoke_result_t<Fn, I&>
     {
-        static_assert(std::is_invocable_v<Fn, I&>,
-                      "with_or<I>(fn, fallback): fn must be callable with I&");
+        static_assert(std::is_invocable_v<Fn, I&>, "with_or<I>(fn, fallback): fn must be callable with I&");
         auto* p = as<I>();
         return p ? fn(*p) : std::forward<Default>(fallback);
     }
@@ -218,6 +216,12 @@ protected:
 private:
     IObject::Ptr obj_;
 };
+
+/** @brief Creates a bare object with metadata support for dynamic properties. */
+inline Object create_object()
+{
+    return Object(instance().create<IObject>(ClassId::Object));
+}
 
 } // namespace velk
 
