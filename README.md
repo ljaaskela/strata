@@ -1,5 +1,3 @@
-# Velk
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
 
@@ -9,6 +7,11 @@
 [![CodeQL](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml)
 
 ---
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logos/logo/velk-logo-standard-dark@2x.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/logos/logo/velk-logo-standard-light@2x.png">
+  <img alt="Velk" src="docs/logos/logo/velk-logo-standard-dark@2x.png" width="200">
+</picture>
 
 Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, compile-time metadata with runtime introspection, and a plugin system for modular extension via shared libraries. 
 
