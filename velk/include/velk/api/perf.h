@@ -28,8 +28,6 @@ namespace velk {
  */
 struct PerfScope
 {
-    uint64_t key;
-
     /** @brief Constructs from a string label. Hashes the label to produce the key. */
     PerfScope(string_view label) : key(make_hash64(label)) { instance().perf_log().start_perf(key, label); }
 
@@ -43,6 +41,9 @@ struct PerfScope
 
     PerfScope(const PerfScope&) = delete;
     PerfScope& operator=(const PerfScope&) = delete;
+
+private:
+    uint64_t key;
 };
 
 #define VELK_PERF_CONCAT_(a, b) a##b

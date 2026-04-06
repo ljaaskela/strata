@@ -21,6 +21,9 @@ class PerfLog final : public ext::InterfaceDispatch<IPerfLog>
 public:
     PerfLog();
 
+    /** @brief Prints accumulated stats via VELK_LOG. */
+    void print_stats() const;
+
     void start_perf(uint64_t key, string_view label) override;
     Duration end_perf(uint64_t key) override;
     Duration get_perf(uint64_t key) const override;
@@ -38,12 +41,13 @@ private:
     };
 
     void accumulate(uint64_t key, string_view label, Duration elapsed);
+    static void add_sample(PerfStats& s, Duration elapsed);
 
     mutable vector<PerfEntry> perf_entries_;
     mutable vector<PerfStats> stats_entries_;
     mutable std::mutex perf_mutex_;
     IPerfSink::Ptr perf_sink_;
-    bool stats_enabled_ = true;
+    bool stats_enabled_{true};
 };
 
 } // namespace velk

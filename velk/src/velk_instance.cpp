@@ -68,6 +68,7 @@ VelkInstance::VelkInstance()
 
 VelkInstance::~VelkInstance()
 {
+    perf_log_.print_stats();
     plugin_registry_.shutdown_all();
 }
 

@@ -33,6 +33,8 @@ public:
 /** @brief Accumulated statistics for a single perf key. */
 struct PerfStats
 {
+    static constexpr size_t kSampleCapacity = 128;
+
     uint64_t key{};     ///< Measurement region key (usually an FNV-1a 64-bit hash of label).
     string label;       ///< Human-readable name of the region.
     Duration last;      ///< Duration of the most recent measurement.
@@ -40,7 +42,14 @@ struct PerfStats
     Duration max;       ///< Longest measurement seen.
     Duration total;     ///< Sum of all measurements.
     Duration avg;       ///< Running average (total / count).
+    Duration median;    ///< Median of recent samples.
+    Duration p95;       ///< 95th percentile of recent samples.
     uint32_t count = 0; ///< Number of completed measurements.
+
+    /** @brief Circular buffer of recent samples for percentile computation. */
+    Duration samples[kSampleCapacity]{};
+    uint32_t sample_count = 0; ///< Number of samples stored (up to kSampleCapacity).
+    uint32_t sample_pos = 0;   ///< Next write position in the circular buffer.
 };
 
 /**
