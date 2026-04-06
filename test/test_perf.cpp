@@ -34,7 +34,11 @@ protected:
 
     void SetUp() override { velk_.perf_log().set_perf_sink(sink_); }
 
-    void TearDown() override { velk_.perf_log().set_perf_sink({}); }
+    void TearDown() override
+    {
+        velk_.perf_log().set_perf_sink({});
+        velk_.perf_log().reset_stats();
+    }
 };
 
 TEST_F(PerfTest, StartEndRecordsTiming)
@@ -150,4 +154,52 @@ TEST_F(PerfTest, PerfScopeWithPrecomputedKey)
     ASSERT_EQ(1u, ts_->records.size());
     EXPECT_EQ(key, ts_->records[0].key);
     EXPECT_GT(ts_->records[0].elapsed.to_microseconds(), 0);
+}
+
+TEST_F(PerfTest, StatsAccumulate)
+{
+    constexpr uint64_t key = make_hash64("stats_test");
+
+    for (int i = 0; i < 3; ++i) {
+        velk_.perf_log().start_perf(key, "stats_test");
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        velk_.perf_log().end_perf(key);
+    }
+
+    auto stats = velk_.perf_log().get_stats();
+    ASSERT_EQ(1u, stats.size());
+    EXPECT_EQ(key, stats[0].key);
+    EXPECT_EQ("stats_test", std::string(stats[0].label.data(), stats[0].label.size()));
+    EXPECT_EQ(3u, stats[0].count);
+    EXPECT_GE(stats[0].min.to_microseconds(), 0);
+    EXPECT_GE(stats[0].max.to_microseconds(), stats[0].min.to_microseconds());
+    EXPECT_GE(stats[0].avg.to_microseconds(), stats[0].min.to_microseconds());
+    EXPECT_LE(stats[0].avg.to_microseconds(), stats[0].max.to_microseconds());
+    EXPECT_GT(stats[0].last.to_microseconds(), 0);
+}
+
+TEST_F(PerfTest, StatsMultipleKeys)
+{
+    constexpr uint64_t k1 = make_hash64("key_a");
+    constexpr uint64_t k2 = make_hash64("key_b");
+
+    velk_.perf_log().start_perf(k1, "key_a");
+    velk_.perf_log().end_perf(k1);
+    velk_.perf_log().start_perf(k2, "key_b");
+    velk_.perf_log().end_perf(k2);
+
+    auto stats = velk_.perf_log().get_stats();
+    EXPECT_EQ(2u, stats.size());
+}
+
+TEST_F(PerfTest, ResetStatsClearsAll)
+{
+    constexpr uint64_t key = make_hash64("reset_test");
+    velk_.perf_log().start_perf(key, "reset_test");
+    velk_.perf_log().end_perf(key);
+
+    EXPECT_EQ(1u, velk_.perf_log().get_stats().size());
+
+    velk_.perf_log().reset_stats();
+    EXPECT_EQ(0u, velk_.perf_log().get_stats().size());
 }

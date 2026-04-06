@@ -4,7 +4,13 @@
 #include <velk/api/velk.h>
 #include <velk/uid.h>
 
+#ifndef VELK_PERF_ENABLED
+#define VELK_PERF_ENABLED 1
+#endif
+
 namespace velk {
+
+#if VELK_PERF_ENABLED
 
 /**
  * @brief RAII helper that measures the lifetime of a scope.
@@ -25,16 +31,10 @@ struct PerfScope
     uint64_t key;
 
     /** @brief Constructs from a string label. Hashes the label to produce the key. */
-    PerfScope(string_view label) : key(make_hash64(label))
-    {
-        instance().perf_log().start_perf(key, label);
-    }
+    PerfScope(string_view label) : key(make_hash64(label)) { instance().perf_log().start_perf(key, label); }
 
     /** @brief Constructs from a pre-computed key (no label forwarded). */
-    explicit PerfScope(uint64_t k) : key(k)
-    {
-        instance().perf_log().start_perf(key);
-    }
+    explicit PerfScope(uint64_t k) : key(k) { instance().perf_log().start_perf(key); }
 
     ~PerfScope() { instance().perf_log().end_perf(key); }
 
@@ -52,8 +52,26 @@ struct PerfScope
  * @def VELK_PERF_SCOPE(label)
  * @brief Creates a PerfScope with an auto-generated variable name.
  */
-#define VELK_PERF_SCOPE(label) \
-    ::velk::PerfScope VELK_PERF_CONCAT(_velk_perf_, __LINE__)(label)
+#define VELK_PERF_SCOPE(label) ::velk::PerfScope VELK_PERF_CONCAT(_velk_perf_, __LINE__)(label)
+
+#else // !VELK_PERF_ENABLED
+
+/** @brief No-op PerfScope when perf logging is disabled at compile time. */
+struct PerfScope
+{
+    PerfScope(string_view) {}
+    explicit PerfScope(uint64_t) {}
+    ~PerfScope() = default;
+    Duration elapsed() const { return {}; }
+    PerfScope(const PerfScope&) = delete;
+    PerfScope& operator=(const PerfScope&) = delete;
+};
+
+#define VELK_PERF_CONCAT_(a, b) a##b
+#define VELK_PERF_CONCAT(a, b) VELK_PERF_CONCAT_(a, b)
+#define VELK_PERF_SCOPE(label) ::velk::PerfScope VELK_PERF_CONCAT(_velk_perf_, __LINE__)(label)
+
+#endif // VELK_PERF_ENABLED
 
 } // namespace velk
 

@@ -2,8 +2,8 @@
 #define VELK_INSTANCE_H
 
 #include "perf_log.h"
-#include "resource/resource_store.h"
 #include "plugin_registry.h"
+#include "resource/resource_store.h"
 #include "type_registry.h"
 
 #include <velk/api/hive/raw_hive.h>
@@ -62,15 +62,15 @@ private:
     void flush_deferred_properties(vector<DeferredPropertySet>& propSets) const;
 
     mutable RawHive<ObjectStorage>
-        metadata_hive_;                 ///< Pool allocator for ObjectStorage instances (destroyed last).
-    LogLevel level_{LogLevel::Info};    ///< Minimum log level (before type_registry_ for init order).
-    ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
-    TypeRegistry type_registry_;        ///< Registry of class factories.
-    PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
-    ResourceStore resource_store_;       ///< URI-based resource access service.
-    PerfLog perf_log_;                   ///< Performance logging.
+        metadata_hive_;              ///< Pool allocator for ObjectStorage instances (destroyed last).
+    LogLevel level_{LogLevel::Info}; ///< Minimum log level (before type_registry_ for init order).
+    ILogSink::Ptr sink_;             ///< Custom log sink (empty = default stderr).
+    TypeRegistry type_registry_;     ///< Registry of class factories.
+    PluginRegistry plugin_registry_; ///< Registry of loaded plugins.
+    ResourceStore resource_store_;   ///< URI-based resource access service.
+    PerfLog perf_log_;               ///< Performance logging.
 
-    mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
+    mutable std::mutex deferred_mutex_;           ///< Guards @c deferred_queue_.
     mutable vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
     mutable vector<DeferredPropertySet>
         deferred_property_queue_; ///< Property sets queued for the next update() call.
