@@ -27,19 +27,19 @@ struct PerfScope
     /** @brief Constructs from a string label. Hashes the label to produce the key. */
     PerfScope(string_view label) : key(make_hash64(label))
     {
-        instance().log().start_perf(key, label);
+        instance().perf_log().start_perf(key, label);
     }
 
     /** @brief Constructs from a pre-computed key (no label forwarded). */
     explicit PerfScope(uint64_t k) : key(k)
     {
-        instance().log().start_perf(key);
+        instance().perf_log().start_perf(key);
     }
 
-    ~PerfScope() { instance().log().end_perf(key); }
+    ~PerfScope() { instance().perf_log().end_perf(key); }
 
     /** @brief Returns elapsed time since the scope started. */
-    Duration elapsed() const { return instance().log().get_perf(key); }
+    Duration elapsed() const { return instance().perf_log().get_perf(key); }
 
     PerfScope(const PerfScope&) = delete;
     PerfScope& operator=(const PerfScope&) = delete;

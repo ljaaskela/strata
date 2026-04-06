@@ -32,17 +32,17 @@ protected:
     IPerfSink::Ptr sink_ = ext::make_object<TestPerfSink, IPerfSink>();
     TestPerfSink* ts_ = static_cast<TestPerfSink*>(sink_.get());
 
-    void SetUp() override { velk_.log().set_perf_sink(sink_); }
+    void SetUp() override { velk_.perf_log().set_perf_sink(sink_); }
 
-    void TearDown() override { velk_.log().set_perf_sink({}); }
+    void TearDown() override { velk_.perf_log().set_perf_sink({}); }
 };
 
 TEST_F(PerfTest, StartEndRecordsTiming)
 {
     constexpr uint64_t key = make_hash64("test_region");
-    velk_.log().start_perf(key, "test_region");
+    velk_.perf_log().start_perf(key, "test_region");
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    auto elapsed = velk_.log().end_perf(key);
+    auto elapsed = velk_.perf_log().end_perf(key);
 
     EXPECT_GT(elapsed.to_microseconds(), 0);
     ASSERT_EQ(1u, ts_->records.size());
@@ -76,34 +76,34 @@ TEST_F(PerfTest, PerfScopeElapsed)
 TEST_F(PerfTest, GetPerfRunningRegion)
 {
     constexpr uint64_t key = make_hash64("running");
-    velk_.log().start_perf(key, "running");
+    velk_.perf_log().start_perf(key, "running");
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    auto elapsed = velk_.log().get_perf(key);
+    auto elapsed = velk_.perf_log().get_perf(key);
     EXPECT_GE(elapsed.to_milliseconds(), 1);
 
-    velk_.log().end_perf(key);
+    velk_.perf_log().end_perf(key);
 }
 
 TEST_F(PerfTest, GetPerfUnknownKeyReturnsZero)
 {
-    auto elapsed = velk_.log().get_perf(12345);
+    auto elapsed = velk_.perf_log().get_perf(12345);
     EXPECT_EQ(0, elapsed.to_microseconds());
 }
 
 TEST_F(PerfTest, NoSinkNoCrash)
 {
-    velk_.log().set_perf_sink({});
+    velk_.perf_log().set_perf_sink({});
     constexpr uint64_t key = make_hash64("no_sink");
-    velk_.log().start_perf(key, "no_sink");
+    velk_.perf_log().start_perf(key, "no_sink");
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    auto elapsed = velk_.log().end_perf(key);
+    auto elapsed = velk_.perf_log().end_perf(key);
     EXPECT_GE(elapsed.to_milliseconds(), 1);
 }
 
 TEST_F(PerfTest, EndPerfUnknownKeyReturnsZero)
 {
-    auto elapsed = velk_.log().end_perf(99999);
+    auto elapsed = velk_.perf_log().end_perf(99999);
     EXPECT_EQ(0, elapsed.to_microseconds());
     EXPECT_EQ(0u, ts_->records.size());
 }
@@ -111,16 +111,16 @@ TEST_F(PerfTest, EndPerfUnknownKeyReturnsZero)
 TEST_F(PerfTest, RestartSameKeyResetsTimer)
 {
     constexpr uint64_t key = make_hash64("restart");
-    velk_.log().start_perf(key, "restart");
+    velk_.perf_log().start_perf(key, "restart");
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     // Elapsed should be >= 10ms
-    auto elapsed = velk_.log().get_perf(key);
+    auto elapsed = velk_.perf_log().get_perf(key);
     EXPECT_GE(elapsed.to_milliseconds(), 10);
 
     // Restart with the same key resets the timer
-    velk_.log().start_perf(key, "restart");
-    elapsed = velk_.log().end_perf(key);
+    velk_.perf_log().start_perf(key, "restart");
+    elapsed = velk_.perf_log().end_perf(key);
 
     // Elapsed should be close to zero (much less than 10ms)
     EXPECT_LT(elapsed.to_milliseconds(), 5.f);

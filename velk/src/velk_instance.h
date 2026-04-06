@@ -1,6 +1,7 @@
 #ifndef VELK_INSTANCE_H
 #define VELK_INSTANCE_H
 
+#include "perf_log.h"
 #include "resource/resource_store.h"
 #include "plugin_registry.h"
 #include "type_registry.h"
@@ -38,6 +39,9 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
+    IPerfLog& perf_log() override { return perf_log_; }
+    const IPerfLog& perf_log() const override { return perf_log_; }
+
     IResourceStore& resource_store() override { return resource_store_; }
     const IResourceStore& resource_store() const override { return resource_store_; }
 
@@ -53,11 +57,6 @@ public:
     LogLevel get_level() const override;
     void dispatch(LogLevel level, const char* file, int line, const char* message) override;
 
-    void start_perf(uint64_t key, string_view label) override;
-    Duration end_perf(uint64_t key) override;
-    Duration get_perf(uint64_t key) const override;
-    void set_perf_sink(const IPerfSink::Ptr& sink) override;
-
 private:
     /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
     void flush_deferred_properties(vector<DeferredPropertySet>& propSets) const;
@@ -69,15 +68,7 @@ private:
     TypeRegistry type_registry_;        ///< Registry of class factories.
     PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
     ResourceStore resource_store_;       ///< URI-based resource access service.
-    struct PerfEntry
-    {
-        uint64_t key = 0;
-        string_view label;
-        int64_t start_us = 0;
-    };
-    mutable vector<PerfEntry> perf_entries_;
-    mutable std::mutex perf_mutex_;        ///< Guards perf_entries_ and perf_sink_.
-    IPerfSink::Ptr perf_sink_;             ///< Custom perf sink (empty = discard).
+    PerfLog perf_log_;                   ///< Performance logging.
 
     mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
     mutable vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
