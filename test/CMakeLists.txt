@@ -32,6 +32,7 @@ add_executable(tests
     test_plugin.cpp
     test_hive.cpp
     test_log.cpp
+    test_perf.cpp
     test_uid.cpp
     test_string.cpp
     test_string_view.cpp

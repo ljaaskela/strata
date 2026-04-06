@@ -95,6 +95,7 @@ add_library(velk SHARED
     include/velk/api/traits.h
     include/velk/api/math_types.h
     include/velk/api/velk.h
+    include/velk/api/perf.h
     include/velk/api/attachment.h
     include/velk/api/hierarchy.h
     include/velk/api/thread_context.h

@@ -1,11 +1,13 @@
 #include "velk_instance.h"
 
-#include "resource/file_protocol.h"
 #include "hive/raw_hive.h"
 #include "object_storage.h"
+#include "resource/file_protocol.h"
 
 #include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
+
+#include <chrono>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -50,6 +52,9 @@ VelkInstance::VelkInstance()
       plugin_registry_(*this, type_registry_)
 {
     type_registry_.register_type(FileProtocol::get_factory());
+
+    // Pre-reserve space for 16 concecutive perf scope entries
+    perf_entries_.reserve(16);
 
     // Register file:// protocol (absolute paths).
     auto file_proto = ext::make_object<FileProtocol>();
@@ -227,6 +232,69 @@ void VelkInstance::dispatch(LogLevel level, const char* file, int line, const ch
         idx = 3;
     }
     fprintf(stderr, "[%s] %s:%d: %s\n", level_names[idx], file, line, message);
+}
+
+static int64_t now_us()
+{
+    using clock = std::chrono::high_resolution_clock;
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               clock::now().time_since_epoch())
+        .count();
+}
+
+void VelkInstance::start_perf(uint64_t key, string_view label)
+{
+    std::lock_guard<std::mutex> lock(perf_mutex_);
+    auto now = now_us();
+    for (auto& e : perf_entries_) {
+        if (e.key == key) {
+            // Restart scope
+            e.label = label;
+            e.start_us = now;
+            return;
+        }
+    }
+    PerfEntry e;
+    e.key = key;
+    e.label = label;
+    e.start_us = now;
+    perf_entries_.emplace_back(std::move(e));
+}
+
+Duration VelkInstance::end_perf(uint64_t key)
+{
+    std::lock_guard<std::mutex> lock(perf_mutex_);
+    for (auto e = perf_entries_.begin(); e != perf_entries_.end(); e++) {
+        if (e->key == key) {
+            auto elapsed = Duration::from_microseconds(now_us() - e->start_us);
+            auto label = e->label;
+            if (perf_sink_) {
+                perf_sink_->write_perf(key, label, elapsed);
+            }
+            perf_entries_.erase(e);
+            return elapsed;
+        }
+    }
+    VELK_LOG(W, "Invalid perf log key: %zu", key);
+    return {};
+}
+
+Duration VelkInstance::get_perf(uint64_t key) const
+{
+    std::lock_guard<std::mutex> lock(perf_mutex_);
+    for (auto& e : perf_entries_) {
+        if (e.key == key) {
+            return Duration::from_microseconds(now_us() - e.start_us);
+        }
+    }
+    VELK_LOG(W, "Invalid perf log key: %zu", key);
+    return {};
+}
+
+void VelkInstance::set_perf_sink(const IPerfSink::Ptr& sink)
+{
+    std::lock_guard<std::mutex> lock(perf_mutex_);
+    perf_sink_ = sink;
 }
 
 } // namespace velk
