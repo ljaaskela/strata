@@ -1,8 +1,8 @@
 #include "velk_instance.h"
 
-#include "resource/file_protocol.h"
 #include "hive/raw_hive.h"
 #include "object_storage.h"
+#include "resource/file_protocol.h"
 
 #include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
@@ -68,6 +68,7 @@ VelkInstance::VelkInstance()
 
 VelkInstance::~VelkInstance()
 {
+    perf_log_.print_stats();
     plugin_registry_.shutdown_all();
 }
 

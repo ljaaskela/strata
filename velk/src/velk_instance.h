@@ -1,8 +1,9 @@
 #ifndef VELK_INSTANCE_H
 #define VELK_INSTANCE_H
 
-#include "resource/resource_store.h"
+#include "perf_log.h"
 #include "plugin_registry.h"
+#include "resource/resource_store.h"
 #include "type_registry.h"
 
 #include <velk/api/hive/raw_hive.h>
@@ -38,6 +39,9 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
+    IPerfLog& perf_log() override { return perf_log_; }
+    const IPerfLog& perf_log() const override { return perf_log_; }
+
     IResourceStore& resource_store() override { return resource_store_; }
     const IResourceStore& resource_store() const override { return resource_store_; }
 
@@ -58,13 +62,15 @@ private:
     void flush_deferred_properties(vector<DeferredPropertySet>& propSets) const;
 
     mutable RawHive<ObjectStorage>
-        metadata_hive_;                 ///< Pool allocator for ObjectStorage instances (destroyed last).
-    LogLevel level_{LogLevel::Info};    ///< Minimum log level (before type_registry_ for init order).
-    ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
-    TypeRegistry type_registry_;        ///< Registry of class factories.
-    PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
-    ResourceStore resource_store_;       ///< URI-based resource access service.
-    mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
+        metadata_hive_;              ///< Pool allocator for ObjectStorage instances (destroyed last).
+    LogLevel level_{LogLevel::Info}; ///< Minimum log level (before type_registry_ for init order).
+    ILogSink::Ptr sink_;             ///< Custom log sink (empty = default stderr).
+    TypeRegistry type_registry_;     ///< Registry of class factories.
+    PluginRegistry plugin_registry_; ///< Registry of loaded plugins.
+    ResourceStore resource_store_;   ///< URI-based resource access service.
+    PerfLog perf_log_;               ///< Performance logging.
+
+    mutable std::mutex deferred_mutex_;           ///< Guards @c deferred_queue_.
     mutable vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
     mutable vector<DeferredPropertySet>
         deferred_property_queue_; ///< Property sets queued for the next update() call.

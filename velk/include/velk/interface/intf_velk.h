@@ -4,6 +4,7 @@
 #include <velk/duration.h>
 #include <velk/interface/resource/intf_resource_store.h>
 #include <velk/interface/intf_log.h>
+#include <velk/interface/intf_perf_log.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_plugin_registry.h>
@@ -123,6 +124,11 @@ public:
     virtual ILog& log() = 0;
     /** @brief Returns the log interface (const). */
     virtual const ILog& log() const = 0;
+
+    /** @brief Returns the performance log interface for scoped timing measurements. */
+    virtual IPerfLog& perf_log() = 0;
+    /** @brief Returns the performance log interface (const). */
+    virtual const IPerfLog& perf_log() const = 0;
 
     /** @brief Returns the resource store for URI-based resource access. */
     virtual IResourceStore& resource_store() = 0;

@@ -40,6 +40,8 @@ add_library(velk SHARED
     src/type_registry.h
     src/plugin_registry.cpp
     src/plugin_registry.h
+    src/perf_log.cpp
+    src/perf_log.h
     src/velk_instance.cpp
     src/velk_instance.h
     src/resource/resource_store.cpp
@@ -52,6 +54,7 @@ add_library(velk SHARED
     src/platform.h
     src/velk.cpp
     include/velk/interface/intf_log.h
+    include/velk/interface/intf_perf_log.h
     include/velk/interface/intf_any.h
     include/velk/interface/intf_binding.h
     include/velk/interface/intf_external_any.h
@@ -95,6 +98,7 @@ add_library(velk SHARED
     include/velk/api/traits.h
     include/velk/api/math_types.h
     include/velk/api/velk.h
+    include/velk/api/perf.h
     include/velk/api/attachment.h
     include/velk/api/hierarchy.h
     include/velk/api/thread_context.h

@@ -166,6 +166,25 @@ constexpr Uid make_hash(const string_view toHash)
     return result;
 }
 
+/**
+ * @brief Computes a compile-time FNV-1a 64-bit hash of a string.
+ *
+ * Prefer make_hash (128-bit) for type and interface identification.
+ * This 64-bit variant is intended for lightweight keys such as performance logging.
+ *
+ * @param toHash The string to hash.
+ * @return The computed 64-bit hash.
+ */
+constexpr uint64_t make_hash64(const string_view toHash)
+{
+    uint64_t result = 0xcbf29ce484222325ULL;
+    for (char c : toHash) {
+        result ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+        result *= 0x00000100000001B3ULL;
+    }
+    return result;
+}
+
 } // namespace velk
 
 template <>
