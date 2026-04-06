@@ -91,7 +91,7 @@ ImportResult JsonImporter::import_from(string_view json) const
                 add_error(result, "object missing 'id' string field");
                 continue;
             }
-            auto obj = create_object(obj_node, result);
+            auto obj = create_object(obj_node, ctx, result);
             if (obj) {
                 const auto& id_str = id_val->as_string();
                 result.store->add(id_str, obj);
@@ -111,10 +111,8 @@ ImportResult JsonImporter::import_from(string_view json) const
     // Process attachments
     process_attachments(root, store, ctx, result);
 
-    // Resolve object references
-    if (objects && objects->type() == JsonType::Array) {
-        resolve_references(store, *objects, ctx, result);
-    }
+    // Resolve deferred object references and inline bindings
+    resolve_references(store, ctx, result);
 
     // Create bindings (top-level array + inline scalar refs handled in resolve_references)
     create_bindings(store, root, ctx, result);
@@ -141,7 +139,8 @@ Uid JsonImporter::resolve_class(string_view class_str, ImportResult& result) con
     return {};
 }
 
-IObject::Ptr JsonImporter::create_object(const JsonValue& obj_node, ImportResult& result) const
+IObject::Ptr JsonImporter::create_object(const JsonValue& obj_node, const ImportContext& ctx,
+                                         ImportResult& result) const
 {
     auto* class_val = obj_node.find("class");
     if (!class_val || class_val->type() != JsonType::String) {
@@ -169,14 +168,14 @@ IObject::Ptr JsonImporter::create_object(const JsonValue& obj_node, ImportResult
     // Set properties
     auto* props = obj_node.find("properties");
     if (props && props->type() == JsonType::Object) {
-        set_properties(*obj, *props, *info, result);
+        set_properties(*obj, *props, *info, ctx, result);
     }
 
     return obj;
 }
 
 void JsonImporter::set_properties(IObject& obj, const JsonValue& props, const ClassInfo& info,
-                                  ImportResult& result) const
+                                  const ImportContext& ctx, ImportResult& result) const
 {
     auto* meta = interface_cast<IMetadata>(&obj);
     if (!meta) {
@@ -210,6 +209,13 @@ void JsonImporter::set_properties(IObject& obj, const JsonValue& props, const Cl
         const JsonValue* value_node = &val;
         if (val.type() == JsonType::Object) {
             if (val.find("ref") || val.find("bind")) {
+                // Defer ref/bind resolution until all objects are created
+                DeferredRef dr;
+                dr.object = obj.get_self();
+                dr.info = &info;
+                dr.property_name = string(name);
+                dr.ref_node = &val;
+                ctx.deferred_refs.push_back(std::move(dr));
                 continue;
             }
             auto* inner = val.find("value");
@@ -659,70 +665,39 @@ IProperty::Ptr JsonImporter::resolve_property(IStore& store, const ImportContext
     return meta->get_property(prop_name);
 }
 
-void JsonImporter::resolve_references(IStore& store, const JsonValue& objects, const ImportContext& ctx,
+void JsonImporter::resolve_references(IStore& store, const ImportContext& ctx,
                                       ImportResult& result) const
 {
-    for (auto& obj_node : objects.as_array()) {
-        if (obj_node.type() != JsonType::Object) {
+    for (auto& ref : ctx.deferred_refs) {
+        auto* meta = interface_cast<IMetadata>(ref.object);
+        if (!meta || !ref.info) {
             continue;
         }
 
-        auto* id_val = obj_node.find("id");
-        if (!id_val || id_val->type() != JsonType::String) {
-            continue;
-        }
+        string_view name_sv = ref.property_name;
 
-        auto obj = store.find(id_val->as_string());
-        if (!obj) {
-            continue;
-        }
-
-        auto* props = obj_node.find("properties");
-        if (!props || props->type() != JsonType::Object) {
-            continue;
-        }
-
-        // Use cached class info instead of re-resolving
-        auto info_it = ctx.object_to_class_info.find(obj.get());
-        if (info_it == ctx.object_to_class_info.end() || !info_it->second) {
-            continue;
-        }
-        const ClassInfo* info = info_it->second;
-
-        auto* meta = interface_cast<IMetadata>(obj);
-        if (!meta) {
-            continue;
-        }
-
-        for (auto& [name, val] : props->as_object()) {
-            if (val.type() != JsonType::Object) {
+        // "ref" is for object references only (ObjectRef properties)
+        auto* ref_val = ref.ref_node->find("ref");
+        if (ref_val && ref_val->type() == JsonType::String) {
+            const MemberDesc* desc = find_property_desc(*ref.info, name_sv);
+            if (!desc) {
                 continue;
             }
-
-            string_view name_sv = name;
-
-            // "ref" is for object references only (ObjectRef properties)
-            auto* ref_val = val.find("ref");
-            if (ref_val && ref_val->type() == JsonType::String) {
-                const MemberDesc* desc = find_property_desc(*info, name_sv);
-                if (!desc) {
-                    continue;
-                }
-                auto* pk = desc->propertyKind();
-                if (!pk || pk->typeUid != ClassId::ObjectRef) {
-                    add_error(result,
-                              string("property '") + name + "' is not an ObjectRef, use 'bind' for bindings");
-                    continue;
-                }
-                resolve_object_ref(*meta, name, val, store, ctx, result);
+            auto* pk = desc->propertyKind();
+            if (!pk || pk->typeUid != ClassId::ObjectRef) {
+                add_error(result,
+                          string("property '") + ref.property_name +
+                              "' is not an ObjectRef, use 'bind' for bindings");
                 continue;
             }
+            resolve_object_ref(*meta, ref.property_name, *ref.ref_node, store, ctx, result);
+            continue;
+        }
 
-            // "bind" creates an inline one-way binding
-            auto* bind_val = val.find("bind");
-            if (bind_val && bind_val->type() == JsonType::String) {
-                resolve_inline_binding(*meta, name, bind_val->as_string(), store, ctx, result);
-            }
+        // "bind" creates an inline one-way binding
+        auto* bind_val = ref.ref_node->find("bind");
+        if (bind_val && bind_val->type() == JsonType::String) {
+            resolve_inline_binding(*meta, ref.property_name, bind_val->as_string(), store, ctx, result);
         }
     }
 }
@@ -740,12 +715,13 @@ void JsonImporter::resolve_object_ref(IMetadata& meta, string_view name, const J
         return;
     }
 
-    auto prop = meta.get_property(name);
-    if (!prop) {
+    // Get the existing ObjectRef from the property (backed by the State struct)
+    auto pi = interface_pointer_cast<IPropertyInternal>(meta.get_property(name));
+    if (!pi) {
         return;
     }
-
-    auto obj_ref = ::velk::instance().create_object_ref();
+    auto existing = pi->get_any();
+    auto* obj_ref = const_cast<IObjectRef*>(interface_cast<const IObjectRef>(existing));
     if (!obj_ref) {
         return;
     }
@@ -755,11 +731,6 @@ void JsonImporter::resolve_object_ref(IMetadata& meta, string_view name, const J
         obj_ref->set_owning(false);
     }
     obj_ref->set_object(resolved);
-
-    auto* pi = interface_cast<IPropertyInternal>(prop);
-    if (pi) {
-        pi->set_any(interface_pointer_cast<IAny>(obj_ref));
-    }
 }
 
 void JsonImporter::resolve_inline_binding(IMetadata& meta, string_view name, string_view ref_path,
@@ -917,7 +888,7 @@ void JsonImporter::process_attachments(const JsonValue& root, IStore& store, con
             continue;
         }
 
-        auto obj = create_object(entry, result);
+        auto obj = create_object(entry, ctx, result);
         if (!obj) {
             continue;
         }
@@ -1049,7 +1020,7 @@ void JsonImporter::process_resources(const JsonValue& root, IStore& store, Impor
             add_error(result, "resource missing 'id' string field");
             continue;
         }
-        auto obj = create_object(obj_node, result);
+        auto obj = create_object(obj_node, ctx, result);
         if (obj) {
             auto store_key = string("resource:") + id_val->as_string();
             store.add(store_key, obj);

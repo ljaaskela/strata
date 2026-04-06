@@ -27,24 +27,35 @@ public:
 private:
     friend class ImportResolver;
 
+    /** @brief Deferred object reference to resolve after all objects are created. */
+    struct DeferredRef
+    {
+        IObject::Ptr object;
+        const ClassInfo* info;
+        string property_name;
+        const JsonValue* ref_node;
+    };
+
     struct ImportContext
     {
         std::unordered_map<string, IObject::Ptr> name_to_object;
         std::unordered_map<IObject*, string> object_to_name;
         std::unordered_map<IObject*, const ClassInfo*> object_to_class_info;
+        mutable vector<DeferredRef> deferred_refs;
     };
 
     Uid resolve_class(string_view class_str, ImportResult& result) const;
-    IObject::Ptr create_object(const JsonValue& obj_node, ImportResult& result) const;
+    IObject::Ptr create_object(const JsonValue& obj_node, const ImportContext& ctx,
+                               ImportResult& result) const;
     void set_properties(IObject& obj, const JsonValue& props, const ClassInfo& info,
-                        ImportResult& result) const;
+                        const ImportContext& ctx, ImportResult& result) const;
     void set_property_value(IPropertyInternal& pi, const PropertyKind& pk, const JsonValue& val) const;
     void register_imported_object(ImportContext& ctx, IObject::Ptr obj, const JsonValue& obj_node,
                                   ImportResult& result) const;
     void build_hierarchies(const JsonValue& hierarchies, IStore& store, ImportResult& result) const;
     void build_hierarchy(string_view name, const JsonValue& tree_json, IStore& store,
                          ImportResult& result) const;
-    void resolve_references(IStore& store, const JsonValue& objects, const ImportContext& ctx,
+    void resolve_references(IStore& store, const ImportContext& ctx,
                             ImportResult& result) const;
     void resolve_object_ref(IMetadata& meta, string_view name, const JsonValue& ref_node,
                             IStore& store, const ImportContext& ctx, ImportResult& result) const;
