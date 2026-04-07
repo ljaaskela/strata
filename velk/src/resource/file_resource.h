@@ -20,12 +20,15 @@ public:
     string_view uri() const override;
     bool exists() const override;
     int64_t size() const override;
+    bool is_persistent() const override { return persistent_; }
+    void set_persistent(bool value) override { persistent_ = value; }
     ReturnValue read(vector<uint8_t>& out) const override;
     ReturnValue read_text(string& out) const override;
 
 private:
     string path_; ///< Resolved filesystem path.
     string uri_;  ///< Full URI (e.g. "file://C:/data/test.json").
+    bool persistent_{false};
 };
 
 } // namespace velk

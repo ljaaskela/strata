@@ -30,6 +30,29 @@ public:
 
     /** @brief Returns the size of the resource in bytes, or -1 on failure. */
     virtual int64_t size() const = 0;
+
+    /**
+     * @brief Returns whether this resource is pinned in the resource store cache.
+     *
+     * Persistent resources stay in the decoded-resource cache even when no
+     * external consumer holds a reference. Non-persistent resources are
+     * evicted as soon as the last reference is dropped (the default).
+     *
+     * Only meaningful for resources produced via a decoder (the only ones
+     * that get cached). Setting this on a protocol-direct resource has no
+     * effect.
+     */
+    virtual bool is_persistent() const = 0;
+
+    /**
+     * @brief Sets the persistence flag.
+     *
+     * Takes effect on the next IResourceStore::get_resource call: pinning
+     * upgrades the cache entry to a strong reference, unpinning drops the
+     * strong reference (the resource then survives only as long as
+     * external references keep it alive).
+     */
+    virtual void set_persistent(bool value) = 0;
 };
 
 /**
