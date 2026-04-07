@@ -218,6 +218,8 @@ The `resource-protocols` array registers custom URI schemes backed by the local 
 
 After import, `assets://font.ttf` resolves to `./assets/font.ttf` via the resource store. Registered protocols persist for the lifetime of the app. See [Resources](../resources.md) for details on the resource system.
 
+URIs in resource declarations can also use the decoder form `name:scheme://path` (e.g. `image:assets://logo.png`) to fetch a typed, decoded result via a registered `IResourceDecoder`. See [Decoders](../resources.md#decoders) for details. Note that the importer currently stores the URI on the resource object but does not eagerly fetch through the decoder; consumers fetch lazily via `instance().resource_store().get_resource(uri)`.
+
 ### Resources
 
 The `resources` array declares resource objects. These follow the same structure as `objects` (id, class, properties) but are stored separately with a `resource:` prefix in the store:

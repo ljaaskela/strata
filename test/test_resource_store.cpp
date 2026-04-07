@@ -1,6 +1,7 @@
 #include <velk/api/velk.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/resource/intf_resource.h>
+#include <velk/interface/resource/intf_resource_decoder.h>
 #include <velk/interface/resource/intf_resource_protocol.h>
 #include <velk/interface/resource/intf_resource_store.h>
 
@@ -205,8 +206,11 @@ public:
     string_view uri() const override { return uri_; }
     bool exists() const override { return true; }
     int64_t size() const override { return 99; }
+    bool is_persistent() const override { return persistent_; }
+    void set_persistent(bool value) override { persistent_ = value; }
 
     ::velk::string uri_;
+    bool persistent_{false};
 };
 
 // Custom protocol for testing type_registry discovery.
@@ -241,4 +245,179 @@ TEST(ResourceStoreCustomProtocol, RegisterCustomProtocol)
 
     // Not an IFile, so cast should fail.
     EXPECT_EQ(nullptr, interface_cast<IFile>(res));
+}
+
+// Decoded resource produced by MockDecoder. Wraps an inner resource.
+class DecodedResource : public ext::ObjectCore<DecodedResource, IResource>
+{
+public:
+    string_view uri() const override { return uri_; }
+    bool exists() const override { return true; }
+    int64_t size() const override { return 1; }
+    bool is_persistent() const override { return persistent_; }
+    void set_persistent(bool value) override { persistent_ = value; }
+
+    ::velk::string uri_;
+    IResource::Ptr inner_;
+    int decode_id_{0};
+    bool persistent_{false};
+};
+
+// Test decoder. Increments a counter on each decode call so tests can verify
+// dedup (cache hit = no new decode) and reload after eviction.
+class MockDecoder : public ext::ObjectCore<MockDecoder, IResourceDecoder>
+{
+public:
+    string_view name() const override { return "mock"; }
+
+    IResource::Ptr decode(const IResource::Ptr& inner) const override
+    {
+        if (!inner) {
+            return nullptr;
+        }
+        ++decode_count_;
+        auto obj = ext::make_object<DecodedResource>();
+        auto* dr = static_cast<DecodedResource*>(obj.get());
+        dr->uri_ = ::velk::string("mock:") + ::velk::string(inner->uri());
+        dr->inner_ = inner;
+        dr->decode_id_ = decode_count_;
+        return interface_pointer_cast<IResource>(obj);
+    }
+
+    mutable int decode_count_{0};
+};
+
+TEST_F(ResourceStoreTest, DecoderRegisterAndFind)
+{
+    auto dec = ext::make_object<MockDecoder>();
+    auto dec_iface = interface_pointer_cast<IResourceDecoder>(dec);
+
+    EXPECT_EQ(Success, store_.register_decoder(dec_iface));
+
+    auto found = store_.find_decoder(string_view("mock"));
+    EXPECT_EQ(dec_iface.get(), found.get());
+
+    EXPECT_EQ(Success, store_.unregister_decoder(dec_iface));
+    EXPECT_FALSE(store_.find_decoder(string_view("mock")));
+}
+
+TEST_F(ResourceStoreTest, DecoderRoundTrip)
+{
+    const char* content = "decoder payload";
+    auto path = write_temp_file("rs_test_decoder.txt", content, strlen(content));
+    auto inner_uri = file_uri(path);
+    auto outer_uri = ::velk::string("mock:") + inner_uri;
+
+    auto dec = ext::make_object<MockDecoder>();
+    auto dec_iface = interface_pointer_cast<IResourceDecoder>(dec);
+    store_.register_decoder(dec_iface);
+
+    auto* raw = static_cast<MockDecoder*>(dec.get());
+    EXPECT_EQ(0, raw->decode_count_);
+
+    auto res = store_.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(res);
+    EXPECT_EQ(1, raw->decode_count_);
+    EXPECT_EQ(string_view(outer_uri), res->uri());
+
+    store_.unregister_decoder(dec_iface);
+}
+
+TEST_F(ResourceStoreTest, DecoderDedupAndEviction)
+{
+    const char* content = "dedup payload";
+    auto path = write_temp_file("rs_test_dedup.txt", content, strlen(content));
+    auto outer_uri = ::velk::string("mock:") + file_uri(path);
+
+    auto dec = ext::make_object<MockDecoder>();
+    auto dec_iface = interface_pointer_cast<IResourceDecoder>(dec);
+    store_.register_decoder(dec_iface);
+    auto* raw = static_cast<MockDecoder*>(dec.get());
+
+    // First call: decodes once.
+    auto a = store_.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(a);
+    EXPECT_EQ(1, raw->decode_count_);
+
+    // Second call while a still alive: cache hit, no new decode, same pointer.
+    auto b = store_.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(b);
+    EXPECT_EQ(1, raw->decode_count_);
+    EXPECT_EQ(a.get(), b.get());
+
+    // Drop both. Cache slot becomes a dead weak_ref.
+    a.reset();
+    b.reset();
+
+    // Next call reloads.
+    auto c = store_.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(c);
+    EXPECT_EQ(2, raw->decode_count_);
+
+    store_.unregister_decoder(dec_iface);
+}
+
+TEST_F(ResourceStoreTest, DecoderUriParsingDoesNotCollideWithProtocol)
+{
+    // "file://..." has a colon but is followed by "//", so it must NOT be
+    // treated as a decoder URI even if a decoder named "file" existed.
+    const char* content = "no collision";
+    auto uri = file_uri(write_temp_file("rs_test_collide.txt", content, strlen(content)));
+
+    auto res = store_.get_resource(string_view(uri));
+    ASSERT_TRUE(res);
+    auto* f = interface_cast<IFile>(res);
+    ASSERT_NE(nullptr, f);
+}
+
+TEST_F(ResourceStoreTest, DecoderPersistencePinning)
+{
+    const char* content = "persistent";
+    auto path = write_temp_file("rs_test_persist.txt", content, strlen(content));
+    auto outer_uri = ::velk::string("mock:") + file_uri(path);
+
+    auto dec = ext::make_object<MockDecoder>();
+    auto dec_iface = interface_pointer_cast<IResourceDecoder>(dec);
+    store_.register_decoder(dec_iface);
+    auto* raw = static_cast<MockDecoder*>(dec.get());
+
+    // Load and mark persistent.
+    {
+        auto a = store_.get_resource(string_view(outer_uri));
+        ASSERT_TRUE(a);
+        EXPECT_EQ(1, raw->decode_count_);
+        a->set_persistent(true);
+        // Touch the cache so it picks up the new persistence flag.
+        auto b = store_.get_resource(string_view(outer_uri));
+        EXPECT_EQ(a.get(), b.get());
+        EXPECT_EQ(1, raw->decode_count_);
+    }
+    // Both local refs dropped, but pinned slot keeps the resource alive.
+    auto c = store_.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(c);
+    EXPECT_EQ(1, raw->decode_count_); // no reload
+
+    // Unpin: next access should drop the strong ref. Drop c too.
+    c->set_persistent(false);
+    // First get_resource reconciles and drops the pinned slot but still
+    // returns c (the live one).
+    auto d = store_.get_resource(string_view(outer_uri));
+    EXPECT_EQ(c.get(), d.get());
+    c.reset();
+    d.reset();
+    // Now nothing keeps it alive: next access reloads.
+    auto e = store_.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(e);
+    EXPECT_EQ(2, raw->decode_count_);
+
+    e->set_persistent(false); // tidy
+    store_.unregister_decoder(dec_iface);
+}
+
+TEST_F(ResourceStoreTest, UnknownDecoderFallsThroughToProtocol)
+{
+    // No decoder registered named "unknown". The store should NOT treat the
+    // URI as a decoder URI; with no protocol matching either, it returns null.
+    auto res = store_.get_resource(string_view("unknown:something"));
+    EXPECT_FALSE(res);
 }

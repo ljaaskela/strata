@@ -80,6 +80,7 @@ add_library(velk SHARED
     include/velk/interface/intf_store.h
     include/velk/interface/intf_hierarchy.h
     include/velk/interface/resource/intf_resource.h
+    include/velk/interface/resource/intf_resource_decoder.h
     include/velk/interface/resource/intf_resource_protocol.h
     include/velk/interface/resource/intf_resource_store.h
     include/velk/interface/intf_importer_extension.h
