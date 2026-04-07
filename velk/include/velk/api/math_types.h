@@ -5,6 +5,18 @@
 
 namespace velk {
 
+/// @brief Small float threshold for near-zero comparisons.
+constexpr float epsilon = 1e-6f;
+
+/// @brief True if @p x is within @ref epsilon of zero.
+constexpr bool is_zero(float x) { return x < epsilon && x > -epsilon; }
+
+/// @brief Convert degrees to radians.
+constexpr float deg_to_rad(float deg) { return deg * 0.01745329251994329577f; }
+
+/// @brief Convert radians to degrees.
+constexpr float rad_to_deg(float rad) { return rad * 57.2957795130823208768f; }
+
 /// @brief 2D float vector.
 struct vec2
 {
@@ -50,6 +62,33 @@ struct vec3
     constexpr vec3& operator*=(float s) { x *= s; y *= s; z *= s; return *this; }
     constexpr bool operator==(const vec3& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
     constexpr bool operator!=(const vec3& rhs) const { return !(*this == rhs); }
+
+    static constexpr float dot(const vec3& a, const vec3& b)
+    {
+        return a.x * b.x + a.y * b.y + a.z * b.z;
+    }
+
+    static constexpr vec3 cross(const vec3& a, const vec3& b)
+    {
+        return {
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x
+        };
+    }
+
+    static constexpr float length_squared(const vec3& v) { return dot(v, v); }
+
+    static float length(const vec3& v) { return std::sqrt(dot(v, v)); }
+
+    /// @brief True if the vector's length is within @ref epsilon of zero.
+    static constexpr bool is_zero(const vec3& v) { return length_squared(v) < epsilon * epsilon; }
+
+    static vec3 normalize(const vec3& v)
+    {
+        float sqr = v.x * v.x + v.y * v.y + v.z * v.z;
+        return v * (1.0f / std::sqrt(sqr));
+    }
 };
 
 constexpr vec3 operator*(float s, const vec3& v) { return v * s; }
@@ -147,6 +186,31 @@ struct mat4
     constexpr float& operator()(int row, int col) { return m[col * 4 + row]; }
     constexpr const float& operator()(int row, int col) const { return m[col * 4 + row]; }
 
+    constexpr vec4 col(int c) const { return {m[c*4], m[c*4+1], m[c*4+2], m[c*4+3]}; }
+    constexpr vec4 row(int r) const { return {m[r], m[r+4], m[r+8], m[r+12]}; }
+
+    constexpr void set_col(int c, const vec4& v)
+    {
+        m[c*4] = v.x; m[c*4+1] = v.y; m[c*4+2] = v.z; m[c*4+3] = v.w;
+    }
+
+    /// @brief Set the xyz of column @p c, leaving row 3 untouched.
+    constexpr void set_col(int c, const vec3& v)
+    {
+        m[c*4] = v.x; m[c*4+1] = v.y; m[c*4+2] = v.z;
+    }
+
+    constexpr void set_row(int r, const vec4& v)
+    {
+        m[r] = v.x; m[r+4] = v.y; m[r+8] = v.z; m[r+12] = v.w;
+    }
+
+    /// @brief Set the xyz of row @p r, leaving column 3 untouched.
+    constexpr void set_row(int r, const vec3& v)
+    {
+        m[r] = v.x; m[r+4] = v.y; m[r+8] = v.z;
+    }
+
     constexpr mat4 operator*(const mat4& rhs) const
     {
         mat4 r = zeros();
@@ -194,6 +258,26 @@ struct mat4
         return r;
     }
 
+    static mat4 rotate_x(float radians)
+    {
+        float c = std::cos(radians);
+        float s = std::sin(radians);
+        mat4 r{};
+        r.m[5]  = c;  r.m[6]  = s;
+        r.m[9]  = -s; r.m[10] = c;
+        return r;
+    }
+
+    static mat4 rotate_y(float radians)
+    {
+        float c = std::cos(radians);
+        float s = std::sin(radians);
+        mat4 r{};
+        r.m[0]  = c; r.m[2]  = -s;
+        r.m[8]  = s; r.m[10] = c;
+        return r;
+    }
+
     static mat4 rotate_z(float radians)
     {
         float c = std::cos(radians);
@@ -201,6 +285,69 @@ struct mat4
         mat4 r{};
         r.m[0] = c;  r.m[1] = s;
         r.m[4] = -s; r.m[5] = c;
+        return r;
+    }
+
+    /// @brief Rotation around an arbitrary axis (Rodrigues' formula). Axis must be normalized.
+    static mat4 rotate(const vec3& axis, float radians)
+    {
+        float c = std::cos(radians);
+        float s = std::sin(radians);
+        float t = 1.f - c;
+        float x = axis.x, y = axis.y, z = axis.z;
+        mat4 r{};
+        r.m[0]  = t*x*x + c;     r.m[1]  = t*x*y + s*z;   r.m[2]  = t*x*z - s*y;
+        r.m[4]  = t*x*y - s*z;   r.m[5]  = t*y*y + c;     r.m[6]  = t*y*z + s*x;
+        r.m[8]  = t*x*z + s*y;   r.m[9]  = t*y*z - s*x;   r.m[10] = t*z*z + c;
+        return r;
+    }
+};
+
+/// @brief Quaternion (x, y, z, w). Defaults to identity.
+struct quat
+{
+    float x{}, y{}, z{}, w{1};
+
+    static constexpr quat identity() { return {}; }
+
+    static quat from_axis_angle(const vec3& axis, float radians)
+    {
+        float h = radians * 0.5f;
+        float s = std::sin(h);
+        return {axis.x * s, axis.y * s, axis.z * s, std::cos(h)};
+    }
+
+    constexpr quat operator*(const quat& r) const
+    {
+        return {
+            w*r.x + x*r.w + y*r.z - z*r.y,
+            w*r.y - x*r.z + y*r.w + z*r.x,
+            w*r.z + x*r.y - y*r.x + z*r.w,
+            w*r.w - x*r.x - y*r.y - z*r.z
+        };
+    }
+
+    constexpr quat conjugate() const { return {-x, -y, -z, w}; }
+
+    static quat normalize(const quat& q)
+    {
+        float n = 1.f / std::sqrt(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
+        return {q.x*n, q.y*n, q.z*n, q.w*n};
+    }
+
+    constexpr bool operator==(const quat& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z && w == rhs.w; }
+    constexpr bool operator!=(const quat& rhs) const { return !(*this == rhs); }
+
+    /// @brief Convert to a column-major 4x4 rotation matrix. Quaternion must be normalized.
+    constexpr mat4 to_mat4() const
+    {
+        float xx = x*x, yy = y*y, zz = z*z;
+        float xy = x*y, xz = x*z, yz = y*z;
+        float wx = w*x, wy = w*y, wz = w*z;
+        mat4 r{};
+        r.m[0]  = 1.f - 2.f*(yy + zz); r.m[1]  = 2.f*(xy + wz);       r.m[2]  = 2.f*(xz - wy);
+        r.m[4]  = 2.f*(xy - wz);       r.m[5]  = 1.f - 2.f*(xx + zz); r.m[6]  = 2.f*(yz + wx);
+        r.m[8]  = 2.f*(xz + wy);       r.m[9]  = 2.f*(yz - wx);       r.m[10] = 1.f - 2.f*(xx + yy);
         return r;
     }
 };
