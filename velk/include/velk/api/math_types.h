@@ -288,6 +288,42 @@ struct mat4
         return r;
     }
 
+    /// @brief General 4x4 matrix inverse via Cramer's rule.
+    /// Returns identity if the matrix is singular (determinant == 0).
+    static mat4 inverse(const mat4& m)
+    {
+        const float* s = m.m;
+        float c00 = s[0]*s[5] - s[1]*s[4], c01 = s[0]*s[6] - s[2]*s[4];
+        float c02 = s[0]*s[7] - s[3]*s[4], c03 = s[1]*s[6] - s[2]*s[5];
+        float c04 = s[1]*s[7] - s[3]*s[5], c05 = s[2]*s[7] - s[3]*s[6];
+        float c06 = s[8]*s[13] - s[9]*s[12], c07 = s[8]*s[14] - s[10]*s[12];
+        float c08 = s[8]*s[15] - s[11]*s[12], c09 = s[9]*s[14] - s[10]*s[13];
+        float c10 = s[9]*s[15] - s[11]*s[13], c11 = s[10]*s[15] - s[11]*s[14];
+
+        float det = c00*c11 - c01*c10 + c02*c09 + c03*c08 - c04*c07 + c05*c06;
+        if (det == 0.f) return identity();
+        float inv = 1.f / det;
+
+        mat4 r = zeros();
+        r.m[0]  = ( s[5]*c11 - s[6]*c10 + s[7]*c09) * inv;
+        r.m[1]  = (-s[1]*c11 + s[2]*c10 - s[3]*c09) * inv;
+        r.m[2]  = ( s[13]*c05 - s[14]*c04 + s[15]*c03) * inv;
+        r.m[3]  = (-s[9]*c05 + s[10]*c04 - s[11]*c03) * inv;
+        r.m[4]  = (-s[4]*c11 + s[6]*c08 - s[7]*c07) * inv;
+        r.m[5]  = ( s[0]*c11 - s[2]*c08 + s[3]*c07) * inv;
+        r.m[6]  = (-s[12]*c05 + s[14]*c02 - s[15]*c01) * inv;
+        r.m[7]  = ( s[8]*c05 - s[10]*c02 + s[11]*c01) * inv;
+        r.m[8]  = ( s[4]*c10 - s[5]*c08 + s[7]*c06) * inv;
+        r.m[9]  = (-s[0]*c10 + s[1]*c08 - s[3]*c06) * inv;
+        r.m[10] = ( s[12]*c04 - s[13]*c02 + s[15]*c00) * inv;
+        r.m[11] = (-s[8]*c04 + s[9]*c02 - s[11]*c00) * inv;
+        r.m[12] = (-s[4]*c09 + s[5]*c07 - s[6]*c06) * inv;
+        r.m[13] = ( s[0]*c09 - s[1]*c07 + s[2]*c06) * inv;
+        r.m[14] = (-s[12]*c03 + s[13]*c01 - s[14]*c00) * inv;
+        r.m[15] = ( s[8]*c03 - s[9]*c01 + s[10]*c00) * inv;
+        return r;
+    }
+
     /// @brief Rotation around an arbitrary axis (Rodrigues' formula). Axis must be normalized.
     static mat4 rotate(const vec3& axis, float radians)
     {
