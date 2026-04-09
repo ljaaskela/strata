@@ -1020,9 +1020,40 @@ void JsonImporter::process_resources(const JsonValue& root, IStore& store, Impor
             add_error(result, "resource missing 'id' string field");
             continue;
         }
+
+        auto store_key = string("resource:") + id_val->as_string();
+
+        // Decoder/URI form: { id, uri, persistent? } — no `class`. Fetches
+        // via the resource store, applies persistence, registers under id.
+        auto* class_val = obj_node.find("class");
+        auto* uri_val = obj_node.find("uri");
+        if (!class_val && uri_val && uri_val->type() == JsonType::String) {
+            auto& res_store = ::velk::instance().resource_store();
+            auto resource = res_store.get_resource(uri_val->as_string());
+            if (!resource) {
+                add_error(result,
+                    string("resource '") + id_val->as_string() +
+                    "': failed to load uri '" + string(uri_val->as_string()) + "'");
+                continue;
+            }
+            auto* persistent_val = obj_node.find("persistent");
+            if (persistent_val && persistent_val->type() == JsonType::Bool && persistent_val->as_bool()) {
+                resource->set_persistent(true);
+            }
+            auto obj_view = interface_pointer_cast<IObject>(resource);
+            if (!obj_view) {
+                add_error(result,
+                    string("resource '") + id_val->as_string() +
+                    "': loaded resource does not implement IObject");
+                continue;
+            }
+            store.add(store_key, obj_view);
+            continue;
+        }
+
+        // Class form: { id, class, properties } — constructs an object.
         auto obj = create_object(obj_node, ctx, result);
         if (obj) {
-            auto store_key = string("resource:") + id_val->as_string();
             store.add(store_key, obj);
             register_imported_object(ctx, obj, obj_node, result);
         }

@@ -7,10 +7,16 @@
 #include <velk/ext/plugin.h>
 #include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_object_ref.h>
+#include <velk/interface/resource/intf_resource.h>
+#include <velk/interface/resource/intf_resource_decoder.h>
+#include <velk/interface/resource/intf_resource_store.h>
 #include <velk/plugins/animator/plugin.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
 #include <velk/string.h>
+
+#include <cstdio>
+#include <cstring>
 
 #include <gtest/gtest.h>
 
@@ -90,6 +96,37 @@ class TestResource : public ext::Object<TestResource, ITestResource>
 {
 public:
     VELK_CLASS_UID("c0000000-0000-0000-0000-000000000013", "TestResource");
+};
+
+// A decoded resource produced by the test decoder. Tracks its persistent
+// flag so importer tests can verify the importer applied it.
+class DecodedTestResource : public ext::ObjectCore<DecodedTestResource, IResource>
+{
+public:
+    string_view uri() const override { return uri_; }
+    bool exists() const override { return true; }
+    int64_t size() const override { return 1; }
+    bool is_persistent() const override { return persistent_; }
+    void set_persistent(bool value) override { persistent_ = value; }
+
+    ::velk::string uri_;
+    bool persistent_{false};
+};
+
+// A decoder named "td" (test decoder) that wraps an inner resource.
+class TestDecoder : public ext::ObjectCore<TestDecoder, IResourceDecoder>
+{
+public:
+    string_view name() const override { return "td"; }
+
+    IResource::Ptr decode(const IResource::Ptr& inner) const override
+    {
+        if (!inner) return nullptr;
+        auto obj = ext::make_object<DecodedTestResource>();
+        auto* dr = static_cast<DecodedTestResource*>(obj.get());
+        dr->uri_ = ::velk::string("td:") + ::velk::string(inner->uri());
+        return interface_pointer_cast<IResource>(obj);
+    }
 };
 
 class WidgetPlugin : public ext::Plugin<WidgetPlugin>
@@ -1276,6 +1313,68 @@ TEST_F(ImporterTest, Resources)
     auto* tr = interface_cast<ITestResource>(res);
     ASSERT_NE(nullptr, tr);
     EXPECT_EQ(string_view("app://fonts/arial.ttf"), tr->uri().get_value());
+}
+
+TEST_F(ImporterTest, ResourcesNoClassDecoderForm)
+{
+    load_importer();
+
+    // Create a temp file the inner URI will resolve to.
+    auto tmp = testing::TempDir();
+    ::velk::string path(tmp.c_str(), tmp.size());
+    path.append("rs_importer_test.txt");
+#ifdef _WIN32
+    FILE* f = nullptr;
+    fopen_s(&f, path.c_str(), "wb");
+#else
+    FILE* f = fopen(path.c_str(), "wb");
+#endif
+    ASSERT_TRUE(f);
+    const char* content = "decoder payload";
+    fwrite(content, 1, std::strlen(content), f);
+    fclose(f);
+
+    // Register the test decoder for the duration of this test.
+    auto& store = ::velk::instance().resource_store();
+    auto dec = ext::make_object<TestDecoder>();
+    auto dec_iface = interface_pointer_cast<IResourceDecoder>(dec);
+    store.register_decoder(dec_iface);
+
+    // Forward slashes for JSON-friendly path (works on Windows too).
+    ::velk::string fwd_path = path;
+    for (size_t i = 0; i < fwd_path.size(); ++i) {
+        if (fwd_path[i] == '\\') fwd_path[i] = '/';
+    }
+    auto file_uri = ::velk::string("file://") + fwd_path;
+    auto outer_uri = ::velk::string("td:") + file_uri;
+
+    // Build the JSON inline.
+    ::velk::string json;
+    json += R"({ "version": 1, "resources": [ { "id": "decoded", "uri": ")";
+    json += outer_uri;
+    json += R"(", "persistent": true } ] })";
+
+    auto result = importer_->import_from(string_view(json));
+    EXPECT_TRUE(result.errors.empty());
+    ASSERT_TRUE(result.store);
+
+    // The resource should be in the store under the "resource:" prefix.
+    auto stored = result.store->find("resource:decoded");
+    ASSERT_TRUE(stored);
+
+    // It should be the same instance as what the resource store cached.
+    auto from_store = store.get_resource(string_view(outer_uri));
+    ASSERT_TRUE(from_store);
+    auto stored_as_res = interface_pointer_cast<IResource>(stored);
+    ASSERT_TRUE(stored_as_res);
+    EXPECT_EQ(from_store.get(), stored_as_res.get());
+
+    // Persistence should have been applied by the importer.
+    EXPECT_TRUE(stored_as_res->is_persistent());
+
+    // Cleanup: unpin and unregister.
+    stored_as_res->set_persistent(false);
+    store.unregister_decoder(dec_iface);
 }
 
 TEST_F(ImporterTest, ResourceRef)
