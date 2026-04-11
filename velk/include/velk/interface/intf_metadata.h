@@ -291,6 +291,49 @@ inline ReturnValue invoke_event(const IInterface* o, string_view name, const IAn
     return invoke_event(o, name, args);
 }
 
+namespace detail {
+
+/// Trait used to gate the single-value invoke_event overload.
+/// Excludes types convertible to const IAny* / IAny::ConstPtr / FnArgs so the
+/// existing pointer / args overloads still win for those cases.
+template <class T>
+inline constexpr bool is_event_value_arg_v =
+    !std::is_convertible_v<const T&, const IAny*> &&
+    !std::is_convertible_v<const T&, IAny::ConstPtr> &&
+    !std::is_convertible_v<const T&, FnArgs>;
+
+} // namespace detail
+
+/**
+ * @brief Invokes a named event with a single value argument.
+ *
+ * The argument is auto-wrapped in `Any<std::decay_t<T>>` and passed as FnArgs.
+ * Types already convertible to `const IAny*` route to the existing IAny overload.
+ *
+ *   invoke_event(this, "on_focus_changed", focused);
+ *   invoke_event(this, "on_resize", new_size);
+ */
+template <class T,
+          std::enable_if_t<detail::is_event_value_arg_v<std::decay_t<T>>, int> = 0>
+ReturnValue invoke_event(const IInterface* o, string_view name, const T& arg)
+{
+    Any<std::decay_t<T>> a(arg);
+    return invoke_event(o, name, a.get_any_interface());
+}
+
+/**
+ * @brief Invokes a named event with multiple IAny-convertible arguments.
+ * @param o    Object to query for the event.
+ * @param name Event name to look up.
+ * @param args Two or more IAny-convertible arguments (e.g. @c Any<T>).
+ */
+template <class... Args, detail::require_any_args<Args...> = 0>
+ReturnValue invoke_event(const IInterface* o, string_view name, const Args&... args)
+{
+    const IAny* ptrs[] = {args.get_any_interface()...};
+    return invoke_event(o, name, FnArgs{ptrs, sizeof...(Args)});
+}
+
 // Variadic invoke_function: IAny-convertible args (name-based)
 
 /**
@@ -327,8 +370,23 @@ IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... 
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
     const IAny* ptrs[sizeof...(Args)];
     auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
-    auto* meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_function(meta->get_function(name), fnArgs) : nullptr;
+    return invoke_function(o, name, fnArgs);
+}
+
+/**
+ * @brief Invokes a named event with multiple value arguments.
+ *
+ * Each argument is auto-wrapped in @c Any<std::decay_t<T>> and passed as FnArgs.
+ *
+ *   invoke_event(this, "on_resized", new_width, new_height);
+ */
+template <class... Args, detail::require_value_args<Args...> = 0>
+ReturnValue invoke_event(const IInterface* o, string_view name, const Args&... args)
+{
+    auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
+    const IAny* ptrs[sizeof...(Args)];
+    auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
+    return invoke_event(o, name, fnArgs);
 }
 
 /** @brief Internal helpers for VELK_INTERFACE macro expansion. */

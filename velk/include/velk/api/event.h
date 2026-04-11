@@ -1,12 +1,16 @@
 #ifndef VELK_API_EVENT_H
 #define VELK_API_EVENT_H
 
+#include <velk/api/any.h>
 #include <velk/api/callback.h>
+#include <velk/api/traits.h>
 #include <velk/common.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_function.h>
 
+#include <tuple>
 #include <type_traits>
+#include <utility>
 
 namespace velk {
 
@@ -159,6 +163,48 @@ private:
     Event event_{IEvent::Ptr{}};
     IFunction::ConstPtr handler_;
 };
+
+// Variadic invoke_event: dispatches an IEvent::ConstPtr directly.
+// Mirrors api/function.h's variadic invoke_function (which takes IFunction::ConstPtr).
+// The IInterface name-lookup variants live in intf_metadata.h alongside their
+// invoke_function siblings.
+
+/**
+ * @brief Invokes an event with multiple IAny-convertible arguments.
+ * @param event Event to invoke.
+ * @param args  Two or more IAny-convertible arguments (e.g. @c Any<T>).
+ */
+template <class... Args, detail::require_any_args<Args...> = 0>
+ReturnValue invoke_event(const IEvent::ConstPtr& event, const Args&... args)
+{
+    if (!event) {
+        return ReturnValue::InvalidArgument;
+    }
+    const IAny* ptrs[] = {args.get_any_interface()...};
+    event->invoke(FnArgs{ptrs, sizeof...(Args)});
+    return ReturnValue::Success;
+}
+
+/**
+ * @brief Invokes an event with multiple value arguments.
+ *
+ * Each argument is auto-wrapped in @c Any<std::decay_t<T>> and passed as FnArgs.
+ */
+template <class... Args, detail::require_value_args<Args...> = 0>
+ReturnValue invoke_event(const IEvent::ConstPtr& event, const Args&... args)
+{
+    if (!event) {
+        return ReturnValue::InvalidArgument;
+    }
+    std::tuple<Any<std::decay_t<Args>>...> tup{args...};
+    std::apply(
+        [&](auto&... anys) {
+            const IAny* ptrs[] = {anys.get_any_interface()...};
+            event->invoke(FnArgs{ptrs, sizeof...(Args)});
+        },
+        tup);
+    return ReturnValue::Success;
+}
 
 } // namespace velk
 
