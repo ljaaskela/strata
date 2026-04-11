@@ -20,7 +20,8 @@ public:
         (PROP, float, width, 100.f),       // read-write, default 100
         (PROP, float, height, 50.f),       // read-write, default 50
         (RPROP, int, id, 0),               // read-only via accessor, writable via state
-        (EVT, on_clicked),                 // event
+        (EVT, on_clicked),                 // event (zero args)
+        (EVT, on_resized, (int, w), (int, h)),  // event with typed signature
         (FN, void, reset),                 // typed function, zero args
         (FN, void, add, (int, x), (float, y)),  // typed function with args
         (FN_RAW, serialize)                // raw function receiving FnArgs

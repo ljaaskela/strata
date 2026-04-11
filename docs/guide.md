@@ -64,14 +64,17 @@ VELK_INTERFACE(
     (ARR, Type, Name),                        // ArrayProperty<Type> Name() const
     (ARR, Type, Name, v1, v2, v3),            // ArrayProperty<Type> Name() const (default {v1,v2,v3})
     (RARR, Type, Name, v1, v2),              // ConstArrayProperty<Type> Name() const (read-only)
-    (EVT, Name),                              // Event Name() const
+    (EVT, Name),                              // Event Name() const                (zero-arg)
+    (EVT, Name, (T1, a1), (T2, a2)),          // Event Name() const                (typed signature)
     (FN, RetType, Name),                      // virtual RetType fn_Name()          (zero-arg)
     (FN, RetType, Name, (T1, a1), (T2, a2)),  // virtual RetType fn_Name(T1 a1, T2 a2) (typed)
     (FN_RAW, Name)                            // virtual fn_Name(FnArgs)   (raw untyped)
 )
 ```
 
-Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Up to 8 typed parameters per function. Members track which interface declared them via `InterfaceInfo`. Array properties use `MemberKind::ArrayProperty` and are backed by `ClassId::ArrayProperty` at runtime.
+Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Up to 8 typed parameters per function or event. Members track which interface declared them via `InterfaceInfo`. Array properties use `MemberKind::ArrayProperty` and are backed by `ClassId::ArrayProperty` at runtime.
+
+Events with a typed signature carry an `FnArgDesc` array describing each argument's name and type. The signature is metadata only — `Event::invoke()` still takes `FnArgs` — but it documents intent and lets runtime tooling (script bindings, debug UIs, validators) know what handlers should expect. Access via `MemberDesc::functionKind()->args` on Event members.
 
 ### Practical example
 
@@ -83,7 +86,8 @@ public:
         (PROP, float, width, 0.f),
         (ARR, float, weights, 1.f, 2.f, 3.f),     // array with defaults
         (RARR, int32_t, tags),                      // read-only array, empty default
-        (EVT, on_clicked),
+        (EVT, on_clicked),                          // zero-arg event
+        (EVT, on_resized, (int, w), (int, h)),     // typed event signature
         (FN, void, reset),                          // zero-arg, void return
         (FN, float, add, (int, x), (float, y))     // typed args, typed return
     )

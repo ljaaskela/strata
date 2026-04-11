@@ -77,7 +77,9 @@ AllowShortEnumsOnASingleLine: true
 AlignAfterOpenBracket: Align
 AlignEscapedNewlines: Left
 AlignOperands: Align
-AlignTrailingComments: true
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
 AllowAllParametersOfDeclarationOnNextLine: true
 BinPackArguments: false
 BinPackParameters: true

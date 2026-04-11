@@ -24,7 +24,8 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 | `ARR` | `(ARR, ElemType, name, ...)` | `ArrayProperty<ElemType>` | Read-write array |
 | `RARR` | `(RARR, ElemType, name, ...)` | `ConstArrayProperty<ElemType>` | Read-only array |
 | `PROP` | `(PROP, velk::Variant, name, {})` | `Property<Variant>` | Typeless property (any type at runtime) |
-| `EVT` | `(EVT, name)` | `Event` | Observable event |
+| `EVT` | `(EVT, name)` | `Event` | Observable event (zero args) |
+| `EVT` | `(EVT, name, (T1, a1), ...)` | `Event` | Observable event with typed signature |
 | `FN` | `(FN, RetType, name)` | `Function` | Typed function, zero args |
 | `FN` | `(FN, RetType, name, (T1, a1), ...)` | `Function` | Typed function with args |
 | `FN_RAW` | `(FN_RAW, name)` | `Function` | Raw function receiving `FnArgs` |
@@ -40,7 +41,7 @@ Velk is a C++17 component object model shipped as a shared DLL. Consumers depend
 - **FN overrides** use `fn_` prefix: `(FN, void, reset)` generates virtual `fn_reset()` to override
 - **FN_RAW overrides** have signature `IAny::Ptr fn_Name(FnArgs)`
 - **Variant properties**: property set is expensive (~96 ns same-type, ~154 ns type-change) due to `copy_from` cloning. For write-heavy code, prefer state struct access (`Variant::set<T>()` at ~9 ns). Property get returns an IAny pointer (~8 ns). Prefer typed `PROP` when the type is known at compile time
-- **Events** conventionally use `on_` prefix: `(EVT, on_clicked)`
+- **Events** conventionally use `on_` prefix: `(EVT, on_clicked)`. Add a typed signature with the same `(Type, name)` syntax as FN: `(EVT, on_resized, (int, w), (int, h))`. The signature is metadata only — `Event::invoke()` is still untyped — but it documents the event and is queryable via `MemberDesc::functionKind()->args`.
 - **Deferred updates**: pass `Deferred` to `set_value()` or `write_state()`, then call `instance().update()` to flush
 - **State access**: prefer `read_state<T>(obj)` / `write_state<T>(obj)` free functions over `meta->read<T>()` / `meta->write<T>()`. These accept both raw pointers and `shared_ptr`
 - **StateWriter fires on_changed** when it destructs, so use RAII scoping

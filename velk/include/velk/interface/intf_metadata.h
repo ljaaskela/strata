@@ -291,6 +291,49 @@ inline ReturnValue invoke_event(const IInterface* o, string_view name, const IAn
     return invoke_event(o, name, args);
 }
 
+namespace detail {
+
+/// Trait used to gate the single-value invoke_event overload.
+/// Excludes types convertible to const IAny* / IAny::ConstPtr / FnArgs so the
+/// existing pointer / args overloads still win for those cases.
+template <class T>
+inline constexpr bool is_event_value_arg_v =
+    !std::is_convertible_v<const T&, const IAny*> &&
+    !std::is_convertible_v<const T&, IAny::ConstPtr> &&
+    !std::is_convertible_v<const T&, FnArgs>;
+
+} // namespace detail
+
+/**
+ * @brief Invokes a named event with a single value argument.
+ *
+ * The argument is auto-wrapped in `Any<std::decay_t<T>>` and passed as FnArgs.
+ * Types already convertible to `const IAny*` route to the existing IAny overload.
+ *
+ *   invoke_event(this, "on_focus_changed", focused);
+ *   invoke_event(this, "on_resize", new_size);
+ */
+template <class T,
+          std::enable_if_t<detail::is_event_value_arg_v<std::decay_t<T>>, int> = 0>
+ReturnValue invoke_event(const IInterface* o, string_view name, const T& arg)
+{
+    Any<std::decay_t<T>> a(arg);
+    return invoke_event(o, name, a.get_any_interface());
+}
+
+/**
+ * @brief Invokes a named event with multiple IAny-convertible arguments.
+ * @param o    Object to query for the event.
+ * @param name Event name to look up.
+ * @param args Two or more IAny-convertible arguments (e.g. @c Any<T>).
+ */
+template <class... Args, detail::require_any_args<Args...> = 0>
+ReturnValue invoke_event(const IInterface* o, string_view name, const Args&... args)
+{
+    const IAny* ptrs[] = {args.get_any_interface()...};
+    return invoke_event(o, name, FnArgs{ptrs, sizeof...(Args)});
+}
+
 // Variadic invoke_function: IAny-convertible args (name-based)
 
 /**
@@ -327,8 +370,23 @@ IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... 
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
     const IAny* ptrs[sizeof...(Args)];
     auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
-    auto* meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_function(meta->get_function(name), fnArgs) : nullptr;
+    return invoke_function(o, name, fnArgs);
+}
+
+/**
+ * @brief Invokes a named event with multiple value arguments.
+ *
+ * Each argument is auto-wrapped in @c Any<std::decay_t<T>> and passed as FnArgs.
+ *
+ *   invoke_event(this, "on_resized", new_width, new_height);
+ */
+template <class... Args, detail::require_value_args<Args...> = 0>
+ReturnValue invoke_event(const IInterface* o, string_view name, const Args&... args)
+{
+    auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
+    const IAny* ptrs[sizeof...(Args)];
+    auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
+    return invoke_event(o, name, fnArgs);
 }
 
 /** @brief Internal helpers for VELK_INTERFACE macro expansion. */
@@ -749,7 +807,7 @@ struct FnRawBind
 #define _VELK_STATE_RPROP(Type, Name, Default) Type Name = Default;
 #define _VELK_STATE_ARR(Type, Name, ...) ::velk::vector<Type> Name = {__VA_ARGS__};
 #define _VELK_STATE_RARR(Type, Name, ...) ::velk::vector<Type> Name = {__VA_ARGS__};
-#define _VELK_STATE_EVT(Name)
+#define _VELK_STATE_EVT(Name, ...)
 #define _VELK_STATE_FN(...)
 #define _VELK_STATE_FN_RAW(...)
 #define _VELK_STATE(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_STATE_, Tag)(__VA_ARGS__))
@@ -768,7 +826,28 @@ struct FnRawBind
 #define _VELK_DEFAULTS_RARR(Type, Name, ...)                          \
     static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name = \
         ::velk::detail::ArrBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
-#define _VELK_DEFAULTS_EVT(...)
+
+// EVT defaults: zero-arg form generates an empty FunctionKind; the typed form
+// generates an FnArgDesc array describing the event's argument signature.
+// Events have no trampoline (handlers are invoked directly), only args.
+#define _VELK_DEFAULTS_EVT_0(Name)                                                                 \
+    static constexpr ::velk::FunctionKind _velk_evtkind_##Name{nullptr, {}};
+
+#define _VELK_DEFAULTS_EVT_N(Name, ...)                                                            \
+    static constexpr ::velk::FnArgDesc _velk_evtargs_##Name[] = {_VELK_ARGDESCS(__VA_ARGS__)};     \
+    static constexpr ::velk::FunctionKind _velk_evtkind_##Name{                                    \
+        nullptr, {_velk_evtargs_##Name, _VELK_NARG(__VA_ARGS__)}};
+
+#define _VELK_DEVT_1(Name) _VELK_DEFAULTS_EVT_0(Name)
+#define _VELK_DEVT_2(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_3(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_4(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_5(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_6(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_7(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_8(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_9(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEFAULTS_EVT(...) _VELK_EXPAND(_VELK_CAT(_VELK_DEVT_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 // Per-member nested struct avoids auto NTTP (FnBind<auto Fn>) in the macro expansion.
 // MSVC 19.x can mangle two auto-NTTP specializations identically when the pointer
@@ -827,7 +906,7 @@ struct FnRawBind
 #define _VELK_META_RPROP(Type, Name, ...) ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
 #define _VELK_META_ARR(Type, Name, ...) ::velk::ArrayPropertyDesc(#Name, &INFO, &_velk_arrkind_##Name),
 #define _VELK_META_RARR(Type, Name, ...) ::velk::ArrayPropertyDesc(#Name, &INFO, &_velk_arrkind_##Name),
-#define _VELK_META_EVT(Name) ::velk::EventDesc(#Name, &INFO),
+#define _VELK_META_EVT(Name, ...) ::velk::EventDesc(#Name, &INFO, &_velk_evtkind_##Name),
 #define _VELK_META_FN(RetType, Name, ...) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
 #define _VELK_META_FN_RAW(Name) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
 #define _VELK_META(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_META_, Tag)(__VA_ARGS__))
@@ -838,7 +917,7 @@ struct FnRawBind
 #define _VELK_TRAMPOLINE_RPROP(...)
 #define _VELK_TRAMPOLINE_ARR(...)
 #define _VELK_TRAMPOLINE_RARR(...)
-#define _VELK_TRAMPOLINE_EVT(Name)
+#define _VELK_TRAMPOLINE_EVT(Name, ...)
 
 #define _VELK_TRAMPOLINE_FN_0(RetType, Name) virtual RetType fn_##Name() = 0;
 #define _VELK_TRAMPOLINE_FN_N(RetType, Name, ...) virtual RetType fn_##Name(_VELK_PARAMS(__VA_ARGS__)) = 0;
@@ -902,7 +981,7 @@ struct FnRawBind
         return ::velk::ConstArrayProperty<Type>(                                             \
             ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
-#define _VELK_ACC_EVT(Name)                                                                                \
+#define _VELK_ACC_EVT(Name, ...)                                                                           \
     ::velk::Event Name() const                                                                             \
     {                                                                                                      \
         return ::velk::Event(::velk::get_event(this->template get_interface<::velk::IMetadata>(), #Name)); \
