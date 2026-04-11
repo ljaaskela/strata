@@ -24,6 +24,8 @@ public:
     void set_persistent(bool value) override { persistent_ = value; }
     ReturnValue read(vector<uint8_t>& out) const override;
     ReturnValue read_text(string& out) const override;
+    ReturnValue write(const uint8_t* data, size_t size) override;
+    ReturnValue write_text(string_view text) override;
 
 private:
     string path_; ///< Resolved filesystem path.
