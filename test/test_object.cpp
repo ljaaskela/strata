@@ -27,6 +27,7 @@ public:
         (PROP, float, height, 50.f),
         (RPROP, int, id, 42),
         (EVT, on_clicked),
+        (EVT, on_resized, (int, new_width), (int, new_height)),
         (FN, void, reset)
     )
 };
@@ -224,11 +225,11 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
     auto* info = instance().type_registry().get_class_info(TestWidget::static_class_id());
     ASSERT_NE(info, nullptr);
 
-    // ITestWidget: width, height, id, on_clicked, reset
+    // ITestWidget: width, height, id, on_clicked, on_resized, reset
     // ITestSerializable: version, serialize
     // ITestMath: add
     // ITestRaw: process
-    EXPECT_EQ(info->members.size(), 9u);
+    EXPECT_EQ(info->members.size(), 10u);
 
     // Check first member
     EXPECT_EQ(info->members[0].name, "width");
@@ -240,8 +241,41 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
     EXPECT_EQ(info->members[3].name, "on_clicked");
     EXPECT_EQ(info->members[3].kind, MemberKind::Event);
 
-    EXPECT_EQ(info->members[4].name, "reset");
-    EXPECT_EQ(info->members[4].kind, MemberKind::Function);
+    EXPECT_EQ(info->members[4].name, "on_resized");
+    EXPECT_EQ(info->members[4].kind, MemberKind::Event);
+
+    EXPECT_EQ(info->members[5].name, "reset");
+    EXPECT_EQ(info->members[5].kind, MemberKind::Function);
+}
+
+TEST_F(ObjectTest, TypedEventSignature)
+{
+    // (EVT, on_clicked) - zero args, FunctionKind exists with empty args.
+    // (EVT, on_resized, (int, new_width), (int, new_height)) - two int args.
+    auto* info = instance().type_registry().get_class_info(TestWidget::static_class_id());
+    ASSERT_NE(info, nullptr);
+
+    // on_clicked: zero args
+    auto& clicked = info->members[3];
+    EXPECT_EQ(clicked.name, "on_clicked");
+    EXPECT_EQ(clicked.kind, MemberKind::Event);
+    auto* clicked_fk = clicked.functionKind();
+    ASSERT_NE(clicked_fk, nullptr);
+    EXPECT_EQ(clicked_fk->trampoline, nullptr);  // events have no trampoline
+    EXPECT_EQ(clicked_fk->args.size(), 0u);
+
+    // on_resized: two int args with names
+    auto& resized = info->members[4];
+    EXPECT_EQ(resized.name, "on_resized");
+    EXPECT_EQ(resized.kind, MemberKind::Event);
+    auto* resized_fk = resized.functionKind();
+    ASSERT_NE(resized_fk, nullptr);
+    EXPECT_EQ(resized_fk->trampoline, nullptr);
+    ASSERT_EQ(resized_fk->args.size(), 2u);
+    EXPECT_EQ(resized_fk->args[0].name, "new_width");
+    EXPECT_EQ(resized_fk->args[0].typeUid, type_uid<int>());
+    EXPECT_EQ(resized_fk->args[1].name, "new_height");
+    EXPECT_EQ(resized_fk->args[1].typeUid, type_uid<int>());
 }
 
 TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
@@ -274,7 +308,7 @@ TEST_F(ObjectTest, StaticDefaultValues)
     EXPECT_FLOAT_EQ(get_default_value<float>(info->members[0]), 100.f); // width
     EXPECT_FLOAT_EQ(get_default_value<float>(info->members[1]), 50.f);  // height
     EXPECT_EQ(get_default_value<int>(info->members[2]), 42);            // id (RPROP)
-    EXPECT_EQ(get_default_value<int>(info->members[5]), 1);             // version
+    EXPECT_EQ(get_default_value<int>(info->members[6]), 1);             // version
 }
 
 TEST_F(ObjectTest, PropertyStateReadWrite)
@@ -1041,8 +1075,8 @@ TEST_F(ObjectWrapperTest, StaticMetadata)
 {
     auto obj = make();
     auto meta = obj.static_metadata();
-    // ITestWidget(5) + ITestSerializable(2) + ITestMath(1) + ITestRaw(1) = 9
-    EXPECT_EQ(meta.size(), 9u);
+    // ITestWidget(6) + ITestSerializable(2) + ITestMath(1) + ITestRaw(1) = 10
+    EXPECT_EQ(meta.size(), 10u);
 }
 
 TEST_F(ObjectWrapperTest, ReadState)

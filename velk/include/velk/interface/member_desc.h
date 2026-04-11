@@ -149,10 +149,13 @@ T get_default_value(const MemberDesc& desc)
  * @brief Creates an Event MemberDesc.
  * @param name Member name for runtime lookup.
  * @param info Interface that declares this member (may be nullptr).
+ * @param fk Optional FunctionKind describing the event's argument signature.
+ *           Trampoline is null for events; only `args` is used.
  */
-constexpr MemberDesc EventDesc(string_view name, const InterfaceInfo* info = nullptr)
+constexpr MemberDesc EventDesc(string_view name, const InterfaceInfo* info = nullptr,
+                               const FunctionKind* fk = nullptr)
 {
-    return {name, MemberKind::Event, info};
+    return {name, MemberKind::Event, info, fk};
 }
 
 /**

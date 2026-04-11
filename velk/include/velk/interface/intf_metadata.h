@@ -749,7 +749,7 @@ struct FnRawBind
 #define _VELK_STATE_RPROP(Type, Name, Default) Type Name = Default;
 #define _VELK_STATE_ARR(Type, Name, ...) ::velk::vector<Type> Name = {__VA_ARGS__};
 #define _VELK_STATE_RARR(Type, Name, ...) ::velk::vector<Type> Name = {__VA_ARGS__};
-#define _VELK_STATE_EVT(Name)
+#define _VELK_STATE_EVT(Name, ...)
 #define _VELK_STATE_FN(...)
 #define _VELK_STATE_FN_RAW(...)
 #define _VELK_STATE(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_STATE_, Tag)(__VA_ARGS__))
@@ -768,7 +768,28 @@ struct FnRawBind
 #define _VELK_DEFAULTS_RARR(Type, Name, ...)                          \
     static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name = \
         ::velk::detail::ArrBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
-#define _VELK_DEFAULTS_EVT(...)
+
+// EVT defaults: zero-arg form generates an empty FunctionKind; the typed form
+// generates an FnArgDesc array describing the event's argument signature.
+// Events have no trampoline (handlers are invoked directly), only args.
+#define _VELK_DEFAULTS_EVT_0(Name)                                                                 \
+    static constexpr ::velk::FunctionKind _velk_evtkind_##Name{nullptr, {}};
+
+#define _VELK_DEFAULTS_EVT_N(Name, ...)                                                            \
+    static constexpr ::velk::FnArgDesc _velk_evtargs_##Name[] = {_VELK_ARGDESCS(__VA_ARGS__)};     \
+    static constexpr ::velk::FunctionKind _velk_evtkind_##Name{                                    \
+        nullptr, {_velk_evtargs_##Name, _VELK_NARG(__VA_ARGS__)}};
+
+#define _VELK_DEVT_1(Name) _VELK_DEFAULTS_EVT_0(Name)
+#define _VELK_DEVT_2(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_3(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_4(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_5(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_6(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_7(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_8(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEVT_9(Name, ...) _VELK_DEFAULTS_EVT_N(Name, __VA_ARGS__)
+#define _VELK_DEFAULTS_EVT(...) _VELK_EXPAND(_VELK_CAT(_VELK_DEVT_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 // Per-member nested struct avoids auto NTTP (FnBind<auto Fn>) in the macro expansion.
 // MSVC 19.x can mangle two auto-NTTP specializations identically when the pointer
@@ -827,7 +848,7 @@ struct FnRawBind
 #define _VELK_META_RPROP(Type, Name, ...) ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
 #define _VELK_META_ARR(Type, Name, ...) ::velk::ArrayPropertyDesc(#Name, &INFO, &_velk_arrkind_##Name),
 #define _VELK_META_RARR(Type, Name, ...) ::velk::ArrayPropertyDesc(#Name, &INFO, &_velk_arrkind_##Name),
-#define _VELK_META_EVT(Name) ::velk::EventDesc(#Name, &INFO),
+#define _VELK_META_EVT(Name, ...) ::velk::EventDesc(#Name, &INFO, &_velk_evtkind_##Name),
 #define _VELK_META_FN(RetType, Name, ...) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
 #define _VELK_META_FN_RAW(Name) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
 #define _VELK_META(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_META_, Tag)(__VA_ARGS__))
@@ -838,7 +859,7 @@ struct FnRawBind
 #define _VELK_TRAMPOLINE_RPROP(...)
 #define _VELK_TRAMPOLINE_ARR(...)
 #define _VELK_TRAMPOLINE_RARR(...)
-#define _VELK_TRAMPOLINE_EVT(Name)
+#define _VELK_TRAMPOLINE_EVT(Name, ...)
 
 #define _VELK_TRAMPOLINE_FN_0(RetType, Name) virtual RetType fn_##Name() = 0;
 #define _VELK_TRAMPOLINE_FN_N(RetType, Name, ...) virtual RetType fn_##Name(_VELK_PARAMS(__VA_ARGS__)) = 0;
@@ -902,7 +923,7 @@ struct FnRawBind
         return ::velk::ConstArrayProperty<Type>(                                             \
             ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
-#define _VELK_ACC_EVT(Name)                                                                                \
+#define _VELK_ACC_EVT(Name, ...)                                                                           \
     ::velk::Event Name() const                                                                             \
     {                                                                                                      \
         return ::velk::Event(::velk::get_event(this->template get_interface<::velk::IMetadata>(), #Name)); \
