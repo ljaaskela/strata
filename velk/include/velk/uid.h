@@ -1,6 +1,7 @@
 #ifndef VELK_UID_H
 #define VELK_UID_H
 
+#include <velk/hash.h>
 #include <velk/string_view.h>
 
 #include <cstdint>
@@ -107,82 +108,19 @@ struct Uid
 static_assert(sizeof(Uid) == 16);
 
 /**
- * @brief Constexpr helper: returns the high 64 bits of a 64x64 multiply.
- */
-constexpr uint64_t mulhi64(uint64_t a, uint64_t b)
-{
-    uint64_t a_lo = a & 0xFFFFFFFF;
-    uint64_t a_hi = a >> 32;
-    uint64_t b_lo = b & 0xFFFFFFFF;
-    uint64_t b_hi = b >> 32;
-
-    uint64_t lo_lo = a_lo * b_lo;
-    uint64_t lo_hi = a_lo * b_hi;
-    uint64_t hi_lo = a_hi * b_lo;
-    uint64_t hi_hi = a_hi * b_hi;
-
-    uint64_t cross = (lo_lo >> 32) + (lo_hi & 0xFFFFFFFF) + (hi_lo & 0xFFFFFFFF);
-    return hi_hi + (lo_hi >> 32) + (hi_lo >> 32) + (cross >> 32);
-}
-
-/**
- * @brief Multiplies a 128-bit value by the FNV-128 prime (2^88 + 315).
+ * @brief Computes a compile-time FNV-1a 128-bit hash of a string, returned
+ * as a Uid.
  *
- * Exploits the prime's structure: x * prime = (x << 88) + x * 315.
- */
-constexpr Uid fnv128_multiply(Uid x)
-{
-    // Compute x * 315 as a 128-bit result
-    constexpr uint64_t small = 315;
-    uint64_t mul_lo = x.lo * small;
-    uint64_t mul_hi = mulhi64(x.lo, small) + x.hi * small;
-
-    // Compute x << 88 = (x << 64) << 24. The low 64 bits are always 0.
-    // High 64 bits = x.lo << 24 (since x.hi bits shift out entirely for a 128-bit value)
-    uint64_t shift_hi = x.lo << 24;
-
-    // Add: (shift_hi, 0) + (mul_hi, mul_lo)
-    uint64_t res_lo = mul_lo;
-    uint64_t res_hi = mul_hi + shift_hi;
-
-    return {res_hi, res_lo};
-}
-
-/**
- * @brief Computes a compile-time FNV-1a 128-bit hash of a string.
+ * Thin wrapper over the generic make_hash128 in velk/hash.h. Use this when
+ * the result is consumed as a type or interface identifier.
+ *
  * @param toHash The string to hash.
  * @return The computed 128-bit Uid.
  */
 constexpr Uid make_hash(const string_view toHash)
 {
-    // FNV-1a 128-bit: offset basis and prime from the FNV spec
-    Uid result{0x6c62272e07bb0142, 0x62b821756295c58d};
-
-    for (char c : toHash) {
-        result.lo ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
-        result = fnv128_multiply(result);
-    }
-
-    return result;
-}
-
-/**
- * @brief Computes a compile-time FNV-1a 64-bit hash of a string.
- *
- * Prefer make_hash (128-bit) for type and interface identification.
- * This 64-bit variant is intended for lightweight keys such as performance logging.
- *
- * @param toHash The string to hash.
- * @return The computed 64-bit hash.
- */
-constexpr uint64_t make_hash64(const string_view toHash)
-{
-    uint64_t result = 0xcbf29ce484222325ULL;
-    for (char c : toHash) {
-        result ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
-        result *= 0x00000100000001B3ULL;
-    }
-    return result;
+    Hash128 h = make_hash128(toHash);
+    return Uid{h.hi, h.lo};
 }
 
 } // namespace velk

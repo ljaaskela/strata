@@ -113,4 +113,50 @@ ReturnValue FileResource::read_text(string& out) const
     return Success;
 }
 
+ReturnValue FileResource::write(const uint8_t* data, size_t size)
+{
+    if (path_.empty()) {
+        return InvalidArgument;
+    }
+
+    // Write to a temp file then rename, so readers never observe a partial write.
+    string tmp_path = path_ + ".tmp";
+
+    FILE* f = open_file(tmp_path.c_str(), "wb");
+    if (!f) {
+        return Fail;
+    }
+
+    if (size > 0) {
+        size_t written = fwrite(data, 1, size, f);
+        if (written != size) {
+            fclose(f);
+            std::remove(tmp_path.c_str());
+            return Fail;
+        }
+    }
+
+    if (fclose(f) != 0) {
+        std::remove(tmp_path.c_str());
+        return Fail;
+    }
+
+    // std::rename on Windows fails if the destination exists; remove first.
+    // The brief window where the destination is missing is acceptable for
+    // cache-style use cases (a concurrent reader would see "no entry" and
+    // recompute, identical content).
+    std::remove(path_.c_str());
+    if (std::rename(tmp_path.c_str(), path_.c_str()) != 0) {
+        std::remove(tmp_path.c_str());
+        return Fail;
+    }
+
+    return Success;
+}
+
+ReturnValue FileResource::write_text(string_view text)
+{
+    return write(reinterpret_cast<const uint8_t*>(text.data()), text.size());
+}
+
 } // namespace velk

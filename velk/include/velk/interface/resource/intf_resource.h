@@ -56,10 +56,11 @@ public:
 };
 
 /**
- * @brief File resource providing read access to file contents.
+ * @brief File resource providing read and write access to file contents.
  *
  * Obtained by casting an IResource::Ptr returned from IResourceStore::get_resource()
- * via interface_cast<IFile>.
+ * via interface_cast<IFile>. Whether write operations succeed depends on the
+ * backing protocol; FileProtocol-backed resources support both read and write.
  *
  * Chain: IInterface -> IResource -> IFile
  */
@@ -71,6 +72,18 @@ public:
 
     /** @brief Reads the entire file as UTF-8 text. */
     virtual ReturnValue read_text(string& out) const = 0;
+
+    /**
+     * @brief Writes binary bytes to the file, replacing any existing contents.
+     *
+     * Implementations should write atomically (temp file + rename) where
+     * possible so that readers never observe a half-written file. Returns
+     * Fail if the backing protocol does not support writing.
+     */
+    virtual ReturnValue write(const uint8_t* data, size_t size) = 0;
+
+    /** @brief Writes UTF-8 text to the file, replacing any existing contents. */
+    virtual ReturnValue write_text(string_view text) = 0;
 };
 
 } // namespace velk
