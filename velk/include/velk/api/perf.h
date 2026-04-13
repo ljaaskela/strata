@@ -4,6 +4,8 @@
 #include <velk/api/velk.h>
 #include <velk/uid.h>
 
+// VELK_PERF_ENABLED is set by CMake (VELK_ENABLE_PERF option).
+// Default to enabled if not defined (e.g. standalone header inclusion).
 #ifndef VELK_PERF_ENABLED
 #define VELK_PERF_ENABLED 1
 #endif

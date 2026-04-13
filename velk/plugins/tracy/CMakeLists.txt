@@ -30,14 +30,24 @@ target_include_directories(velk_tracy
     PRIVATE ${TRACY_EXTRACT_DIR}
 )
 
-# TRACY_NO_SYSTEM_TRACING: disable ETW tracing (needs newer Windows SDK than MSVC 2019 provides)
-# RelationProcessorDie=5: enum value missing from older Windows SDK headers
 target_compile_definitions(velk_tracy PRIVATE
     VELK_EXPORTS
     TRACY_ENABLE
     TRACY_NO_SYSTEM_TRACING
-    "RelationProcessorDie=static_cast<LOGICAL_PROCESSOR_RELATIONSHIP>(5)"
 )
+
+# RelationProcessorDie was added in Windows SDK 10.0.20348. Define it only when missing.
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_QUIET ON)
+check_cxx_source_compiles("
+    #include <windows.h>
+    int main() { auto x = RelationProcessorDie; return (int)x; }
+" HAS_RELATION_PROCESSOR_DIE)
+if(NOT HAS_RELATION_PROCESSOR_DIE)
+    target_compile_definitions(velk_tracy PRIVATE
+        "RelationProcessorDie=static_cast<LOGICAL_PROCESSOR_RELATIONSHIP>(5)"
+    )
+endif()
 
 # Tracy needs exceptions enabled (velk core disables them)
 if(MSVC)
