@@ -96,6 +96,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | [Importer](docs/plugins/importer.md) | JSON scene import with extensible collections |
 | [Animator](docs/plugins/animator.md) | Implicit animations and transitions for properties |
 | [Scripting](docs/plugins/scripting.md) | JavaScript scripting via QuickJS-ng: expression bindings and event handlers |
+| [Tracy](docs/plugins/tracy.md) | Tracy profiler integration via the perf sink interface |
 
 ## Project structure
 
@@ -117,6 +118,7 @@ velk/
       importer.md         Importer plugin: JSON import, extensions, format reference
       animator.md         Animator plugin: transitions, easing, interpolators
       scripting.md        Scripting plugin: JavaScript expression bindings, event handlers
+      tracy.md            Tracy plugin: profiler integration via the perf sink
   velk/
     include/              Public API (consumers depend only on these headers)
       interface/          Abstract interfaces (ABI contracts)

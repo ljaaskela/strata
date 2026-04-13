@@ -57,10 +57,13 @@ void PerfLog::print_stats() const
     }
 }
 
-void PerfLog::start_perf(uint64_t key, string_view label)
+void PerfLog::start_perf(uint64_t key, string_view label, const char* file, uint32_t line)
 {
     auto start = now();
     std::lock_guard<std::mutex> lock(perf_mutex_);
+    if (perf_sink_) {
+        perf_sink_->start_perf(key, label, file, line);
+    }
     for (auto& e : perf_entries_) {
         if (e.key == key) {
             // Existing key, restart measurement
@@ -89,8 +92,7 @@ Duration PerfLog::end_perf(uint64_t key)
                 accumulate(key, label, elapsed);
             }
             if (perf_sink_) {
-                // Write sink
-                perf_sink_->write_perf(key, label, elapsed);
+                perf_sink_->end_perf(key, label, elapsed);
             }
             // Erase from vector
             perf_entries_.erase(e);
@@ -175,6 +177,14 @@ void PerfLog::set_stats_enabled(bool enabled)
 {
     std::lock_guard<std::mutex> lock(perf_mutex_);
     stats_enabled_ = enabled;
+}
+
+void PerfLog::event(PerfEvent type)
+{
+    std::lock_guard<std::mutex> lock(perf_mutex_);
+    if (perf_sink_) {
+        perf_sink_->event(type);
+    }
 }
 
 } // namespace velk

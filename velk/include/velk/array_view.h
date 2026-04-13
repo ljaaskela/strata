@@ -12,7 +12,11 @@ struct array_view
     constexpr array_view() = default;
     /** @brief Constructs a view over @p size elements starting at @p data. */
     constexpr array_view(const T* data, size_t size) : data_(data), size_(size) {}
-
+    /** @brief Constructs a view over @p N elements starting at @p data. */
+    template <size_t N>
+    constexpr array_view(const T (&data)[N]) : data_(data),
+                                               size_(N)
+    {}
     /** @brief Returns the number of elements in the view. */
     constexpr size_t size() const { return size_; }
     /** @brief Returns true if the view contains no elements. */

@@ -17,7 +17,14 @@ add_subdirectory(velk/plugins/animator)
 add_subdirectory(velk/plugins/importer)
 add_subdirectory(velk/plugins/script/js)
 add_subdirectory(velk/c_api)
+
+option(VELK_ENABLE_TRACY "Enable Tracy profiler plugin" ON)
+if(VELK_ENABLE_TRACY)
+    add_subdirectory(velk/plugins/tracy)
+endif()
+
 add_subdirectory(demo)
 add_subdirectory(test)
 add_subdirectory(benchmark)
+
 
