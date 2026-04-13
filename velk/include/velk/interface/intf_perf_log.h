@@ -11,6 +11,14 @@
 
 namespace velk {
 
+/** @brief Named performance events for frame/phase boundaries. */
+enum class PerfEvent : uint32_t
+{
+    Update,
+    Render,
+    Present
+};
+
 /**
  * @brief Sink interface for receiving performance measurement results.
  *
@@ -22,12 +30,25 @@ class IPerfSink : public Interface<IPerfSink>
 {
 public:
     /**
+     * @brief Called when a performance measurement begins.
+     * @param key   The hash key identifying the measurement region.
+     * @param label Human-readable label (may be empty if start_perf was called with key only).
+     * @param file  Source file where the measurement was started (may be null).
+     * @param line  Source line where the measurement was started.
+     */
+    virtual void start_perf(uint64_t key, string_view label,
+                            const char* file, uint32_t line) = 0;
+
+    /**
      * @brief Called when a performance measurement completes.
      * @param key     The hash key identifying the measurement region.
      * @param label   Human-readable label (may be empty if start_perf was called with key only).
      * @param elapsed Duration of the measured region.
      */
-    virtual void write_perf(uint64_t key, string_view label, Duration elapsed) = 0;
+    virtual void end_perf(uint64_t key, string_view label, Duration elapsed) = 0;
+
+    /** @brief Called when a performance event occurs (e.g. frame boundaries). */
+    virtual void event(PerfEvent type) = 0;
 };
 
 /** @brief Accumulated statistics for a single perf key. */
@@ -62,7 +83,8 @@ class IPerfLog : public Interface<IPerfLog>
 {
 public:
     /** @brief Begins a performance measurement for the given key. */
-    virtual void start_perf(uint64_t key, string_view label = {}) = 0;
+    virtual void start_perf(uint64_t key, string_view label = {},
+                            const char* file = nullptr, uint32_t line = 0) = 0;
     /** @brief Ends a performance measurement and reports to the perf sink. Returns elapsed duration. */
     virtual Duration end_perf(uint64_t key) = 0;
     /** @brief Returns elapsed time for a running measurement. Returns zero if key not found. */
@@ -76,6 +98,9 @@ public:
     virtual void reset_stats() = 0;
     /** @brief Enables or disables stats accumulation. Enabled by default. */
     virtual void set_stats_enabled(bool enabled) = 0;
+
+    /** @brief Emits a performance event (e.g. frame boundaries). */
+    virtual void event(PerfEvent type) = 0;
 };
 
 } // namespace velk

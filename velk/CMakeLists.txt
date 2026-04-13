@@ -148,10 +148,15 @@ target_include_directories(velk
 )
 
 option(VELK_ENABLE_BLOCK_POOL "Enable thread-local control_block pooling" ON)
+option(VELK_ENABLE_PERF "Enable performance instrumentation (VELK_PERF_SCOPE)" ON)
 
 target_compile_definitions(velk PRIVATE
     VELK_EXPORTS
     VELK_ENABLE_BLOCK_POOL=$<BOOL:${VELK_ENABLE_BLOCK_POOL}>
+)
+
+target_compile_definitions(velk PUBLIC
+    VELK_PERF_ENABLED=$<BOOL:${VELK_ENABLE_PERF}>
 )
 
 # No RTTI, no exceptions for the library itself.

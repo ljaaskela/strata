@@ -17,10 +17,14 @@ struct PerfRecord
 class TestPerfSink : public ext::ObjectCore<TestPerfSink, IPerfSink>
 {
 public:
-    void write_perf(uint64_t key, string_view label, Duration elapsed) override
+    void start_perf(uint64_t, string_view, const char*, uint32_t) override {}
+
+    void end_perf(uint64_t key, string_view label, Duration elapsed) override
     {
         records.push_back({key, std::string(label.data(), label.size()), elapsed});
     }
+
+    void event(PerfEvent) override {}
 
     std::vector<PerfRecord> records;
 };

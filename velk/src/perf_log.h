@@ -24,13 +24,14 @@ public:
     /** @brief Prints accumulated stats via VELK_LOG. */
     void print_stats() const;
 
-    void start_perf(uint64_t key, string_view label) override;
+    void start_perf(uint64_t key, string_view label, const char* file, uint32_t line) override;
     Duration end_perf(uint64_t key) override;
     Duration get_perf(uint64_t key) const override;
     void set_perf_sink(const IPerfSink::Ptr& sink) override;
     vector<PerfStats> get_stats() const override;
     void reset_stats() override;
     void set_stats_enabled(bool enabled) override;
+    void event(PerfEvent type) override;
 
 private:
     struct PerfEntry
