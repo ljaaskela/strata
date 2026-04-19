@@ -2,6 +2,7 @@
 #define VELK_API_MATH_TYPES_H
 
 #include <cmath>
+#include <cstdint>
 
 namespace velk {
 
@@ -16,6 +17,21 @@ constexpr float deg_to_rad(float deg) { return deg * 0.01745329251994329577f; }
 
 /// @brief Convert radians to degrees.
 constexpr float rad_to_deg(float rad) { return rad * 57.2957795130823208768f; }
+
+/// @brief Returns the smaller of @p a and @p b. Ties return @p a.
+template <typename T>
+constexpr T min(const T& a, const T& b) { return a < b ? a : b; }
+
+/// @brief Returns the larger of @p a and @p b. Ties return @p a.
+template <typename T>
+constexpr T max(const T& a, const T& b) { return a > b ? a : b; }
+
+/// @brief Clamps @p x to [lo, hi].
+template <typename T>
+constexpr T clamp(const T& x, const T& lo, const T& hi)
+{
+    return ::velk::min(::velk::max(x, lo), hi);
+}
 
 /// @brief 2D float vector.
 struct vec2
@@ -115,6 +131,17 @@ struct vec4
 
 constexpr vec4 operator*(float s, const vec4& v) { return v * s; }
 
+/// @brief 2D unsigned integer vector.
+struct uvec2
+{
+    uint32_t x{}, y{};
+
+    static constexpr uvec2 zero() { return {0, 0}; }
+
+    constexpr bool operator==(const uvec2& rhs) const { return x == rhs.x && y == rhs.y; }
+    constexpr bool operator!=(const uvec2& rhs) const { return !(*this == rhs); }
+};
+
 /// @brief 3D dimensions.
 struct size
 {
@@ -147,8 +174,41 @@ struct aabb
     static constexpr aabb from_size(size s) { return {{}, s}; };
     static constexpr aabb zero() { return {}; }
 
+    /// @brief Empty box marker: inverted min/max so merge(empty, x) == x.
+    static constexpr aabb empty()
+    {
+        aabb a;
+        a.position = { 1e30f,  1e30f,  1e30f};
+        a.extent   = {-2e30f, -2e30f, -2e30f};
+        return a;
+    }
+
     constexpr vec3 min() const { return position; }
     constexpr vec3 max() const { return {position.x + extent.width, position.y + extent.height, position.z + extent.depth}; }
+
+    /// @brief Returns a box covering both inputs. Either may be empty().
+    static constexpr aabb merge(const aabb& a, const aabb& b)
+    {
+        const vec3 a_lo = a.min(), a_hi = a.max();
+        const vec3 b_lo = b.min(), b_hi = b.max();
+        const vec3 lo{::velk::min(a_lo.x, b_lo.x),
+                      ::velk::min(a_lo.y, b_lo.y),
+                      ::velk::min(a_lo.z, b_lo.z)};
+        const vec3 hi{::velk::max(a_hi.x, b_hi.x),
+                      ::velk::max(a_hi.y, b_hi.y),
+                      ::velk::max(a_hi.z, b_hi.z)};
+        aabb out;
+        out.position = lo;
+        out.extent = {hi.x - lo.x, hi.y - lo.y, hi.z - lo.z};
+        return out;
+    }
+
+    /// @brief World-space AABB of this local-space box transformed by
+    ///        `m`. Tests all eight corners so rotation/scale produces a
+    ///        correct axis-aligned bound; pure translation degenerates
+    ///        to a single offset. Defined out-of-line below since it
+    ///        depends on @c mat4.
+    aabb transformed(const struct mat4& m) const;
 
     constexpr bool operator==(const aabb& rhs) const { return position == rhs.position && extent == rhs.extent; }
     constexpr bool operator!=(const aabb& rhs) const { return !(*this == rhs); }
@@ -387,6 +447,38 @@ struct quat
         return r;
     }
 };
+
+inline aabb aabb::transformed(const mat4& m) const
+{
+    const float w = extent.width;
+    const float h = extent.height;
+    const float d = extent.depth;
+    const float cx[8] = {0, w, 0, w, 0, w, 0, w};
+    const float cy[8] = {0, 0, h, h, 0, 0, h, h};
+    const float cz[8] = {0, 0, 0, 0, d, d, d, d};
+    const float ox = position.x, oy = position.y, oz = position.z;
+
+    vec3 lo{ 1e30f,  1e30f,  1e30f};
+    vec3 hi{-1e30f, -1e30f, -1e30f};
+    for (int i = 0; i < 8; ++i) {
+        const float lx = ox + cx[i];
+        const float ly = oy + cy[i];
+        const float lz = oz + cz[i];
+        const float x = m(0,0)*lx + m(0,1)*ly + m(0,2)*lz + m(0,3);
+        const float y = m(1,0)*lx + m(1,1)*ly + m(1,2)*lz + m(1,3);
+        const float z = m(2,0)*lx + m(2,1)*ly + m(2,2)*lz + m(2,3);
+        lo.x = ::velk::min(lo.x, x);
+        lo.y = ::velk::min(lo.y, y);
+        lo.z = ::velk::min(lo.z, z);
+        hi.x = ::velk::max(hi.x, x);
+        hi.y = ::velk::max(hi.y, y);
+        hi.z = ::velk::max(hi.z, z);
+    }
+    aabb out;
+    out.position = lo;
+    out.extent = {hi.x - lo.x, hi.y - lo.y, hi.z - lo.z};
+    return out;
+}
 
 } // namespace velk
 

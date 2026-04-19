@@ -106,6 +106,48 @@ inline void invoke_property_changed(IObjectStorage* storage, size_t storage_id, 
     }
 }
 
+/** @brief Finds the first attachment implementing T on @p storage. Null-safe. */
+template <class T>
+typename T::Ptr find_attachment(IObjectStorage* storage)
+{
+    return storage ? storage->template find_attachment<T>() : typename T::Ptr{};
+}
+
+/** @brief Finds the first attachment implementing T on @p obj's IObjectStorage. */
+template <class T>
+typename T::Ptr find_attachment(IInterface* obj)
+{
+    return find_attachment<T>(interface_cast<IObjectStorage>(obj));
+}
+
+/** @brief Finds the first attachment implementing T on the object behind @p obj. */
+template <class T>
+typename T::Ptr find_attachment(const IInterface::Ptr& obj)
+{
+    return find_attachment<T>(obj.get());
+}
+
+/** @brief True iff @p storage carries at least one T-implementing attachment. */
+template <class T>
+bool has_attachment(IObjectStorage* storage)
+{
+    return storage && storage->template find_attachment<T>() != nullptr;
+}
+
+/** @brief True iff @p obj's IObjectStorage carries at least one T-implementing attachment. */
+template <class T>
+bool has_attachment(IInterface* obj)
+{
+    return has_attachment<T>(interface_cast<IObjectStorage>(obj));
+}
+
+/** @brief True iff the object behind @p obj carries at least one T-implementing attachment. */
+template <class T>
+bool has_attachment(const IInterface::Ptr& obj)
+{
+    return has_attachment<T>(obj.get());
+}
+
 } // namespace velk
 
 #endif // VELK_INTF_OBJECT_STORAGE_H
