@@ -50,6 +50,8 @@ add_library(velk SHARED
     src/resource/file_protocol.h
     src/resource/file_resource.cpp
     src/resource/file_resource.h
+    src/resource/memory_protocol.cpp
+    src/resource/memory_protocol.h
     src/library_handle.h
     src/platform.h
     src/velk.cpp

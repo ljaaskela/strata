@@ -413,6 +413,50 @@ struct quat
         return {axis.x * s, axis.y * s, axis.z * s, std::cos(h)};
     }
 
+    /// @brief Builds a quaternion from XYZ Euler angles (radians), applied
+    ///        as Rx * Ry * Rz (intrinsic X-then-Y-then-Z), matching the
+    ///        convention historically used by ITrs's Euler helpers.
+    static quat from_euler(const vec3& radians)
+    {
+        float hx = radians.x * 0.5f;
+        float hy = radians.y * 0.5f;
+        float hz = radians.z * 0.5f;
+        float cx = std::cos(hx), sx = std::sin(hx);
+        float cy = std::cos(hy), sy = std::sin(hy);
+        float cz = std::cos(hz), sz = std::sin(hz);
+        // q = qz * qy * qx so that v' = q*v*~q applies X, then Y, then Z.
+        return {
+            sx*cy*cz + cx*sy*sz,
+            cx*sy*cz - sx*cy*sz,
+            cx*cy*sz + sx*sy*cz,
+            cx*cy*cz - sx*sy*sz
+        };
+    }
+
+    /// @brief Extracts XYZ Euler angles (radians) matching `from_euler`'s
+    ///        convention. Not a perfect inverse near gimbal lock, but
+    ///        stable for well-behaved rotations.
+    vec3 to_euler() const
+    {
+        // Derived from the rotation matrix produced by from_euler.
+        const float sinp = 2.f * (w*y - z*x);
+        float rx, ry, rz;
+        if (sinp >= 1.f - 1e-6f) {           // +90° Y (gimbal lock)
+            ry = 1.57079632679f;
+            rx = std::atan2(-2.f * (x*z - w*y), 1.f - 2.f * (x*x + y*y));
+            rz = 0.f;
+        } else if (sinp <= -1.f + 1e-6f) {   // -90° Y
+            ry = -1.57079632679f;
+            rx = std::atan2(2.f * (x*z - w*y), 1.f - 2.f * (x*x + y*y));
+            rz = 0.f;
+        } else {
+            ry = std::asin(sinp);
+            rx = std::atan2(2.f * (w*x + y*z), 1.f - 2.f * (x*x + y*y));
+            rz = std::atan2(2.f * (w*z + x*y), 1.f - 2.f * (y*y + z*z));
+        }
+        return {rx, ry, rz};
+    }
+
     constexpr quat operator*(const quat& r) const
     {
         return {

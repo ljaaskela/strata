@@ -295,7 +295,17 @@ IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Res
     if (mode == Resolve::Create && matchClass) {
         auto created = instance().create<IInterface>(query.classUid);
         if (created) {
-            add_attachment(created);
+            // Route through the owner's IObjectStorage so any
+            // add_attachment override on the owning object (e.g. to
+            // index attachments into a side structure) participates.
+            // Without this, calling our own add_attachment here would
+            // bypass virtual dispatch on the outer object.
+            auto* owner_storage = owner_ ? interface_cast<IObjectStorage>(owner_) : nullptr;
+            if (owner_storage && owner_storage != this) {
+                owner_storage->add_attachment(created);
+            } else {
+                add_attachment(created);
+            }
         }
         return created;
     }
