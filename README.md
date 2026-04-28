@@ -19,6 +19,8 @@ Velk includes dense, cache-friendly object storage via hives, promise/future pai
 
 Velk is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces. 
 
+Velk is the foundation for [velk-platform](https://github.com/ljaaskela/velk-platform), a GPU-accelerated 3D/UI framework.
+
 ```cpp
 // Define an interface
 class IWidget : public Interface<IWidget> {
