@@ -1,6 +1,6 @@
 ---
 name: velk
-description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin_from_path, importer plugin, IStoreImporter, IImporterExtension, IImportData, IImportResolver, JSON import, animations"
+description: "Velk C++ component object model: VELK_INTERFACE macro, Object<T> CRTP, properties, variant properties, events, functions, bindings, interface_cast, type registration, create objects, IMetadata, StateReader, StateWriter, plugins, ext::Plugin<T>, VELK_PLUGIN, IPluginRegistry, load_plugin, load_plugin_from_path, importer plugin, IStoreImporter, IImporterExtension, IImportData, IImportResolver, JSON import, animations"
 ---
 
 # Velk Usage Guide
@@ -85,9 +85,10 @@ Override `pre_update(const IPlugin::PreUpdateInfo&)` and/or `post_update(const I
 
 ```cpp
 auto& reg = instance().plugin_registry();
-reg.load_plugin_from_path("my_plugin.dll");   // by path
-reg.load_plugin(pluginUid);                   // by registered UID
-reg.load_plugin(pluginPtr);                   // by IPlugin::Ptr
+reg.load_plugin("plugin:my_plugin");          // by URI (primary; resolves to <exe_dir>/plugins/my_plugin.dll)
+reg.load_plugin_from_path("my_plugin.dll");   // by path (escape hatch for custom locations)
+reg.load_plugin_from_uid(pluginUid);          // by registered UID (type must already be known)
+reg.load_plugin(pluginPtr);                   // by IPlugin::Ptr (already-instantiated)
 
 auto p = reg.find_plugin(pluginUid);         // IPlugin::Ptr, null if not loaded
 auto p = reg.get_or_load_plugin(pluginUid);  // IPlugin::Ptr, lazy load

@@ -234,13 +234,28 @@ public:
 VELK_PLUGIN(MyPlugin)
 ```
 
-The host loads it at runtime:
+The host loads it at runtime via the `plugin:` URI scheme:
 
 ```cpp
-auto rv = velk::instance().plugin_registry().load_plugin_from_path("my_plugin.dll");
+auto rv = velk::instance().plugin_registry().load_plugin("plugin:my_plugin");
 ```
 
-`load_plugin_from_path` performs the following steps:
+The resolver maps `plugin:NAME` to a concrete shared library path on the host platform:
+
+| Platform | Resolved path |
+|---|---|
+| Windows | `<exe_dir>/plugins/<NAME>.dll` |
+| Linux / Android | `<exe_dir>/plugins/lib<NAME>.so` |
+
+The convention is one `plugins/` subdirectory next to the executable holding all loadable plugins. Use the same URI on every platform; the per-OS path mapping happens inside the registry.
+
+For loading a plugin from an arbitrary path (e.g. for tests, custom deployment, or one-off integrations), use the lower-level overload:
+
+```cpp
+auto rv = velk::instance().plugin_registry().load_plugin_from_path("D:/custom/path/my_plugin.dll");
+```
+
+Both entry points perform the same steps once they have a path:
 
 1. Opens the shared library (`LoadLibraryA` / `dlopen`)
 2. Resolves the `velk_plugin_info` symbol

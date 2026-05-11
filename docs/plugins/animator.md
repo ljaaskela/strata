@@ -33,7 +33,7 @@ The plugin is loaded automatically when you first call any animation API functio
 #include <velk/plugins/animator/api/animator.h>
 
 // Load
-instance().plugin_registry().load_plugin(PluginId::AnimatorPlugin);
+instance().plugin_registry().load_plugin("plugin:velk_animator");
 
 // Unload (calls shutdown, sweeps registered types and interpolators)
 instance().plugin_registry().unload_plugin(PluginId::AnimatorPlugin);
