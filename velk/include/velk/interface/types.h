@@ -62,6 +62,9 @@ inline constexpr Uid Store{"b4dde845-c159-4737-90ed-f63d4bce6c42"};
 /** @brief Local filesystem protocol handler. Supports configurable scheme and base path.
  *  @see velk::IResourceProtocol (interface/resource/intf_resource_protocol.h) */
 inline constexpr Uid FileProtocol{"0f781b05-29d9-47f5-82c0-ac3cac32319c"};
+/** @brief In-memory protocol handler. Serves registered byte buffers under `memory://`.
+ *  @see velk::IMemoryProtocol (interface/resource/intf_resource_protocol.h) */
+inline constexpr Uid MemoryProtocol{"98a7c593-747f-4340-b105-a8285bb22786"};
 /** @brief Bare object with metadata support for holding dynamic properties.
  *  @see velk::create_object (api/object.h) */
 inline constexpr Uid Object{"a51b001b-d5ad-4e03-9bb4-9b14c500e591"};

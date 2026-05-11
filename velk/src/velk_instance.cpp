@@ -3,6 +3,7 @@
 #include "hive/raw_hive.h"
 #include "object_storage.h"
 #include "resource/file_protocol.h"
+#include "resource/memory_protocol.h"
 
 #include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
@@ -50,6 +51,7 @@ VelkInstance::VelkInstance()
       plugin_registry_(*this, type_registry_)
 {
     type_registry_.register_type(FileProtocol::get_factory());
+    type_registry_.register_type(MemoryProtocol::get_factory());
 
     // Register file:// protocol (absolute paths).
     auto file_proto = ext::make_object<FileProtocol>();
@@ -64,6 +66,12 @@ VelkInstance::VelkInstance()
             resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(app_proto));
         }
     }
+
+    // Register memory:// protocol. Plugins that receive embedded bytes
+    // (e.g. images inside a .glb) register them here and feed the URIs
+    // through the existing decoder pipeline.
+    auto memory_proto = ext::make_object<MemoryProtocol>();
+    resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(memory_proto));
 }
 
 VelkInstance::~VelkInstance()

@@ -50,6 +50,34 @@ public:
     virtual ReturnValue set_base_path(string_view base_path) = 0;
 };
 
+/**
+ * @brief In-memory protocol for serving registered byte buffers as
+ *        resources.
+ *
+ * Callers register bytes under a path (`add_file`); `resolve` on the
+ * same path then returns an IFile reading those bytes. The protocol
+ * takes ownership of the bytes via a held vector; the registration
+ * lasts until `remove_file` is called or the protocol is destroyed.
+ *
+ * Typical use: a plugin that receives embedded resources (e.g. images
+ * packed inside a .glb) registers them under synthetic
+ * `memory://...` paths and feeds the resulting URIs through the
+ * existing decoder pipeline (`image:memory://...`).
+ *
+ * Chain: IInterface -> IResourceProtocol -> IMemoryProtocol
+ */
+class IMemoryProtocol : public Interface<IMemoryProtocol, IResourceProtocol>
+{
+public:
+    /// Registers @p bytes under @p path. Copies the bytes. Returns
+    /// Success on insertion, NothingToDo if @p path already exists.
+    virtual ReturnValue add_file(string_view path, const uint8_t* bytes, size_t size) = 0;
+
+    /// Removes a previously-registered entry. Returns NothingToDo if
+    /// the path was not present.
+    virtual ReturnValue remove_file(string_view path) = 0;
+};
+
 } // namespace velk
 
 #endif // VELK_INTF_RESOURCE_PROTOCOL_H

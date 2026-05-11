@@ -327,6 +327,12 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
                    static_cast<float>(arr[2].as_number()),
                    static_cast<float>(arr[3].as_number())};
             pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<quat>() && arr.size() == 4) {
+            quat v{static_cast<float>(arr[0].as_number()),
+                   static_cast<float>(arr[1].as_number()),
+                   static_cast<float>(arr[2].as_number()),
+                   static_cast<float>(arr[3].as_number())};
+            pi.set_data(&v, sizeof(v), typeUid);
         } else if (typeUid == type_uid<size>() && arr.size() >= 2) {
             size v{static_cast<float>(arr[0].as_number()),
                    static_cast<float>(arr[1].as_number()),
@@ -369,6 +375,23 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
         } else if (typeUid == type_uid<vec4>()) {
             vec4 v{f("x"), f("y"), f("z"), f("w")};
             pi.set_data(&v, sizeof(v), typeUid);
+        } else if (typeUid == type_uid<quat>()) {
+            // Accept an object as either a raw quaternion {x,y,z,w} or an
+            // Euler-degree triple {x,y,z} (no `w`), matching the legacy
+            // ITrs authoring convention.
+            auto* w_node = val.find(string_view{"w"});
+            if (w_node) {
+                quat v{f("x"), f("y"), f("z"), f("w")};
+                pi.set_data(&v, sizeof(v), typeUid);
+            } else {
+                constexpr float kDegToRad = 0.0174532925199433f;
+                quat v = quat::from_euler({
+                    f("x") * kDegToRad,
+                    f("y") * kDegToRad,
+                    f("z") * kDegToRad,
+                });
+                pi.set_data(&v, sizeof(v), typeUid);
+            }
         } else if (typeUid == type_uid<size>()) {
             size v{f("width"), f("height"), f("depth")};
             pi.set_data(&v, sizeof(v), typeUid);

@@ -312,6 +312,30 @@ public:
         size_ = 0;
     }
 
+    /**
+     * @brief Replaces the contents with the range [first, last).
+     *
+     * Iterators must not reference this vector's storage.
+     */
+    template <class It>
+    void assign(It first, It last)
+    {
+        clear();
+        for (; first != last; ++first) {
+            push_back(*first);
+        }
+    }
+
+    /** @brief Replaces the contents with @p count copies of @p value. */
+    void assign(size_t count, const T& value)
+    {
+        clear();
+        ensure_capacity(count);
+        for (size_t i = 0; i < count; ++i) {
+            push_back(value);
+        }
+    }
+
     /** @brief Appends a copy of @p value. Safe when @p value references this vector. */
     void push_back(const T& value)
     {
