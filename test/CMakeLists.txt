@@ -63,5 +63,17 @@ target_compile_definitions(tests PRIVATE
     TEST_JS_DLL_PATH="$<TARGET_FILE:velk_js>"
 )
 
+# Stage test_plugin_dll under <tests_exe_dir>/plugins/ so the
+# `plugin:<name>` URI resolver in load_plugin_from_uri can find it via the
+# conventional layout that ships with the runtime.
+add_custom_command(TARGET tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:tests>/plugins
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:test_plugin_dll>
+        $<TARGET_FILE_DIR:tests>/plugins/$<TARGET_FILE_NAME:test_plugin_dll>
+    COMMENT "Staging test_plugin_dll under tests/plugins/ for URI load tests"
+    VERBATIM
+)
+
 include(GoogleTest)
 gtest_discover_tests(tests)

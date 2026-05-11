@@ -29,9 +29,10 @@ public:
     PluginRegistry(IVelk& velk, TypeRegistry& types);
 
     // IPluginRegistry overrides
+    ReturnValue load_plugin(string_view uri) override;
     ReturnValue load_plugin(const IPlugin::Ptr& plugin) override;
-    ReturnValue load_plugin(Uid pluginUid) override;
-    ReturnValue load_plugin_from_path(const char* path) override;
+    ReturnValue load_plugin_from_uid(Uid pluginUid) override;
+    ReturnValue load_plugin_from_path(string_view path) override;
     ReturnValue unload_plugin(Uid pluginId) override;
     IPlugin::Ptr find_plugin(Uid pluginId) const override;
     size_t plugin_count() const override;

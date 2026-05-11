@@ -9,7 +9,72 @@
 #include <mutex>
 #include <shared_mutex>
 
+#ifdef _WIN32
+#  include <windows.h>
+#else
+#  include <unistd.h>
+#  include <limits.h>
+#endif
+
 namespace velk {
+
+namespace {
+
+/// Returns the directory the running executable was loaded from, with a
+/// trailing path separator. Cached after the first call.
+const string& executable_directory()
+{
+    static const string dir = []() -> string {
+#ifdef _WIN32
+        char buf[MAX_PATH];
+        DWORD n = GetModuleFileNameA(nullptr, buf, MAX_PATH);
+        if (n == 0 || n == MAX_PATH) return string{};
+        string_view sv{buf, static_cast<size_t>(n)};
+        size_t fwd = sv.rfind('/');
+        size_t bwd = sv.rfind('\\');
+        size_t slash_pos = (fwd == string_view::npos) ? bwd
+                          : (bwd == string_view::npos) ? fwd
+                          : (fwd > bwd ? fwd : bwd);
+        if (slash_pos == string_view::npos) return string{};
+        return string{sv.substr(0, slash_pos + 1)};
+#else
+        char buf[PATH_MAX];
+        ssize_t n = readlink("/proc/self/exe", buf, PATH_MAX);
+        if (n <= 0) return string{};
+        string_view sv{buf, static_cast<size_t>(n)};
+        size_t slash_pos = sv.rfind('/');
+        if (slash_pos == string_view::npos) return string{};
+        return string{sv.substr(0, slash_pos + 1)};
+#endif
+    }();
+    return dir;
+}
+
+/// Maps a `plugin:NAME` URI to a concrete library path on disk.
+/// Returns empty string if the URI is not in the expected form.
+string resolve_plugin_uri(string_view uri)
+{
+    constexpr string_view kPrefix = "plugin:";
+    if (uri.size() <= kPrefix.size() || uri.substr(0, kPrefix.size()) != kPrefix) {
+        return {};
+    }
+    string_view name = uri.substr(kPrefix.size());
+    if (name.empty()) return {};
+
+    string path = executable_directory();
+    path += "plugins/";
+#ifdef _WIN32
+    path += name;
+    path += ".dll";
+#else
+    path += "lib";
+    path += name;
+    path += ".so";
+#endif
+    return path;
+}
+
+} // namespace
 
 static int64_t now_us()
 {
@@ -119,7 +184,7 @@ ReturnValue PluginRegistry::load_plugin(const IPlugin::Ptr& plugin)
     return ReturnValue::Success;
 }
 
-ReturnValue PluginRegistry::load_plugin(Uid pluginUid)
+ReturnValue PluginRegistry::load_plugin_from_uid(Uid pluginUid)
 {
     auto plugin = interface_pointer_cast<IPlugin>(types_.create(pluginUid));
     if (!plugin) {
@@ -135,15 +200,19 @@ ReturnValue PluginRegistry::load_plugin(Uid pluginUid)
     return load_plugin(plugin);
 }
 
-ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
+ReturnValue PluginRegistry::load_plugin_from_path(string_view path)
 {
-    if (!path || !*path) {
+    if (path.empty()) {
         return ReturnValue::InvalidArgument;
     }
 
-    auto lib = LibraryHandle::open(path);
+    // LoadLibrary/dlopen need a null-terminated C string.
+    string path_storage(path);
+    const char* path_cstr = path_storage.c_str();
+
+    auto lib = LibraryHandle::open(path_cstr);
     if (!lib) {
-        detail::velk_log(log_, LogLevel::Error, __FILE__, __LINE__, "Failed to load library: %s", path);
+        detail::velk_log(log_, LogLevel::Error, __FILE__, __LINE__, "Failed to load library: %s", path_cstr);
         return ReturnValue::Fail;
     }
 
@@ -154,7 +223,7 @@ ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
                          __FILE__,
                          __LINE__,
                          "Library missing velk_plugin_info entry point: %s",
-                         path);
+                         path_cstr);
         lib.close();
         return ReturnValue::Fail;
     }
@@ -197,6 +266,22 @@ ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
         lib.close();
     }
     return rv;
+}
+
+ReturnValue PluginRegistry::load_plugin(string_view uri)
+{
+    string path = resolve_plugin_uri(uri);
+    if (path.empty()) {
+        detail::velk_log(log_,
+                         LogLevel::Error,
+                         __FILE__,
+                         __LINE__,
+                         "load_plugin: unsupported URI '%.*s' (expected 'plugin:NAME')",
+                         static_cast<int>(uri.size()),
+                         uri.data());
+        return ReturnValue::InvalidArgument;
+    }
+    return load_plugin_from_path(path);
 }
 
 ReturnValue PluginRegistry::unload_plugin(Uid pluginId)

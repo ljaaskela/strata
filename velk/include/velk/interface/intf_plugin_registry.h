@@ -2,6 +2,7 @@
 #define VELK_INTF_PLUGIN_REGISTRY_H
 
 #include <velk/interface/intf_plugin.h>
+#include <velk/string_view.h>
 
 namespace velk {
 
@@ -15,12 +16,21 @@ namespace velk {
 class IPluginRegistry : public Interface<IPluginRegistry>
 {
 public:
-    /** @brief Loads a plugin, calling its initialize() method. */
+    /**
+     * @brief Loads a plugin by URI. Primary entry point for plugin loading.
+     *
+     * Currently supports the `plugin:` scheme: `plugin:NAME` resolves to
+     * `<exe_dir>/plugins/<NAME>.dll` on Windows or `<exe_dir>/plugins/lib<NAME>.so`
+     * on other platforms, then loads the resulting shared library. Lets callers
+     * use the same URI on every platform without per-OS path handling.
+     */
+    virtual ReturnValue load_plugin(string_view uri) = 0;
+    /** @brief Loads an already-instantiated plugin object, calling its initialize() method. */
     virtual ReturnValue load_plugin(const IPlugin::Ptr& plugin) = 0;
     /** @brief Creates and loads a plugin by its registered class UID. */
-    virtual ReturnValue load_plugin(Uid pluginUid) = 0;
+    virtual ReturnValue load_plugin_from_uid(Uid pluginUid) = 0;
     /** @brief Loads a plugin from a shared library (.dll/.so) at the given path. */
-    virtual ReturnValue load_plugin_from_path(const char* path) = 0;
+    virtual ReturnValue load_plugin_from_path(string_view path) = 0;
     /** @brief Unloads a plugin by ID, calling shutdown() and sweeping owned types. */
     virtual ReturnValue unload_plugin(Uid pluginId) = 0;
     /** @brief Finds a loaded plugin by its ID, or nullptr if not loaded. */
@@ -50,7 +60,7 @@ public:
     {
         auto plugin = find_plugin(pluginId);
         if (!plugin) {
-            load_plugin(pluginId);
+            load_plugin_from_uid(pluginId);
             plugin = find_plugin(pluginId);
         }
         return plugin;
