@@ -31,14 +31,16 @@ static constexpr bool starts_with(string_view str, string_view prefix)
 
 static constexpr uint32_t color_for_label(string_view label)
 {
-    // Tracy colors are 0xRRGGBB
-    if (starts_with(label, "renderer.")) return 0xE07040;  // orange
-    if (starts_with(label, "vk."))       return 0xD04040;  // red
-    if (starts_with(label, "scene."))    return 0x40A0E0;  // blue
-    if (starts_with(label, "layout."))   return 0x40C080;  // green
-    if (starts_with(label, "text."))     return 0xC080E0;  // purple
-    if (starts_with(label, "image."))    return 0xE0C040;  // yellow
-    if (starts_with(label, "app."))      return 0x80C0C0;  // teal
+    // Tracy colors are 0xRRGGBB. Tracy renders zones on a pale
+    // background, so saturated mid-darks (~30 to 50% lightness)
+    // read clearly. Distinct hues per category.
+    if (starts_with(label, "renderer.")) return 0xC03020;  // dark orange-red
+    if (starts_with(label, "vk."))       return 0x800020;  // burgundy
+    if (starts_with(label, "scene."))    return 0x1F4E79;  // dark blue
+    if (starts_with(label, "layout."))   return 0x2E7D32;  // forest green
+    if (starts_with(label, "text."))     return 0x6A1B9A;  // dark purple
+    if (starts_with(label, "image."))    return 0xB7791F;  // dark amber
+    if (starts_with(label, "app."))      return 0x00838F;  // dark teal
     return 0;
 }
 

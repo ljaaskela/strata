@@ -323,11 +323,20 @@ TEST_F(PluginTest, LoadFromPathNonExistentFails)
     EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
-TEST_F(PluginTest, LoadFromPathNullFails)
+TEST_F(PluginTest, LoadFromPathEmptyFails)
 {
     auto& reg = velk_.plugin_registry();
-    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin_from_path(nullptr));
     EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin_from_path(""));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin_from_path(string_view{}));
+}
+
+TEST_F(PluginTest, LoadFromUriRejectsMalformedUris)
+{
+    auto& reg = velk_.plugin_registry();
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin(""));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin("plugin:"));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin("file://foo.dll"));
+    EXPECT_EQ(ReturnValue::InvalidArgument, reg.load_plugin("just_a_name"));
 }
 
 TEST_F(PluginTest, LoadFromPathInvalidDllFails)
@@ -551,6 +560,15 @@ TEST_F(PluginTest, LoadFromPathThenUnload)
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
     EXPECT_EQ(builtin_count_, reg.plugin_count());
     EXPECT_FALSE(reg.find_plugin(DllTestPluginUid));
+}
+
+TEST_F(PluginTest, LoadFromUriSuccess)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin("plugin:test_plugin_dll"));
+    auto plugin = reg.find_plugin(DllTestPluginUid);
+    ASSERT_TRUE(plugin);
+    EXPECT_EQ(string_view("DllTestPlugin"), plugin->get_plugin_info().name);
 }
 
 TEST_F(PluginTest, LoadFromPathMultiPlugin)
