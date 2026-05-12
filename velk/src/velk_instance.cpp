@@ -8,14 +8,6 @@
 #include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define velk_getcwd _getcwd
-#else
-#include <unistd.h>
-#define velk_getcwd getcwd
-#endif
-
 namespace velk {
 
 static IRawHive::Ptr create_metadata_hive()
@@ -25,25 +17,6 @@ static IRawHive::Ptr create_metadata_hive()
     hive->init(type_uid<ObjectStorage>(), sizeof(ObjectStorage), alignof(ObjectStorage));
     return interface_pointer_cast<IRawHive>(obj);
 }
-
-namespace detail {
-string get_working_directory()
-{
-    string base;
-    char cwd[4096];
-    if (velk_getcwd(cwd, sizeof(cwd))) {
-        // Ensure trailing separator.
-        base.append(cwd);
-        if (!base.empty()) {
-            char last = base.back();
-            if (last != '/' && last != '\\') {
-                base.append("/");
-            }
-        }
-    }
-    return base;
-}
-} // namespace detail
 
 VelkInstance::VelkInstance()
     : metadata_hive_(create_metadata_hive()),
@@ -57,21 +30,14 @@ VelkInstance::VelkInstance()
     auto file_proto = ext::make_object<FileProtocol>();
     resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(file_proto));
 
-    // Register app:// protocol (relative to working directory).
-    if (auto working = detail::get_working_directory(); !working.empty()) {
-        auto app_proto = ext::make_object<FileProtocol>();
-        if (auto* app_internal = interface_cast<IResourceProtocolInternal>(app_proto)) {
-            app_internal->set_scheme("app");
-            app_internal->set_base_path(working);
-            resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(app_proto));
-        }
-    }
-
     // Register memory:// protocol. Plugins that receive embedded bytes
     // (e.g. images inside a .glb) register them here and feed the URIs
     // through the existing decoder pipeline.
     auto memory_proto = ext::make_object<MemoryProtocol>();
     resource_store_.register_protocol(interface_pointer_cast<IResourceProtocol>(memory_proto));
+
+    // app:// is platform-specific (cwd on desktop, AAssetManager on Android,
+    // etc.) and is registered by the active runtime plugin.
 }
 
 VelkInstance::~VelkInstance()
