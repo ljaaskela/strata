@@ -61,6 +61,14 @@ string resolve_plugin_uri(string_view uri)
     string_view name = uri.substr(kPrefix.size());
     if (name.empty()) return {};
 
+#if defined(__ANDROID__)
+    // APKs flatten all .so files into lib/<abi>/, which is in the linker
+    // search path. Pass just the base name and let dlopen resolve.
+    string path = "lib";
+    path += name;
+    path += ".so";
+    return path;
+#else
     string path = executable_directory();
     path += "plugins/";
 #ifdef _WIN32
@@ -72,6 +80,7 @@ string resolve_plugin_uri(string_view uri)
     path += ".so";
 #endif
     return path;
+#endif
 }
 
 } // namespace
