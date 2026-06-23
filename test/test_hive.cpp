@@ -3,6 +3,7 @@
 #include <velk/ext/object.h>
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
+#include <velk/memory.h>
 
 #include <gtest/gtest.h>
 #include <string>
@@ -235,6 +236,34 @@ TEST_F(HiveTest, SlotReuse)
     auto obj4 = hive->add();
     EXPECT_EQ(before + 3, hive->size());
     EXPECT_TRUE(hive->contains(*obj4));
+}
+
+TEST_F(HiveTest, WeakPtrDoesNotResurrectReusedSlot)
+{
+    // A weak_ptr to a destroyed object must never resurrect a different
+    // object that later occupies the freed slot. The slot must stay
+    // reserved until the last weak_ptr drops, so lock() returns null.
+    auto hive = fresh_hive();
+
+    auto obj1 = hive->add();
+    void* addr1 = obj1.get();
+    weak_ptr<IObject> wp(obj1);
+
+    // Kill obj1: drop the hive's strong ref, then the local one.
+    hive->remove(*obj1);
+    obj1.reset();
+
+    // The object is gone; the weak_ptr must report it.
+    EXPECT_TRUE(wp.expired());
+    EXPECT_FALSE(wp.lock());
+
+    // Allocate a new object. The freed slot must not be reused while a
+    // weak_ptr still observes it, and the weak_ptr must never resurrect
+    // whatever object lands there.
+    auto obj2 = hive->add();
+    EXPECT_NE(addr1, obj2.get());
+    EXPECT_TRUE(wp.expired());
+    EXPECT_FALSE(wp.lock());
 }
 
 TEST_F(HiveTest, ForEachVisitsAllLiveObjects)
