@@ -19,7 +19,8 @@ enum class SlotState : uint8_t
 {
     Active = 0,
     Zombie = 1,
-    Free = 2
+    Free = 2,
+    WeakPending = 3 ///< Object destroyed; slot reserved until outstanding weak_ptrs drop.
 };
 
 struct HiveControlBlock;

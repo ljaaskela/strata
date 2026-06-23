@@ -21,6 +21,8 @@ struct HiveControlBlock
     HivePage* page;
 };
 
+static void hive_weak_reclaim(external_control_block* ecb);
+
 /**
  * @brief Shared destroy logic for hive-managed objects.
  *
@@ -59,27 +61,28 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
         // Lock the owning hive's mutex to protect page state (freelist, bitmask, counts).
         std::lock_guard<std::shared_mutex> lock(*page->hive_mutex);
 
-        // Normal mode: block stays embedded in the page. If outstanding
-        // weak_ptrs exist, set the destroy callback to hive_weak_release
-        // so the page can track when they all drop.
-        if (!last_weak) {
-            // Outstanding weak_ptrs. Set destroy to the weak release callback
-            // so dealloc_control_block (called when last weak_ptr drops) will
-            // notify the page. The external+embedded tags are already set.
-            // No weak_hcb_count tracking needed in normal mode because the
-            // page is still owned by the Hive.
-            hcb->ecb.destroy = nullptr;
-        }
-        // else: no outstanding weak_ptrs, block is fully dead. It sits inert
-        // in the page allocation, ready for reuse.
-
-        // Clear active bit and transition slot to Free.
+        // Clear active bit: the object is gone either way.
         size_t word = slot_index / 64;
         size_t bit = slot_index % 64;
         clear_slot_active(page->active_bits, word, bit);
 
-        page->state[slot_index] = SlotState::Free;
-        push_free_slot(page->slots, slot_index, slot_sz, page->free_head);
+        if (!last_weak) {
+            // Outstanding weak_ptrs still reference this slot's embedded
+            // control block. The slot must NOT be reused yet: prepare_slot
+            // reinitialises the embedded block in place, so reusing it while a
+            // weak observer remains would let a stale weak_ptr's lock() resurrect
+            // the new occupant. Reserve the slot (WeakPending) and reclaim it via
+            // hive_weak_reclaim once the last weak_ptr drops. weak_hcb_count keeps
+            // the page alive past hive destruction so the block memory stays valid.
+            hcb->ecb.destroy = hive_weak_reclaim;
+            page->state[slot_index] = SlotState::WeakPending;
+            page->weak_hcb_count.fetch_add(1, std::memory_order_relaxed);
+        } else {
+            // No outstanding weak_ptrs: the block is fully dead and the slot is
+            // safe to reuse immediately.
+            page->state[slot_index] = SlotState::Free;
+            push_free_slot(page->slots, slot_index, slot_sz, page->free_head);
+        }
     } else {
         // Orphan mode: page was detached from the Hive.
         if (!last_weak) {
@@ -104,6 +107,46 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
         aligned_free_impl(page->allocation);
         delete page;
     }
+}
+
+/**
+ * @brief Reclaims a slot whose object was destroyed while weak_ptrs still
+ *        referenced its embedded control block.
+ *
+ * Installed as the block's destroy callback for a WeakPending slot, so the
+ * slot is returned to the freelist only once the last weak_ptr drops. This
+ * prevents a stale weak_ptr from resurrecting a different object placed in a
+ * reused slot: prepare_slot reinitialises the embedded block in place, so
+ * reusing the slot while a weak observer remains would make its lock()
+ * succeed against the new occupant.
+ */
+static void hive_weak_reclaim(external_control_block* ecb)
+{
+    auto* hcb = reinterpret_cast<HiveControlBlock*>(ecb);
+    HivePage* page = hcb->page;
+
+    if (page->orphaned) {
+        // Page detached from its hive: free it once the last weak_ptr drops
+        // and no live objects remain (mirrors the orphan destroy callback).
+        if (page->weak_hcb_count.fetch_sub(1, std::memory_order_acq_rel) == 1 &&
+            page->live_count == 0) {
+            aligned_free_impl(page->allocation);
+            delete page;
+        }
+        return;
+    }
+
+    // Normal: the hive still owns the page. Return the slot to the freelist
+    // now that no weak observers remain.
+    std::lock_guard<std::shared_mutex> lock(*page->hive_mutex);
+    size_t slot_sz = page->slot_size;
+    auto obj_addr = reinterpret_cast<uintptr_t>(ecb->get_ptr());
+    auto base_addr = reinterpret_cast<uintptr_t>(page->slots);
+    size_t slot_index = static_cast<size_t>(obj_addr - base_addr) / slot_sz;
+
+    page->state[slot_index] = SlotState::Free;
+    push_free_slot(page->slots, slot_index, slot_sz, page->free_head);
+    page->weak_hcb_count.fetch_sub(1, std::memory_order_acq_rel);
 }
 
 static void hive_destroy(external_control_block* ecb)
